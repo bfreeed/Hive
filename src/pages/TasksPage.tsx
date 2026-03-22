@@ -251,17 +251,15 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
           </button>
         </div>
 
-        {/* Filter row */}
-        <div className="flex items-center gap-2 mb-2 flex-wrap">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search..."
-              className="pl-8 pr-3 py-1.5 w-36 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white/80 placeholder-white/20 focus:outline-none focus:border-brand-500/50 focus:w-48 transition-all"
-            />
-          </div>
+        {/* Row 1: filters */}
+        <div className="flex items-center gap-2 mb-1.5 overflow-x-auto scrollbar-hide">
+          <SelectFilter value={filterFlag} onChange={setFilterFlag}>
+            <option value="all">All Flags</option>
+            <option value="72h">72h Priority</option>
+            <option value="questions">Questions for Lev</option>
+            <option value="checkin">Sarah's Update</option>
+            <option value="private">Private</option>
+          </SelectFilter>
           <SelectFilter value={filterProject} onChange={setFilterProject}>
             <option value="all">All Projects</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -286,18 +284,35 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
             <option value="all">All Assignees</option>
             {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
           </SelectFilter>
-          <SelectFilter value={filterFlag} onChange={setFilterFlag}>
-            <option value="all">All Flags</option>
-            <option value="72h">72h Priority</option>
-            <option value="questions">Questions for Lev</option>
-            <option value="checkin">Sarah's Update</option>
-            <option value="private">Private</option>
-          </SelectFilter>
+        </div>
 
-          {/* Group & Sort toggle */}
+        {/* Row 2: view switcher + search + sort */}
+        <div className="flex items-center gap-1 mb-2">
+          {[
+            { id: 'list', icon: <List size={14} />, label: 'List' },
+            { id: 'board', icon: <LayoutGrid size={14} />, label: 'Board' },
+            { id: 'mindmap', icon: <GitBranch size={14} />, label: 'Map' },
+          ].map((v) => (
+            <button
+              key={v.id}
+              onClick={() => setViewType(v.id as any)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${viewType === v.id ? 'bg-white/[0.08] text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'}`}
+            >
+              {v.icon}{v.label}
+            </button>
+          ))}
+          <div className="relative ml-auto">
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/30" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search..."
+              className="pl-7 pr-3 py-1.5 w-28 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/80 placeholder-white/20 focus:outline-none focus:border-brand-500/50 focus:w-40 transition-all"
+            />
+          </div>
           <button
             onClick={() => setShowSort(v => !v)}
-            className={`ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
               sortActive
                 ? 'bg-brand-600/20 border-brand-500/40 text-brand-300'
                 : 'bg-white/[0.04] border-white/[0.08] text-white/50 hover:text-white/70'
@@ -360,23 +375,6 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
             )}
           </div>
         )}
-
-        {/* View switcher */}
-        <div className="flex items-center gap-1 mb-3">
-          {[
-            { id: 'list', icon: <List size={14} />, label: 'List' },
-            { id: 'board', icon: <LayoutGrid size={14} />, label: 'Board' },
-            { id: 'mindmap', icon: <GitBranch size={14} />, label: 'Mind Map' },
-          ].map((v) => (
-            <button
-              key={v.id}
-              onClick={() => setViewType(v.id as any)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${viewType === v.id ? 'bg-white/[0.08] text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'}`}
-            >
-              {v.icon}{v.label}
-            </button>
-          ))}
-        </div>
 
         {/* New task input */}
         {showNewTask && (
