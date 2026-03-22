@@ -64,9 +64,11 @@ export function buildGroups(
   }
 
   if (groupBy === 'project') {
-    return projects
-      .map(p => ({ label: p.name, color: p.color, tasks: taskList.filter(t => (t.projectIds ?? []).includes(p.id)) }))
-      .filter(g => g.tasks.length > 0);
+    const grps = projects
+      .map(p => ({ label: p.name, color: p.color, tasks: taskList.filter(t => (t.projectIds ?? []).includes(p.id)) }));
+    const noProject = taskList.filter(t => !t.projectIds?.length || !t.projectIds.some(id => projects.find(p => p.id === id)));
+    if (noProject.length > 0) grps.push({ label: 'No Project', color: undefined, tasks: noProject });
+    return grps.filter(g => g.tasks.length > 0);
   }
 
   if (groupBy === 'assignee') {
