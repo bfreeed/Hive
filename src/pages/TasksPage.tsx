@@ -238,7 +238,7 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
 
   return (
     <div className="flex-1 overflow-y-auto scrollbar-hide">
-      <div className="max-w-4xl mx-auto px-8 py-8">
+      <div className="max-w-5xl mx-auto px-5 py-8">
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -252,7 +252,9 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
         </div>
 
         {/* Row 1: filters */}
-        <div className="flex items-center gap-2 mb-1.5 overflow-x-auto scrollbar-hide">
+        <div className="relative mb-1.5">
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pr-8">
+
           <SelectFilter value={filterFlag} onChange={setFilterFlag}>
             <option value="all">All Flags</option>
             <option value="72h">72h Priority</option>
@@ -285,6 +287,8 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
             {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
           </SelectFilter>
         </div>
+        <div className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-[#0d0d0f] to-transparent" />
+        </div>
 
         {/* Row 2: view switcher + search + sort */}
         <div className="flex items-center gap-1 mb-2">
@@ -307,7 +311,7 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search..."
-              className="pl-7 pr-3 py-1.5 w-28 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/80 placeholder-white/20 focus:outline-none focus:border-brand-500/50 focus:w-40 transition-all"
+              className="pl-7 pr-3 py-1.5 w-24 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/80 placeholder-white/20 focus:outline-none focus:border-brand-500/50"
             />
           </div>
           <button
