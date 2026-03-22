@@ -94,14 +94,18 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
   const [filterAssignee, setFilterAssignee] = useState('all');
   const [filterFlag, setFilterFlag] = useState('all');
 
-  // Group & Sort
+  // Group & Sort — persisted across navigation
   const [showSort, setShowSort] = useState(false);
-  const [groupBy, setGroupBy] = useState<BoardGroupBy>('none');
-  const [sortBy, setSortBy] = useState<BoardSortBy>('date');
-  const [sortOrder, setSortOrder] = useState<BoardSortOrder>('asc');
+  const [groupBy, setGroupByRaw] = useState<BoardGroupBy>(() => (localStorage.getItem('tasks-groupBy') as BoardGroupBy) ?? 'none');
+  const [sortBy, setSortByRaw] = useState<BoardSortBy>(() => (localStorage.getItem('tasks-sortBy') as BoardSortBy) ?? 'date');
+  const [sortOrder, setSortOrderRaw] = useState<BoardSortOrder>(() => (localStorage.getItem('tasks-sortOrder') as BoardSortOrder) ?? 'asc');
+  const setGroupBy = (v: BoardGroupBy) => { setGroupByRaw(v); localStorage.setItem('tasks-groupBy', v); };
+  const setSortBy = (v: BoardSortBy) => { setSortByRaw(v); localStorage.setItem('tasks-sortBy', v); };
+  const setSortOrder = (v: BoardSortOrder) => { setSortOrderRaw(v); localStorage.setItem('tasks-sortOrder', v); };
 
   // View
-  const [viewType, setViewType] = useState<'list' | 'board' | 'mindmap'>('list');
+  const [viewType, setViewTypeRaw] = useState<'list' | 'board' | 'mindmap'>(() => (localStorage.getItem('tasks-viewType') as any) ?? 'list');
+  const setViewType = (v: 'list' | 'board' | 'mindmap') => { setViewTypeRaw(v); localStorage.setItem('tasks-viewType', v); };
 
   // Keyboard navigation
   const [focusedIdx, setFocusedIdx] = useState<number | null>(null);
