@@ -348,7 +348,7 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
             <div className="w-px h-4 bg-white/10" />
             <div className="flex items-center gap-2">
               <span className="text-xs text-white/30 font-medium w-8">Sort</span>
-              <SelectFilter value={sortBy} onChange={v => { setSortBy(v as BoardSortBy); if (v !== 'manual' as any) setGroupBy('none'); }}>
+              <SelectFilter value={sortBy} onChange={v => { setSortBy(v as BoardSortBy); if (v === 'manual' as any) setGroupBy('none'); }}>
                 <option value="date">Date</option>
                 <option value="priority">Priority</option>
                 <option value="assignee">Assignee</option>
