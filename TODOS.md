@@ -1,6 +1,15 @@
 # Hive — Deferred Work
 
-## P2 — Recurring Tasks
+## P2 — Task Labels
+**What:** Wire the existing `label?: string` field. Add label input in TaskDetail, show as chip on task rows, add label filter to TasksPage.
+**Why:** Fast visual categorization without creating new projects.
+**Effort:** S (human: ~45 min / CC: ~5 min)
+**Priority:** P2
+**Depends on:** Nothing.
+
+---
+
+## P2 — Recurring Tasks (PROMOTED — building now)
 **What:** Recurrence picker (daily/weekly/monthly/custom) in TaskDetail. When a recurring task is marked done, auto-create the next instance with the updated due date.
 **Why:** Solves repetitive manual task re-entry for regular activities (weekly check-ins, monthly reviews, etc.)
 **Pros:** Eliminates re-entry friction; keeps recurring commitments visible.
@@ -12,15 +21,16 @@
 
 ---
 
-## P3 — Task Labels
-**What:** Wire the existing `label?: string` field on Task. Add a label input in TaskDetail, show as a small chip on task rows in TasksPage and Home, add label filter to TasksPage.
-**Why:** Lets you quickly categorize tasks by type (phone call, email, research, waiting on...) without creating new projects.
-**Pros:** Fast visual scanning; filterable; uses existing type field.
-**Cons:** Another field in an already-busy TaskDetail layout.
-**Context:** `Task.label` exists in `types/index.ts` but is never read or written anywhere in the UI.
-**Effort:** S (human: ~45 min / CC+gstack: ~5 min)
+## P3 — Remove Twilio Dead Dependency
+**What:** `twilio` is installed in package.json but never used. Actual notifications use Pushover via `/api/send-notification`.
+**Why:** Reduces node_modules size (~8MB).
+**Effort:** XS (npm uninstall twilio + commit)
 **Priority:** P3
 **Depends on:** Nothing.
+
+---
+
+## P3 — Calendar View in TasksPage
 
 ---
 

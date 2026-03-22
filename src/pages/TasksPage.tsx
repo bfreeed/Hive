@@ -1,15 +1,40 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store';
-import { Plus, Search, ArrowUpDown, List, LayoutGrid, GitBranch } from 'lucide-react';
+import { Plus, Search, ArrowUpDown, List, LayoutGrid, GitBranch, GripVertical } from 'lucide-react';
 import type { Task, Priority } from '../types';
 import TaskRow from '../components/TaskRow';
 import BoardView from '../components/BoardView';
 import { buildGroups, sortTasks } from '../utils/buildGroups';
 import type { BoardGroupBy, BoardSortBy, BoardSortOrder } from '../utils/buildGroups';
+import {
+  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy, arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 const PRIORITY_DOT: Record<Priority, string> = {
   urgent: 'bg-red-400', high: 'bg-orange-400', medium: 'bg-yellow-400', low: 'bg-white/20',
 };
+
+function SortableTaskRow({ task, onOpenTask, showProject, focused, focusRef }: {
+  task: Task; onOpenTask: (id: string) => void; showProject: boolean; focused: boolean; focusRef?: React.Ref<HTMLDivElement>;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center group/drag">
+      <div {...attributes} {...listeners} className="px-1 py-2.5 cursor-grab active:cursor-grabbing text-white/15 hover:text-white/40 transition-colors flex-shrink-0">
+        <GripVertical size={14} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <TaskRow task={task} onOpenTask={onOpenTask} showProject={showProject} focused={focused} ref={focusRef} />
+      </div>
+    </div>
+  );
+}
 
 function MindMapView({ tasks, onOpenTask }: { tasks: Task[]; onOpenTask: (id: string) => void }) {
   const { projects } = useStore();
@@ -55,7 +80,11 @@ function MindMapView({ tasks, onOpenTask }: { tasks: Task[]; onOpenTask: (id: st
 }
 
 export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => void }) {
-  const { tasks, projects, users, addTask } = useStore();
+  const { tasks, projects, users, addTask, manualOrder, setManualOrder } = useStore();
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   // Filters
   const [search, setSearch] = useState('');
@@ -111,8 +140,19 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
   const filteredAllStatuses = tasks.filter(baseFilter);
 
   // --- Sort ---
-  const sorted = sortTasks(filtered, sortBy, sortOrder, projects, users);
-  const sortedAllStatuses = sortTasks(filteredAllStatuses, sortBy, sortOrder, projects, users);
+  const isManual = sortBy === 'manual' as any;
+  const baseSorted = sortTasks(filtered, isManual ? 'date' : sortBy, sortOrder, projects, users);
+  const sorted = isManual
+    ? [...baseSorted].sort((a, b) => {
+        const ai = manualOrder.indexOf(a.id);
+        const bi = manualOrder.indexOf(b.id);
+        if (ai === -1 && bi === -1) return 0;
+        if (ai === -1) return 1;
+        if (bi === -1) return -1;
+        return ai - bi;
+      })
+    : baseSorted;
+  const sortedAllStatuses = sortTasks(filteredAllStatuses, isManual ? 'date' : sortBy, sortOrder, projects, users);
 
   // --- Group ---
   // List groups: respect status filter, use selected groupBy
@@ -173,6 +213,15 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
     });
     setNewTaskTitle('');
     setShowNewTask(false);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const ids = sorted.map(t => t.id);
+    const oldIdx = ids.indexOf(active.id as string);
+    const newIdx = ids.indexOf(over.id as string);
+    setManualOrder(arrayMove(ids, oldIdx, newIdx));
   };
 
   const sortActive = groupBy !== 'none' || sortBy !== 'date' || sortOrder !== 'asc';
@@ -264,25 +313,29 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
         {showSort && (
           <div className="flex items-center gap-3 mb-4 px-3 py-2.5 bg-white/[0.03] border border-white/[0.06] rounded-xl">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-white/30 font-medium w-12">Group</span>
-              <SelectFilter value={groupBy} onChange={v => setGroupBy(v as BoardGroupBy)}>
+              <span className={`text-xs font-medium w-12 ${isManual ? 'text-white/15' : 'text-white/30'}`}>Group</span>
+              <SelectFilter value={isManual ? 'none' : groupBy} onChange={v => setGroupBy(v as BoardGroupBy)}>
                 <option value="none">No Grouping</option>
-                <option value="priority">Priority</option>
-                <option value="date">Date</option>
-                <option value="assignee">Assignee</option>
-                <option value="status">Status</option>
-                <option value="project">Project</option>
+                {!isManual && <>
+                  <option value="priority">Priority</option>
+                  <option value="date">Date</option>
+                  <option value="assignee">Assignee</option>
+                  <option value="status">Status</option>
+                  <option value="project">Project</option>
+                </>}
               </SelectFilter>
+              {isManual && <span className="text-xs text-white/20 italic">disabled in manual mode</span>}
             </div>
             <div className="w-px h-4 bg-white/10" />
             <div className="flex items-center gap-2">
               <span className="text-xs text-white/30 font-medium w-8">Sort</span>
-              <SelectFilter value={sortBy} onChange={v => setSortBy(v as BoardSortBy)}>
+              <SelectFilter value={sortBy} onChange={v => { setSortBy(v as BoardSortBy); if (v !== 'manual' as any) setGroupBy('none'); }}>
                 <option value="date">Date</option>
                 <option value="priority">Priority</option>
                 <option value="assignee">Assignee</option>
                 <option value="status">Status</option>
                 <option value="project">Project</option>
+                <option value={'manual' as any}>Manual Order</option>
               </SelectFilter>
             </div>
             <div className="w-px h-4 bg-white/10" />
@@ -358,6 +411,26 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
           <div className="py-16 text-center">
             <p className="text-white/20">No tasks found</p>
           </div>
+        ) : isManual ? (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={sorted.map(t => t.id)} strategy={verticalListSortingStrategy}>
+              <div className="space-y-0.5">
+                {sorted.map((task, idx) => {
+                  const isFocused = focusedIdx === idx;
+                  return (
+                    <SortableTaskRow
+                      key={task.id}
+                      task={task}
+                      onOpenTask={onOpenTask}
+                      showProject
+                      focused={isFocused}
+                      focusRef={isFocused ? focusedRowRef : undefined}
+                    />
+                  );
+                })}
+              </div>
+            </SortableContext>
+          </DndContext>
         ) : (
           <div className="space-y-6">
             {groups.map((group, gi) => (

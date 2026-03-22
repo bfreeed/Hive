@@ -80,6 +80,8 @@ interface AppStore {
   channels: Channel[]; messages: Message[];
   activeChannelId: string;
   activeProjectId: string | null; sidebarOpen: boolean; darkMode: boolean; voiceOpen: boolean;
+  manualOrder: string[];
+  setManualOrder: (order: string[]) => void;
   setActiveProject: (id: string | null) => void;
   setActiveChannel: (id: string) => void;
   toggleSidebar: () => void; toggleDarkMode: () => void; toggleVoice: () => void;
@@ -109,6 +111,8 @@ export const useStore = create<AppStore>()(persist((set) => ({
   channels: CHANNELS, messages: MESSAGES,
   activeChannelId: 'general',
   activeProjectId: null, sidebarOpen: true, darkMode: true, voiceOpen: false,
+  manualOrder: [],
+  setManualOrder: (order) => set({ manualOrder: order }),
   setActiveProject: (id) => set({ activeProjectId: id }),
   setActiveChannel: (id) => set((s) => ({
     activeChannelId: id,
@@ -230,5 +234,6 @@ export const useStore = create<AppStore>()(persist((set) => ({
     notifications: state.notifications,
     darkMode: state.darkMode,
     activeChannelId: state.activeChannelId,
+    manualOrder: state.manualOrder,
   }),
 }));
