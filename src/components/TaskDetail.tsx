@@ -470,6 +470,31 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
               </div>
             </div>
 
+            {/* Recurring */}
+            <div>
+              <p className="text-xs text-white/30 uppercase tracking-wider mb-2">Repeat</p>
+              <div className="flex items-center gap-1 bg-white/[0.04] border border-white/[0.06] rounded-xl p-1 w-fit">
+                {([undefined, 'daily', 'weekly', 'monthly'] as const).map((r) => {
+                  const label = r === undefined ? 'Never' : r.charAt(0).toUpperCase() + r.slice(1);
+                  const active = (task.recurring ?? undefined) === r;
+                  return (
+                    <button
+                      key={label}
+                      onClick={() => update('recurring', r)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${active ? 'bg-white/[0.10] text-white' : 'text-white/40 hover:text-white/70'}`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              {task.recurring && (
+                <p className="text-xs text-white/25 mt-1.5">
+                  Completing this task will auto-create the next {task.recurring} instance.
+                </p>
+              )}
+            </div>
+
             {/* Notes */}
             <div>
               <p className="text-xs text-white/30 uppercase tracking-wider mb-2">Notes</p>

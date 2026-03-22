@@ -41,6 +41,7 @@ export default function TaskRow({ task, onOpenTask, showProject = false }: TaskR
       <span className={`flex-1 min-w-0 text-sm truncate ${task.status === 'done' ? 'line-through text-white/30' : 'text-white/80 group-hover:text-white'}`}>
         {task.title}
       </span>
+      {task.recurring && task.status !== 'done' && <span className="flex-shrink-0 text-xs text-white/25" title={`Repeats ${task.recurring}`}>↻</span>}
       {task.within72Hours && <span className="flex-shrink-0 text-xs px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 font-medium">72h</span>}
       {task.questionsForLev && <span className="flex-shrink-0 text-xs px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 font-medium">?</span>}
       <span className={`flex-shrink-0 w-1.5 h-1.5 rounded-full ${PRIORITY_DOT[task.priority]}`} title={task.priority} />

@@ -144,7 +144,25 @@ export const useStore = create<AppStore>()(persist((set) => ({
       if (u.assigneeIds && JSON.stringify([...u.assigneeIds].sort()) !== JSON.stringify([...prev.assigneeIds].sort())) nn.push(mkn('assignee_change', 'Task updated', prev.title + ' \u2192 assignees changed'));
       if (u.dueDate !== undefined && u.dueDate !== prev.dueDate) nn.push(mkn('date_change', 'Task updated', prev.title + ' \u2192 ' + (u.dueDate ? u.dueDate.slice(0, 10) : 'no date')));
     }
-    return { tasks, notifications: [...nn, ...s.notifications] };
+    // Recurring: when marked done, auto-create next instance
+    let newRecurring: Task[] = [];
+    if (u.status === 'done' && prev.status !== 'done' && prev.recurring && prev.recurring !== 'custom') {
+      let nextDue: string | undefined;
+      if (prev.dueDate) {
+        const d = new Date(prev.dueDate + 'T12:00:00');
+        if (prev.recurring === 'daily') d.setDate(d.getDate() + 1);
+        else if (prev.recurring === 'weekly') d.setDate(d.getDate() + 7);
+        else if (prev.recurring === 'monthly') {
+          const targetMonth = d.getMonth() + 1;
+          d.setMonth(targetMonth);
+          if (d.getMonth() !== targetMonth % 12) d.setDate(0); // clamp month overflow
+        }
+        nextDue = d.toISOString().slice(0, 10);
+      }
+      const { id: _id, createdAt: _c, updatedAt: _u, completedAt: _x, reminderSent: _rs, ...rest } = prev;
+      newRecurring = [{ ...rest, id: uid(), status: 'todo', dueDate: nextDue, reminderSent: false, createdAt: ts, updatedAt: ts }];
+    }
+    return { tasks: [...tasks, ...newRecurring], notifications: [...nn, ...s.notifications] };
   }),
   deleteTask: (id) => set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) })),
   addProject: (p) => set((s) => ({ projects: [...s.projects, { ...p, id: uid(), createdAt: new Date().toISOString() }] })),
