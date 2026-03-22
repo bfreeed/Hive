@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store';
 import { Plus, Search, ArrowUpDown, List, LayoutGrid, GitBranch } from 'lucide-react';
 import type { Task, Priority } from '../types';
@@ -74,6 +74,10 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
   // View
   const [viewType, setViewType] = useState<'list' | 'board' | 'mindmap'>('list');
 
+  // Keyboard navigation
+  const [focusedIdx, setFocusedIdx] = useState<number | null>(null);
+  const focusedRowRef = useRef<HTMLDivElement>(null);
+
   // New task
   const [showNewTask, setShowNewTask] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -115,6 +119,42 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
   const groups = buildGroups(sorted, groupBy, projects, users);
   // Board groups: ignore status filter (columns = statuses by default), use selected groupBy
   const boardGroups = buildGroups(sortedAllStatuses, groupBy === 'none' ? 'status' : groupBy, projects, users);
+
+  // Keyboard navigation (list view only)
+  useEffect(() => {
+    if (viewType !== 'list') return;
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (e.key === 'n' || e.key === 'N') {
+        // 'N' for new task is handled by Home; here N = next task
+        if (sorted.length === 0) return;
+        e.preventDefault();
+        setFocusedIdx(prev => prev === null ? 0 : Math.min(prev + 1, sorted.length - 1));
+      } else if (e.key === 'p' || e.key === 'P') {
+        if (sorted.length === 0) return;
+        e.preventDefault();
+        setFocusedIdx(prev => prev === null ? 0 : Math.max(prev - 1, 0));
+      } else if (e.key === 'Enter') {
+        if (focusedIdx !== null && sorted[focusedIdx]) {
+          e.preventDefault();
+          onOpenTask(sorted[focusedIdx].id);
+        }
+      } else if (e.key === 'Escape') {
+        setFocusedIdx(null);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [viewType, sorted, focusedIdx, onOpenTask]);
+
+  // Scroll focused row into view
+  useEffect(() => {
+    focusedRowRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [focusedIdx]);
+
+  // Reset focus when filters/sort change
+  useEffect(() => { setFocusedIdx(null); }, [filterProject, filterStatus, filterPriority, filterAssignee, filterFlag, search, sortBy, sortOrder, groupBy]);
 
   const handleAddTask = () => {
     if (!newTaskTitle.trim()) return;
@@ -332,9 +372,20 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
                 )}
                 {/* Tasks */}
                 <div className="space-y-0.5">
-                  {group.tasks.map(task => (
-                    <TaskRow key={task.id} task={task} onOpenTask={onOpenTask} showProject={groupBy !== 'project'} />
-                  ))}
+                  {group.tasks.map(task => {
+                    const idx = sorted.findIndex(t => t.id === task.id);
+                    const isFocused = focusedIdx === idx;
+                    return (
+                      <TaskRow
+                        key={task.id}
+                        task={task}
+                        onOpenTask={onOpenTask}
+                        showProject={groupBy !== 'project'}
+                        focused={isFocused}
+                        ref={isFocused ? focusedRowRef : undefined}
+                      />
+                    );
+                  })}
                 </div>
               </div>
             ))}

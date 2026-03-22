@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { useStore } from '../store';
 import { AlertTriangle } from 'lucide-react';
 import { format, isPast, isToday, isTomorrow } from 'date-fns';
@@ -15,16 +15,18 @@ interface TaskRowProps {
   task: Task;
   onOpenTask: (id: string) => void;
   showProject?: boolean;
+  focused?: boolean;
 }
 
-export default function TaskRow({ task, onOpenTask, showProject = false }: TaskRowProps) {
+const TaskRow = forwardRef<HTMLDivElement, TaskRowProps>(function TaskRow({ task, onOpenTask, showProject = false, focused = false }, ref) {
   const { projects, updateTask } = useStore();
   const project = projects.find((p) => p.id === task.projectIds?.[0]);
   const isOverdue = task.dueDate && isPast(new Date(task.dueDate)) && task.status !== 'done';
 
   return (
     <div
-      className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-white/[0.04] cursor-pointer group transition-colors"
+      ref={ref}
+      className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer group transition-colors ${focused ? 'bg-white/[0.06] ring-1 ring-brand-500/40' : 'hover:bg-white/[0.04]'}`}
       onClick={() => onOpenTask(task.id)}
     >
       <button
@@ -58,4 +60,6 @@ export default function TaskRow({ task, onOpenTask, showProject = false }: TaskR
       )}
     </div>
   );
-}
+});
+
+export default TaskRow;
