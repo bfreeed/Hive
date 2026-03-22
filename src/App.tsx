@@ -19,8 +19,66 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
   const clientIdRef = useRef<HTMLInputElement>(null);
   const apiKeyRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
   const [saved, setSaved] = useState(false);
   const [phoneSaved, setPhoneSaved] = useState(false);
+  const [importPreview, setImportPreview] = useState<any>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  const handleExport = () => {
+    const state = useStore.getState();
+    const data = {
+      tasks: state.tasks,
+      projects: state.projects,
+      contacts: state.contacts,
+      channels: state.channels,
+      messages: state.messages,
+      notifications: state.notifications,
+      users: state.users,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `hive-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target?.result as string);
+        if (!Array.isArray(data.tasks) || !Array.isArray(data.projects)) {
+          setImportError('Invalid backup file — missing tasks or projects.');
+          return;
+        }
+        setImportError(null);
+        setImportPreview(data);
+      } catch {
+        setImportError('Invalid file — could not parse JSON.');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleImportConfirm = () => {
+    const d = importPreview;
+    useStore.setState({
+      tasks: d.tasks ?? [],
+      projects: d.projects ?? [],
+      contacts: d.contacts ?? [],
+      channels: d.channels ?? [],
+      messages: d.messages ?? [],
+      notifications: d.notifications ?? [],
+      users: d.users ?? [],
+    });
+    setImportPreview(null);
+  };
 
   const userId = currentUser?.id || 'lev';
 
@@ -42,6 +100,7 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
   };
 
   return (
+    <>
     <div className="flex-1 overflow-y-auto scrollbar-hide">
       <div className="max-w-2xl mx-auto px-8 py-8">
         <h1 className="text-2xl font-semibold text-white tracking-tight mb-8">Settings</h1>
@@ -97,6 +156,33 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
           </div>
         </div>
 
+        {/* Data */}
+        <div className="mb-8">
+          <h2 className="text-xs font-semibold text-white/30 uppercase tracking-wider mb-3">Data</h2>
+          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 space-y-4">
+            <p className="text-xs text-white/40 leading-relaxed">
+              Export a full backup of your tasks, projects, contacts, and messages. Import to restore from a backup file.{' '}
+              <span className="text-white/25">Import replaces all current data — export first if you want to keep it.</span>
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleExport}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
+              >
+                Export JSON
+              </button>
+              <button
+                onClick={() => importInputRef.current?.click()}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-white/[0.06] hover:bg-white/[0.10] text-white/60 hover:text-white/80 transition-colors"
+              >
+                Import Backup…
+              </button>
+              <input ref={importInputRef} type="file" accept=".json" className="hidden" onChange={handleImportFile} />
+            </div>
+            {importError && <p className="text-xs text-red-400">{importError}</p>}
+          </div>
+        </div>
+
         {/* Google Drive */}
         <div className="mb-8">
           <h2 className="text-xs font-semibold text-white/30 uppercase tracking-wider mb-3">Google Drive</h2>
@@ -135,6 +221,36 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
         </div>
       </div>
     </div>
+
+    {/* Import confirmation modal */}
+    {importPreview && (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="bg-[#1a1a1f] border border-white/[0.10] rounded-2xl p-6 w-80 shadow-2xl">
+          <h3 className="text-white font-semibold mb-2">Replace all data?</h3>
+          <p className="text-sm text-white/50 mb-4">
+            Backup contains{' '}
+            <span className="text-white/80">{importPreview.tasks?.length ?? 0} tasks</span> and{' '}
+            <span className="text-white/80">{importPreview.projects?.length ?? 0} projects</span>.
+            This will replace your current data.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={handleImportConfirm}
+              className="flex-1 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              Replace
+            </button>
+            <button
+              onClick={() => setImportPreview(null)}
+              className="flex-1 py-2 bg-white/[0.06] hover:bg-white/[0.10] text-white/60 text-sm rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
