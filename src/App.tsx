@@ -350,6 +350,7 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
 type Page =
   | { id: 'home' }
   | { id: 'tasks' }
+  | { id: 'today' }
   | { id: 'contacts' }
   | { id: 'messages' }
   | { id: 'project'; projectId: string }
@@ -357,9 +358,29 @@ type Page =
   | { id: 'notifications' }
   | { id: 'settings' };
 
+function hashToPage(hash: string): Page {
+  const h = hash.replace(/^#/, '');
+  if (h === 'tasks') return { id: 'tasks' };
+  if (h === 'today') return { id: 'today' };
+  if (h === 'contacts') return { id: 'contacts' };
+  if (h === 'messages') return { id: 'messages' };
+  if (h === 'notifications') return { id: 'notifications' };
+  if (h === 'settings') return { id: 'settings' };
+  if (h.startsWith('project-')) return { id: 'project', projectId: h.slice(8) };
+  if (h.startsWith('team-member-')) return { id: 'team-member', userId: h.slice(12) };
+  return { id: 'home' };
+}
+
+function pageToHash(p: Page): string {
+  if (p.id === 'project') return `#project-${(p as any).projectId}`;
+  if (p.id === 'team-member') return `#team-member-${(p as any).userId}`;
+  if (p.id === 'home') return '#home';
+  return `#${p.id}`;
+}
+
 function AuthenticatedApp() {
   const { sidebarOpen, currentUser, darkMode, toggleDarkMode } = useStore();
-  const [page, setPage] = useState<Page>({ id: 'home' });
+  const [page, setPage] = useState<Page>(() => hashToPage(window.location.hash));
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [cmdKOpen, setCmdKOpen] = useState(false);
 
@@ -378,6 +399,13 @@ function AuthenticatedApp() {
     }
   }, []);
 
+  // Sync hash → page when user navigates with browser back/forward
+  useEffect(() => {
+    const onHashChange = () => setPage(hashToPage(window.location.hash));
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -390,15 +418,17 @@ function AuthenticatedApp() {
   }, []);
 
   const navigate = (pageName: string, id?: string) => {
-    if (pageName === 'home') setPage({ id: 'home' });
-    else if (pageName === 'tasks') setPage({ id: 'tasks' });
-    else if (pageName === 'today') setPage({ id: 'today' });
-    else if (pageName === 'contacts') setPage({ id: 'contacts' });
-    else if (pageName === 'messages') setPage({ id: 'messages' });
-    else if (pageName === 'project' && id) setPage({ id: 'project', projectId: id });
-    else if (pageName === 'team-member' && id) setPage({ id: 'team-member', userId: id });
-    else if (pageName === 'notifications') setPage({ id: 'notifications' });
-    else if (pageName === 'settings') setPage({ id: 'settings' });
+    let newPage: Page = { id: 'home' };
+    if (pageName === 'tasks') newPage = { id: 'tasks' };
+    else if (pageName === 'today') newPage = { id: 'today' };
+    else if (pageName === 'contacts') newPage = { id: 'contacts' };
+    else if (pageName === 'messages') newPage = { id: 'messages' };
+    else if (pageName === 'project' && id) newPage = { id: 'project', projectId: id };
+    else if (pageName === 'team-member' && id) newPage = { id: 'team-member', userId: id };
+    else if (pageName === 'notifications') newPage = { id: 'notifications' };
+    else if (pageName === 'settings') newPage = { id: 'settings' };
+    window.location.hash = pageToHash(newPage);
+    setPage(newPage);
   };
 
   const activePage = page.id === 'project'
