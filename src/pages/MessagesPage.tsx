@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useStore } from '../store';
 import { supabase } from '../lib/supabase';
-import { Hash, Plus, Search, Smile, Paperclip, Send, X, Pencil, Trash2, MessageSquare, Link, MoreHorizontal, Pin, Copy, ChevronDown, BellOff, Bell, RotateCcw, Archive } from 'lucide-react';
+import { Hash, Plus, Search, Smile, Paperclip, Send, X, Pencil, Trash2, MessageSquare, Link, MoreHorizontal, Pin, Copy, ChevronDown, BellOff, Bell, RotateCcw, Archive, Bookmark } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 import type { Message, User } from '../types';
 
@@ -103,9 +103,11 @@ interface BubbleProps {
   onEditCancel: () => void;
   isThread?: boolean;
   isFirstUnread?: boolean;
+  isSaved?: boolean;
+  onSave?: (id: string) => void;
 }
 
-function MessageBubble({ msg, prevMsg, userNames, users, replyCount, isPinned, onReact, onEdit, onDelete, onOpenThread, onPin, onCopyLink, editing, editValue, onEditChange, onEditSave, onEditCancel, isThread, isFirstUnread }: BubbleProps) {
+function MessageBubble({ msg, prevMsg, userNames, users, replyCount, isPinned, onReact, onEdit, onDelete, onOpenThread, onPin, onCopyLink, editing, editValue, onEditChange, onEditSave, onEditCancel, isThread, isFirstUnread, isSaved, onSave }: BubbleProps) {
   const [showEmoji, setShowEmoji] = useState(false);
   const author = users.find(u => u.id === msg.authorId);
   const isContinuation = prevMsg && prevMsg.authorId === msg.authorId
@@ -269,6 +271,15 @@ function MessageBubble({ msg, prevMsg, userNames, users, replyCount, isPinned, o
           >
             <Copy size={14} />
           </button>
+          {onSave && (
+            <button
+              onClick={() => onSave(msg.id)}
+              className={`p-1.5 rounded-md hover:bg-white/[0.08] transition-colors ${isSaved ? 'text-amber-400' : 'text-white/30 hover:text-white/60'}`}
+              title={isSaved ? 'Remove bookmark' : 'Save message'}
+            >
+              <Bookmark size={14} />
+            </button>
+          )}
           <button
             onClick={() => onDelete(msg.id)}
             className="p-1.5 rounded-md hover:bg-white/[0.08] text-red-400/50 hover:text-red-400 transition-colors"
@@ -317,6 +328,12 @@ export default function MessagesPage() {
   const typingTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [showDeleted, setShowDeleted] = useState(false);
   const [confirmPermDeleteId, setConfirmPermDeleteId] = useState<string | null>(null);
+  const [savedIds, setSavedIds] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('saved_msg_ids') || '[]')); }
+    catch { return new Set<string>(); }
+  });
+  const [showSaved, setShowSaved] = useState(false);
+  const prevChannelIdRef = useRef<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -417,6 +434,29 @@ export default function MessagesPage() {
     };
   }, [activeChannelId, currentUser.id]);
 
+  // Draft management: load saved draft when switching channels
+  useEffect(() => {
+    if (prevChannelIdRef.current !== activeChannelId) {
+      const draft = localStorage.getItem(`msg_draft_${activeChannelId}`);
+      setInput(draft || '');
+      prevChannelIdRef.current = activeChannelId;
+    }
+  }, [activeChannelId]); // intentionally omits `input` - drafts are saved inline in onChange
+
+  const hasDraft = (id: string) => {
+    if (id === activeChannelId) return !!input.trim();
+    try { return !!(localStorage.getItem(`msg_draft_${id}`) || '').trim(); } catch { return false; }
+  };
+
+  const toggleSave = useCallback((msgId: string) => {
+    setSavedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(msgId)) { next.delete(msgId); } else { next.add(msgId); }
+      try { localStorage.setItem('saved_msg_ids', JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  }, []);
+
   const isUnread = (ch: typeof channels[0]) => {
     const lastRead = ch.lastReadAt;
     if (!lastRead) return messages.some(m => m.channelId === ch.id);
@@ -444,6 +484,7 @@ export default function MessagesPage() {
       }
     }
 
+    localStorage.removeItem(`msg_draft_${activeChannelId}`);
     sendMessage(
       activeChannelId,
       body,
@@ -579,6 +620,8 @@ export default function MessagesPage() {
           onEditCancel={() => { setEditingId(null); setEditValue(''); }}
           isThread={isThread}
           isFirstUnread={isFirstUnread}
+          isSaved={savedIds.has(msg.id)}
+          onSave={toggleSave}
         />
       );
       // Wrap first-unread message in a ref div so we can scroll to it
@@ -618,6 +661,20 @@ export default function MessagesPage() {
         </div>
 
         <div className="flex-1 overflow-y-auto scrollbar-hide py-2">
+          {/* Saved Items quick nav */}
+          {!search.trim() && (
+            <div className="px-1 mb-1">
+              <button
+                onClick={() => setShowSaved(v => !v)}
+                className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${showSaved ? 'bg-white/[0.08] text-white' : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'}`}
+              >
+                <Bookmark size={14} className={showSaved ? 'text-amber-400' : 'text-white/30'} />
+                <span className="flex-1 text-left">Saved Items</span>
+                {savedIds.size > 0 && <span className="text-xs text-white/30">{savedIds.size}</span>}
+              </button>
+            </div>
+          )}
+
           {search.trim() ? (
             /* Search results mode */
             <div>
@@ -679,13 +736,14 @@ export default function MessagesPage() {
                   return (
                     <div key={c.id} className="group relative mx-1 flex items-center">
                       <button
-                        onClick={() => { setActiveChannel(c.id); setChannelMenuId(null); }}
+                        onClick={() => { setActiveChannel(c.id); setChannelMenuId(null); setShowSaved(false); }}
                         className={`flex-1 flex items-center gap-2 px-3 py-1.5 text-sm transition-colors rounded-md ${
-                          isActive ? 'bg-white/[0.08] text-white' : unread ? 'text-white font-medium hover:bg-white/[0.04]' : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'
+                          !showSaved && isActive ? 'bg-white/[0.08] text-white' : unread ? 'text-white font-medium hover:bg-white/[0.04]' : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'
                         }`}
                       >
                         <Hash size={14} className="flex-shrink-0 text-white/30" />
                         <span className="truncate flex-1 text-left">{c.name}</span>
+                        {!isActive && hasDraft(c.id) && <span className="text-[9px] text-amber-400/70 font-medium flex-shrink-0">DRAFT</span>}
                         {c.muted && <BellOff size={11} className="text-white/20 flex-shrink-0" />}
                         {unread && !isActive && !c.muted && <span className="w-1.5 h-1.5 rounded-full bg-brand-400 flex-shrink-0" />}
                       </button>
@@ -760,15 +818,16 @@ export default function MessagesPage() {
                   return (
                     <div key={c.id} className="group relative mx-1 flex items-center">
                       <button
-                        onClick={() => { setActiveChannel(c.id); setChannelMenuId(null); }}
+                        onClick={() => { setActiveChannel(c.id); setChannelMenuId(null); setShowSaved(false); }}
                         className={`flex-1 flex items-center gap-2 px-3 py-1.5 text-sm transition-colors rounded-md ${
-                          isActive ? 'bg-white/[0.08] text-white' : unread ? 'text-white font-medium hover:bg-white/[0.04]' : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'
+                          !showSaved && isActive ? 'bg-white/[0.08] text-white' : unread ? 'text-white font-medium hover:bg-white/[0.04]' : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'
                         }`}
                       >
                         <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-semibold text-white ${AVATAR_COLORS[userId] || 'bg-white/20'}`}>
                           {getDmName(c)[0]}
                         </div>
                         <span className="truncate flex-1 text-left">{getDmName(c)}</span>
+                        {!isActive && hasDraft(c.id) && <span className="text-[9px] text-amber-400/70 font-medium flex-shrink-0">DRAFT</span>}
                         {unread && !isActive
                           ? <span className="w-1.5 h-1.5 rounded-full bg-brand-400 flex-shrink-0" />
                           : <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
@@ -872,8 +931,68 @@ export default function MessagesPage() {
         </div>
       </div>
 
+      {/* Saved Items panel */}
+      {showSaved && (
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+          <div className="flex items-center gap-3 px-5 h-14 border-b border-white/[0.06] flex-shrink-0">
+            <Bookmark size={16} className="text-amber-400 flex-shrink-0" />
+            <h2 className="text-sm font-semibold text-white">Saved Items</h2>
+            <span className="text-xs text-white/30">{savedIds.size}</span>
+          </div>
+          <div className="flex-1 overflow-y-auto scrollbar-hide py-4">
+            {savedIds.size === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center px-8">
+                <div className="w-14 h-14 rounded-2xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center mb-4">
+                  <Bookmark size={24} className="text-white/20" />
+                </div>
+                <p className="text-white/60 font-medium">No saved items yet</p>
+                <p className="text-white/30 text-sm mt-1">Hover a message and click the bookmark icon to save it.</p>
+              </div>
+            ) : (
+              messages
+                .filter(m => savedIds.has(m.id))
+                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                .map(msg => {
+                  const ch = channels.find(c => c.id === msg.channelId);
+                  const author = users.find(u => u.id === msg.authorId);
+                  return (
+                    <div key={msg.id} className="group flex items-start gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors">
+                      <Avatar userId={msg.authorId} size={8} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 mb-0.5 flex-wrap">
+                          <span className="text-xs font-semibold text-white/80">{author?.name}</span>
+                          {ch && (
+                            <button
+                              onClick={() => { setActiveChannel(msg.channelId); setShowSaved(false); }}
+                              className="flex items-center gap-0.5 text-[10px] text-brand-400/70 hover:text-brand-400 transition-colors"
+                            >
+                              {ch.type === 'channel' ? <Hash size={9} /> : null}
+                              {ch.type === 'channel' ? ch.name : getDmName(ch)}
+                            </button>
+                          )}
+                          <span className="text-[10px] text-white/25">{formatTime(msg.createdAt)}</span>
+                        </div>
+                        <p className="text-sm text-white/60 leading-relaxed break-words line-clamp-3">
+                          {renderBody(msg.body, userNames)}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => toggleSave(msg.id)}
+                        title="Remove bookmark"
+                        className="opacity-0 group-hover:opacity-100 p-1 text-amber-400 hover:text-white/40 transition-all flex-shrink-0 mt-0.5"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  );
+                })
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Main message area */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+      {!showSaved && <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Header */}
         <div className="flex items-center gap-3 px-5 h-14 border-b border-white/[0.06] flex-shrink-0">
           {channel?.type === 'channel' ? (
@@ -1095,10 +1214,13 @@ export default function MessagesPage() {
               ref={inputRef}
               value={input}
               onChange={e => {
-                setInput(e.target.value);
+                const v = e.target.value;
+                setInput(v);
                 e.target.style.height = 'auto';
                 e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
                 broadcastTyping();
+                if (v.trim()) localStorage.setItem(`msg_draft_${activeChannelId}`, v);
+                else localStorage.removeItem(`msg_draft_${activeChannelId}`);
               }}
               onKeyDown={e => {
                 if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
@@ -1135,7 +1257,7 @@ export default function MessagesPage() {
             <p className="text-center text-[10px] text-white/15 mt-1.5">Enter to send · Shift+Enter for new line</p>
           )}
         </div>
-      </div>
+      </div>}
 
       {/* Thread panel */}
       {openThreadId && threadParentMsg && (
@@ -1175,6 +1297,8 @@ export default function MessagesPage() {
                 onEditChange={setEditValue}
                 onEditSave={handleEditSave}
                 onEditCancel={() => { setEditingId(null); setEditValue(''); }}
+                isSaved={savedIds.has(threadParentMsg.id)}
+                onSave={toggleSave}
                 isThread
               />
             </div>
