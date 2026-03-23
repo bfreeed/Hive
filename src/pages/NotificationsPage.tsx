@@ -168,42 +168,74 @@ export default function NotificationsPage({ onNavigate, onOpenTask }: Notificati
       <div className={`mx-auto px-8 py-8 ${viewType === 'board' ? 'max-w-full' : 'max-w-2xl'}`}>
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-semibold text-white tracking-tight">Notifications</h1>
-          <div className="flex items-center gap-2">
+        <div className="mb-6">
+          {/* Title row */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-semibold text-white tracking-tight">Notifications</h1>
+              {unreadCount > 0 && (
+                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-400 border border-brand-500/30">
+                  {unreadCount} unread
+                </span>
+              )}
+            </div>
+            {unreadCount > 0 && (
+              <button
+                onClick={markAllNotificationsRead}
+                className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition-colors"
+              >
+                <CheckCheck size={13} />
+                Mark all read
+              </button>
+            )}
+          </div>
 
-            {/* View toggle */}
+          {/* Controls row */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* View toggle — List / Board */}
             <div className="flex items-center bg-white/[0.04] border border-white/[0.08] rounded-lg p-0.5">
               {([
-                { id: 'list', icon: <List size={14} /> },
-                { id: 'board', icon: <LayoutGrid size={14} /> },
+                { id: 'list',  icon: <List size={13} />,       label: 'List'  },
+                { id: 'board', icon: <LayoutGrid size={13} />, label: 'Board' },
               ] as const).map(v => (
                 <button
                   key={v.id}
                   onClick={() => setViewType(v.id)}
-                  className={`p-1.5 rounded transition-colors ${viewType === v.id ? 'bg-white/[0.08] text-white' : 'text-white/30 hover:text-white/60'}`}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-colors ${
+                    viewType === v.id
+                      ? 'bg-white/[0.10] text-white'
+                      : 'text-white/40 hover:text-white/70'
+                  }`}
                 >
                   {v.icon}
+                  {v.label}
                 </button>
               ))}
             </div>
 
-            {/* Group by (list only) */}
+            {/* Group by — only in list view */}
             {viewType === 'list' && (
-              <button
-                onClick={() => setGroupBy(v => v === 'type' ? 'project' : 'type')}
-                className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-                  groupBy === 'project'
-                    ? 'border-brand-500/40 bg-brand-600/10 text-brand-400'
-                    : 'border-white/[0.08] text-white/40 hover:text-white/70'
-                }`}
-              >
-                <ArrowUpDown size={12} />
-                {groupBy === 'project' ? 'By project' : 'By type'}
-              </button>
+              <div className="flex items-center bg-white/[0.04] border border-white/[0.08] rounded-lg p-0.5">
+                {([
+                  { id: 'type',    label: 'By type'    },
+                  { id: 'project', label: 'By project' },
+                ] as const).map(g => (
+                  <button
+                    key={g.id}
+                    onClick={() => setGroupBy(g.id)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-colors ${
+                      groupBy === g.id
+                        ? 'bg-white/[0.10] text-white'
+                        : 'text-white/40 hover:text-white/70'
+                    }`}
+                  >
+                    {g.label}
+                  </button>
+                ))}
+              </div>
             )}
 
-            {/* Unread only */}
+            {/* Unread filter */}
             <button
               onClick={() => setShowUnreadOnly(v => !v)}
               className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
@@ -214,17 +246,6 @@ export default function NotificationsPage({ onNavigate, onOpenTask }: Notificati
             >
               {showUnreadOnly ? 'Unread only' : 'All'}
             </button>
-
-            {/* Mark all read */}
-            {unreadCount > 0 && (
-              <button
-                onClick={markAllNotificationsRead}
-                className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition-colors"
-              >
-                <CheckCheck size={13} />
-                Mark all read
-              </button>
-            )}
           </div>
         </div>
 
