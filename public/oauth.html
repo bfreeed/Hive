@@ -1,0 +1,17 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Connecting to Google…</title></head>
+<body>
+<script>
+  try {
+    if (window.opener) {
+      window.opener.postMessage(
+        { type: 'google-oauth-callback', hash: location.hash },
+        location.origin
+      );
+    }
+  } catch (e) {}
+  window.close();
+</script>
+</body>
+</html>
