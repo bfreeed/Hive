@@ -215,6 +215,7 @@ function dbToChannel(row: any): Channel {
     pinnedMessageIds: row.pinned_message_ids ?? [],
     muted: row.muted ?? false,
     readBy: row.read_by ?? {},
+    deletedAt: row.deleted_at ?? undefined,
   };
 }
 
@@ -305,6 +306,8 @@ interface AppStore {
   addChannel: (channel: Omit<Channel, 'id'>) => void;
   updateChannel: (id: string, u: Partial<Channel>) => void;
   deleteChannel: (id: string) => void;
+  restoreChannel: (id: string) => void;
+  permanentlyDeleteChannel: (id: string) => void;
   sendMessage: (channelId: string, body: string, attachments?: { name: string; url: string; type: string }[]) => void;
   updateMessage: (id: string, body: string) => void;
   deleteMessage: (id: string) => void;
@@ -468,6 +471,7 @@ export const useStore = create<AppStore>()((set, get) => ({
     if ('pinnedMessageIds' in u) dbFields.pinned_message_ids = u.pinnedMessageIds ?? [];
     if ('muted' in u) dbFields.muted = u.muted ?? false;
     if ('readBy' in u) dbFields.read_by = u.readBy ?? {};
+    if ('deletedAt' in u) dbFields.deleted_at = u.deletedAt ?? null;
     if (Object.keys(dbFields).length > 0) {
       supabase.from('channels').update(dbFields).eq('id', id)
         .then(({ error }) => { if (error) console.error('updateChannel error:', error); });
@@ -475,16 +479,33 @@ export const useStore = create<AppStore>()((set, get) => ({
   },
 
   deleteChannel: (id) => {
+    const now = new Date().toISOString();
+    set((s) => ({
+      channels: s.channels.map(c => c.id === id ? { ...c, deletedAt: now } : c),
+      activeChannelId: s.activeChannelId === id
+        ? (s.channels.find(c => c.id !== id && !c.deletedAt)?.id ?? s.activeChannelId)
+        : s.activeChannelId,
+    }));
+    supabase.from('channels').update({ deleted_at: now }).eq('id', id)
+      .then(({ error }) => { if (error) console.error('deleteChannel error:', error); });
+  },
+
+  restoreChannel: (id) => {
+    set((s) => ({
+      channels: s.channels.map(c => c.id === id ? { ...c, deletedAt: undefined } : c),
+    }));
+    supabase.from('channels').update({ deleted_at: null }).eq('id', id)
+      .then(({ error }) => { if (error) console.error('restoreChannel error:', error); });
+  },
+
+  permanentlyDeleteChannel: (id) => {
     set((s) => ({
       channels: s.channels.filter(c => c.id !== id),
       messages: s.messages.filter(m => m.channelId !== id),
-      activeChannelId: s.activeChannelId === id
-        ? (s.channels.find(c => c.id !== id)?.id ?? s.activeChannelId)
-        : s.activeChannelId,
     }));
     supabase.from('messages').delete().eq('channel_id', id)
       .then(() => supabase.from('channels').delete().eq('id', id))
-      .then(({ error }) => { if (error) console.error('deleteChannel error:', error); });
+      .then(({ error }) => { if (error) console.error('permanentlyDeleteChannel error:', error); });
   },
 
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useStore } from '../store';
 import { supabase } from '../lib/supabase';
-import { Hash, Plus, Search, Smile, Paperclip, Send, X, Pencil, Trash2, MessageSquare, Link, MoreHorizontal, Pin, Copy, ChevronDown, BellOff, Bell } from 'lucide-react';
+import { Hash, Plus, Search, Smile, Paperclip, Send, X, Pencil, Trash2, MessageSquare, Link, MoreHorizontal, Pin, Copy, ChevronDown, BellOff, Bell, RotateCcw, Archive } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 import type { Message, User } from '../types';
 
@@ -288,7 +288,7 @@ export default function MessagesPage() {
     channels, messages, users, currentUser, activeChannelId,
     setActiveChannel, sendMessage, addReaction,
     updateMessage, deleteMessage, replyToMessage, addNotification, deleteChannel, addChannel,
-    updateChannel, pinMessage, unpinMessage,
+    updateChannel, pinMessage, unpinMessage, restoreChannel, permanentlyDeleteChannel,
   } = useStore();
 
   const [input, setInput] = useState('');
@@ -315,6 +315,8 @@ export default function MessagesPage() {
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [confirmPermDeleteId, setConfirmPermDeleteId] = useState<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -329,8 +331,9 @@ export default function MessagesPage() {
   const threadReplies = openThreadId ? messages.filter(m => m.parentId === openThreadId) : [];
   const threadParentMsg = openThreadId ? messages.find(m => m.id === openThreadId) : null;
 
-  const groupedChannels = channels.filter(c => c.type === 'channel');
-  const dmChannels = channels.filter(c => c.type === 'dm');
+  const groupedChannels = channels.filter(c => c.type === 'channel' && !c.deletedAt);
+  const dmChannels = channels.filter(c => c.type === 'dm' && !c.deletedAt);
+  const deletedChannels = channels.filter(c => c.deletedAt);
   const userNames = users.map(u => u.name);
   const pinnedIds = new Set(channel?.pinnedMessageIds ?? []);
   const pinnedMessages = topLevelMessages.filter(m => pinnedIds.has(m.id));
@@ -813,6 +816,58 @@ export default function MessagesPage() {
                 })}
               </div>
             </>
+          )}
+
+          {/* Deleted channels archive */}
+          {deletedChannels.length > 0 && (
+            <div className="mt-2 border-t border-white/[0.04] pt-2">
+              <button
+                onClick={() => setShowDeleted(v => !v)}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-white/25 hover:text-white/50 transition-colors"
+              >
+                <Archive size={12} />
+                <span className="flex-1 text-left">Deleted ({deletedChannels.length})</span>
+                <ChevronDown size={11} className={`transition-transform ${showDeleted ? '' : '-rotate-90'}`} />
+              </button>
+              {showDeleted && deletedChannels.map(c => (
+                <div key={c.id} className="mx-1 mb-0.5 flex items-center gap-1 px-2 py-1.5 rounded-md bg-white/[0.02] group">
+                  <span className="flex-1 text-xs text-white/25 truncate">
+                    {c.type === 'channel' ? `#${c.name}` : getDmName(c)}
+                  </span>
+                  <button
+                    onClick={() => restoreChannel(c.id)}
+                    title="Restore"
+                    className="p-1 rounded text-white/30 hover:text-emerald-400 hover:bg-white/[0.06] transition-colors flex-shrink-0"
+                  >
+                    <RotateCcw size={11} />
+                  </button>
+                  {confirmPermDeleteId === c.id ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => { permanentlyDeleteChannel(c.id); setConfirmPermDeleteId(null); }}
+                        className="text-[10px] px-1.5 py-0.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded transition-colors"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        onClick={() => setConfirmPermDeleteId(null)}
+                        className="text-white/30 hover:text-white/60"
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmPermDeleteId(c.id)}
+                      title="Delete permanently"
+                      className="p-1 rounded text-white/20 hover:text-red-400 hover:bg-white/[0.06] transition-colors flex-shrink-0"
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>

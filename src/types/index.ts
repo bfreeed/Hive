@@ -139,6 +139,7 @@ export interface Channel {
   pinnedMessageIds?: string[];
   muted?: boolean;
   readBy?: Record<string, string>; // userId → ISO timestamp of last read
+  deletedAt?: string; // soft delete — set when channel is "deleted", cleared on restore
 }
 
 export interface Message {
