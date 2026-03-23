@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from './store';
+import { useAuth } from './hooks/useAuth';
+import LoginPage from './pages/LoginPage';
 import Sidebar from './components/Sidebar';
 import VoicePanel from './components/VoicePanel';
 import TaskDetail from './components/TaskDetail';
@@ -264,7 +266,7 @@ type Page =
   | { id: 'notifications' }
   | { id: 'settings' };
 
-export default function App() {
+function AuthenticatedApp() {
   const { sidebarOpen, currentUser, darkMode, toggleDarkMode } = useStore();
   const [page, setPage] = useState<Page>({ id: 'home' });
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
@@ -345,4 +347,22 @@ export default function App() {
       {cmdKOpen && <CommandPalette onClose={() => setCmdKOpen(false)} onNavigate={navigate} onOpenTask={(id) => { setOpenTaskId(id); setCmdKOpen(false); }} />}
     </div>
   );
+}
+
+export default function App() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0d0d0f] flex items-center justify-center">
+        <span className="text-2xl font-bold text-white tracking-tight opacity-60">Hive</span>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage />;
+  }
+
+  return <AuthenticatedApp />;
 }

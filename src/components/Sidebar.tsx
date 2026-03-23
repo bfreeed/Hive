@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
+import { supabase } from '../lib/supabase';
 import {
   Home, CheckSquare, Users, Bell, Settings, ChevronDown, ChevronRight,
-  Plus, FolderOpen, Mic, Moon, Sun, Menu, MessageSquare, Check, Lock
+  Plus, FolderOpen, Mic, Moon, Sun, Menu, MessageSquare, Check, Lock, LogOut
 } from 'lucide-react';
 
 const PROJECT_COLORS = ['#6366f1','#10b981','#f59e0b','#ef4444','#3b82f6','#8b5cf6','#ec4899','#14b8a6'];
@@ -20,7 +21,11 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
-  const { projects, tasks, notifications, darkMode, toggleDarkMode, toggleVoice, sidebarOpen, toggleSidebar, addProject } = useStore();
+  const { projects, tasks, notifications, darkMode, toggleDarkMode, toggleVoice, sidebarOpen, toggleSidebar, addProject, currentUser } = useStore();
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+  };
   const [projectsExpanded, setProjectsExpanded] = useState(true);
   const [showNewProject, setShowNewProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
@@ -191,14 +196,31 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
           {sidebarOpen && <span>Settings</span>}
         </button>
 
-        {/* Avatar */}
-        {sidebarOpen && (
-          <div className="flex items-center gap-2.5 px-2 py-2 mt-1">
+        {/* Avatar + Sign Out */}
+        {sidebarOpen ? (
+          <div className="flex items-center gap-2.5 px-2 py-2 mt-1 group">
             <div className="w-6 h-6 rounded-full bg-brand-600 flex items-center justify-center flex-shrink-0">
-              <span className="text-xs font-semibold text-white">L</span>
+              <span className="text-xs font-semibold text-white">
+                {(currentUser?.name || 'L').charAt(0).toUpperCase()}
+              </span>
             </div>
-            <span className="text-sm text-white/60 truncate">Lev Freedman</span>
+            <span className="text-sm text-white/60 truncate flex-1">{currentUser?.name || 'Lev Freedman'}</span>
+            <button
+              onClick={handleSignOut}
+              title="Sign out"
+              className="opacity-0 group-hover:opacity-100 p-1 rounded text-white/30 hover:text-white/70 hover:bg-white/[0.06] transition-all"
+            >
+              <LogOut size={13} />
+            </button>
           </div>
+        ) : (
+          <button
+            onClick={handleSignOut}
+            title="Sign out"
+            className="w-full flex items-center justify-center p-2 rounded-md text-white/30 hover:text-white/70 hover:bg-white/[0.04] transition-colors"
+          >
+            <LogOut size={14} />
+          </button>
         )}
       </div>
     </aside>
