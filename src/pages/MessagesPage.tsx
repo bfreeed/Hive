@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useStore } from '../store';
 import { Hash, Plus, Search, Smile, Paperclip, Send, X, Pencil, Trash2, MessageSquare, Link } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
-import type { Message } from '../types';
+import type { Message, User } from '../types';
 
 const EMOJIS = ['👍', '❤️', '😂', '🎉', '✅', '🔥'];
 
@@ -64,7 +64,7 @@ interface BubbleProps {
   msg: Message;
   prevMsg?: Message;
   userNames: string[];
-  users: ReturnType<typeof useStore>['users'];
+  users: User[];
   replyCount: number;
   onReact: (id: string, emoji: string) => void;
   onEdit: (id: string) => void;

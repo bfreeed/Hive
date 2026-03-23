@@ -34,7 +34,7 @@ export interface Task {
   dueTimeEnd?: string;
   calendarEventId?: string;
   calendarShowAs?: 'free' | 'busy';
-  calendarSync: boolean;
+  calendarSync?: boolean;
   snoozeDate?: string;
   waitDate?: string;
   label?: string;
