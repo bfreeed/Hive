@@ -230,7 +230,7 @@ export default function MessagesPage() {
   const {
     channels, messages, users, currentUser, activeChannelId,
     setActiveChannel, sendMessage, addReaction,
-    updateMessage, deleteMessage, replyToMessage, addNotification, deleteChannel,
+    updateMessage, deleteMessage, replyToMessage, addNotification, deleteChannel, addChannel,
   } = useStore();
 
   const [input, setInput] = useState('');
@@ -239,6 +239,10 @@ export default function MessagesPage() {
   const [editValue, setEditValue] = useState('');
   const [openThreadId, setOpenThreadId] = useState<string | null>(null);
   const [threadInput, setThreadInput] = useState('');
+  const [showNewChannel, setShowNewChannel] = useState(false);
+  const [newChannelName, setNewChannelName] = useState('');
+  const [showNewDm, setShowNewDm] = useState(false);
+  const [newDmUserId, setNewDmUserId] = useState('');
   const [showAttachForm, setShowAttachForm] = useState(false);
   const [pendingUrl, setPendingUrl] = useState('');
   const [pendingUrlName, setPendingUrlName] = useState('');
@@ -366,6 +370,22 @@ export default function MessagesPage() {
     setShowAttachForm(false);
   };
 
+  const handleAddChannel = () => {
+    if (!newChannelName.trim()) return;
+    addChannel({ name: newChannelName.trim(), type: 'channel', memberIds: [currentUser.id] });
+    setNewChannelName('');
+    setShowNewChannel(false);
+  };
+
+  const handleAddDm = () => {
+    if (!newDmUserId) return;
+    const existing = channels.find(c => c.type === 'dm' && c.memberIds.includes(newDmUserId));
+    if (existing) { setActiveChannel(existing.id); setShowNewDm(false); return; }
+    addChannel({ name: '', type: 'dm', memberIds: [currentUser.id, newDmUserId] });
+    setNewDmUserId('');
+    setShowNewDm(false);
+  };
+
   const getDmName = (ch: typeof channels[0]) => {
     const otherId = ch.memberIds.find(id => id !== currentUser.id);
     return users.find(u => u.id === otherId)?.name || ch.name;
@@ -480,16 +500,30 @@ export default function MessagesPage() {
               <div className="mb-3">
                 <div className="flex items-center justify-between px-3 mb-1">
                   <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Channels</span>
-                  <button className="text-white/30 hover:text-white/60 transition-colors"><Plus size={12} /></button>
+                  <button onClick={() => setShowNewChannel(v => !v)} className="text-white/30 hover:text-white/60 transition-colors"><Plus size={12} /></button>
                 </div>
+                {showNewChannel && (
+                  <div className="mx-2 mb-2 flex items-center gap-1">
+                    <input
+                      autoFocus
+                      value={newChannelName}
+                      onChange={e => setNewChannelName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleAddChannel(); if (e.key === 'Escape') { setShowNewChannel(false); setNewChannelName(''); } }}
+                      placeholder="channel-name"
+                      className="flex-1 px-2 py-1 bg-white/[0.06] border border-white/[0.1] rounded text-xs text-white/80 placeholder-white/20 focus:outline-none focus:border-brand-500/40"
+                    />
+                    <button onClick={handleAddChannel} className="px-2 py-1 bg-brand-600 hover:bg-brand-500 text-white text-xs rounded transition-colors">Add</button>
+                    <button onClick={() => { setShowNewChannel(false); setNewChannelName(''); }} className="text-white/30 hover:text-white/60"><X size={12} /></button>
+                  </div>
+                )}
                 {groupedChannels.map(c => {
                   const unread = isUnread(c);
                   const isActive = c.id === activeChannelId;
                   return (
-                    <div key={c.id} className="group/ch relative mx-1">
+                    <div key={c.id} className="group relative mx-1 flex items-center">
                       <button
                         onClick={() => setActiveChannel(c.id)}
-                        className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors rounded-md ${
+                        className={`flex-1 flex items-center gap-2 px-3 py-1.5 text-sm transition-colors rounded-md ${
                           isActive
                             ? 'bg-white/[0.08] text-white'
                             : unread
@@ -504,8 +538,8 @@ export default function MessagesPage() {
                         )}
                       </button>
                       <button
-                        onClick={(e) => { e.stopPropagation(); deleteChannel(c.id); }}
-                        className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/ch:opacity-100 p-1 rounded text-white/20 hover:text-red-400 hover:bg-white/[0.06] transition-all"
+                        onClick={() => deleteChannel(c.id)}
+                        className="opacity-0 group-hover:opacity-100 p-1 mr-1 rounded text-white/30 hover:text-red-400 transition-all flex-shrink-0"
                         title="Delete channel"
                       >
                         <X size={11} />
@@ -518,17 +552,34 @@ export default function MessagesPage() {
               <div>
                 <div className="flex items-center justify-between px-3 mb-1">
                   <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Direct Messages</span>
-                  <button className="text-white/30 hover:text-white/60 transition-colors"><Plus size={12} /></button>
+                  <button onClick={() => setShowNewDm(v => !v)} className="text-white/30 hover:text-white/60 transition-colors"><Plus size={12} /></button>
                 </div>
+                {showNewDm && (
+                  <div className="mx-2 mb-2 flex items-center gap-1">
+                    <select
+                      autoFocus
+                      value={newDmUserId}
+                      onChange={e => setNewDmUserId(e.target.value)}
+                      className="flex-1 px-2 py-1 bg-white/[0.06] border border-white/[0.1] rounded text-xs text-white/80 focus:outline-none focus:border-brand-500/40"
+                    >
+                      <option value="">Select person...</option>
+                      {users.filter(u => u.id !== currentUser.id).map(u => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                      ))}
+                    </select>
+                    <button onClick={handleAddDm} className="px-2 py-1 bg-brand-600 hover:bg-brand-500 text-white text-xs rounded transition-colors">Open</button>
+                    <button onClick={() => { setShowNewDm(false); setNewDmUserId(''); }} className="text-white/30 hover:text-white/60"><X size={12} /></button>
+                  </div>
+                )}
                 {dmChannels.map(c => {
                   const unread = isUnread(c);
                   const isActive = c.id === activeChannelId;
                   const userId = getDmUserId(c);
                   return (
-                    <div key={c.id} className="group/dm relative mx-1">
+                    <div key={c.id} className="group relative mx-1 flex items-center">
                       <button
                         onClick={() => setActiveChannel(c.id)}
-                        className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors rounded-md ${
+                        className={`flex-1 flex items-center gap-2 px-3 py-1.5 text-sm transition-colors rounded-md ${
                           isActive
                             ? 'bg-white/[0.08] text-white'
                             : unread
@@ -546,8 +597,8 @@ export default function MessagesPage() {
                         }
                       </button>
                       <button
-                        onClick={(e) => { e.stopPropagation(); deleteChannel(c.id); }}
-                        className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/dm:opacity-100 p-1 rounded text-white/20 hover:text-red-400 hover:bg-white/[0.06] transition-all"
+                        onClick={() => deleteChannel(c.id)}
+                        className="opacity-0 group-hover:opacity-100 p-1 mr-1 rounded text-white/30 hover:text-red-400 transition-all flex-shrink-0"
                         title="Delete conversation"
                       >
                         <X size={11} />

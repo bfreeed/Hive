@@ -299,6 +299,7 @@ interface AppStore {
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   addNotification: (n: Omit<Notification, 'id' | 'createdAt' | 'read'>) => void;
+  addChannel: (channel: Omit<Channel, 'id'>) => void;
   updateChannel: (id: string, u: Partial<Channel>) => void;
   deleteChannel: (id: string) => void;
   sendMessage: (channelId: string, body: string, attachments?: { name: string; url: string; type: string }[]) => void;
@@ -431,6 +432,10 @@ export const useStore = create<AppStore>()((set, get) => ({
   setActiveChannel: (id) => set((s) => ({
     activeChannelId: id,
     channels: s.channels.map(c => c.id === id ? { ...c, lastReadAt: new Date().toISOString() } : c),
+  })),
+
+  addChannel: (channel) => set((s) => ({
+    channels: [...s.channels, { ...channel, id: uid() }],
   })),
 
   updateChannel: (id, u) => set((s) => ({
