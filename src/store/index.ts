@@ -300,6 +300,7 @@ interface AppStore {
   markAllNotificationsRead: () => void;
   addNotification: (n: Omit<Notification, 'id' | 'createdAt' | 'read'>) => void;
   updateChannel: (id: string, u: Partial<Channel>) => void;
+  deleteChannel: (id: string) => void;
   sendMessage: (channelId: string, body: string, attachments?: { name: string; url: string; type: string }[]) => void;
   updateMessage: (id: string, body: string) => void;
   deleteMessage: (id: string) => void;
@@ -434,6 +435,14 @@ export const useStore = create<AppStore>()((set, get) => ({
 
   updateChannel: (id, u) => set((s) => ({
     channels: s.channels.map(c => c.id === id ? { ...c, ...u } : c),
+  })),
+
+  deleteChannel: (id) => set((s) => ({
+    channels: s.channels.filter(c => c.id !== id),
+    messages: s.messages.filter(m => m.channelId !== id),
+    activeChannelId: s.activeChannelId === id
+      ? (s.channels.find(c => c.id !== id)?.id ?? s.activeChannelId)
+      : s.activeChannelId,
   })),
 
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),

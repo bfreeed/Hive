@@ -230,7 +230,7 @@ export default function MessagesPage() {
   const {
     channels, messages, users, currentUser, activeChannelId,
     setActiveChannel, sendMessage, addReaction,
-    updateMessage, deleteMessage, replyToMessage, addNotification,
+    updateMessage, deleteMessage, replyToMessage, addNotification, deleteChannel,
   } = useStore();
 
   const [input, setInput] = useState('');
@@ -486,23 +486,31 @@ export default function MessagesPage() {
                   const unread = isUnread(c);
                   const isActive = c.id === activeChannelId;
                   return (
-                    <button
-                      key={c.id}
-                      onClick={() => setActiveChannel(c.id)}
-                      className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors rounded-md mx-1 ${
-                        isActive
-                          ? 'bg-white/[0.08] text-white'
-                          : unread
-                            ? 'text-white font-medium hover:bg-white/[0.04]'
-                            : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'
-                      }`}
-                    >
-                      <Hash size={14} className="flex-shrink-0 text-white/30" />
-                      <span className="truncate flex-1 text-left">{c.name}</span>
-                      {unread && !isActive && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-brand-400 flex-shrink-0" />
-                      )}
-                    </button>
+                    <div key={c.id} className="group/ch relative mx-1">
+                      <button
+                        onClick={() => setActiveChannel(c.id)}
+                        className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors rounded-md ${
+                          isActive
+                            ? 'bg-white/[0.08] text-white'
+                            : unread
+                              ? 'text-white font-medium hover:bg-white/[0.04]'
+                              : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'
+                        }`}
+                      >
+                        <Hash size={14} className="flex-shrink-0 text-white/30" />
+                        <span className="truncate flex-1 text-left">{c.name}</span>
+                        {unread && !isActive && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-brand-400 flex-shrink-0" />
+                        )}
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteChannel(c.id); }}
+                        className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/ch:opacity-100 p-1 rounded text-white/20 hover:text-red-400 hover:bg-white/[0.06] transition-all"
+                        title="Delete channel"
+                      >
+                        <X size={11} />
+                      </button>
+                    </div>
                   );
                 })}
               </div>
@@ -517,26 +525,34 @@ export default function MessagesPage() {
                   const isActive = c.id === activeChannelId;
                   const userId = getDmUserId(c);
                   return (
-                    <button
-                      key={c.id}
-                      onClick={() => setActiveChannel(c.id)}
-                      className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors rounded-md mx-1 ${
-                        isActive
-                          ? 'bg-white/[0.08] text-white'
-                          : unread
-                            ? 'text-white font-medium hover:bg-white/[0.04]'
-                            : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'
-                      }`}
-                    >
-                      <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-semibold text-white ${AVATAR_COLORS[userId] || 'bg-white/20'}`}>
-                        {getDmName(c)[0]}
-                      </div>
-                      <span className="truncate flex-1 text-left">{getDmName(c)}</span>
-                      {unread && !isActive
-                        ? <span className="w-1.5 h-1.5 rounded-full bg-brand-400 flex-shrink-0" />
-                        : <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
-                      }
-                    </button>
+                    <div key={c.id} className="group/dm relative mx-1">
+                      <button
+                        onClick={() => setActiveChannel(c.id)}
+                        className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors rounded-md ${
+                          isActive
+                            ? 'bg-white/[0.08] text-white'
+                            : unread
+                              ? 'text-white font-medium hover:bg-white/[0.04]'
+                              : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'
+                        }`}
+                      >
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-semibold text-white ${AVATAR_COLORS[userId] || 'bg-white/20'}`}>
+                          {getDmName(c)[0]}
+                        </div>
+                        <span className="truncate flex-1 text-left">{getDmName(c)}</span>
+                        {unread && !isActive
+                          ? <span className="w-1.5 h-1.5 rounded-full bg-brand-400 flex-shrink-0" />
+                          : <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
+                        }
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteChannel(c.id); }}
+                        className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/dm:opacity-100 p-1 rounded text-white/20 hover:text-red-400 hover:bg-white/[0.06] transition-all"
+                        title="Delete conversation"
+                      >
+                        <X size={11} />
+                      </button>
+                    </div>
                   );
                 })}
               </div>
