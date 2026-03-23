@@ -318,6 +318,8 @@ interface AppStore {
   addUserFlag: (flag: Omit<UserFlag, 'id'>) => void;
   updateUserFlag: (flagId: string, changes: Partial<Omit<UserFlag, 'id'>>) => void;
   removeUserFlag: (flagId: string) => void;
+  userStatuses: Record<string, string>;
+  setUserStatus: (userId: string, status: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -340,6 +342,7 @@ export const useStore = create<AppStore>()((set, get) => ({
   voiceOpen: false,
   manualOrder: [],
   isLoading: false,
+  userStatuses: { lev: 'online', sarah: 'online' },
 
   // -------------------------------------------------------------------------
   // loadData — fetch everything from Supabase and replace local state
@@ -472,6 +475,7 @@ export const useStore = create<AppStore>()((set, get) => ({
     if ('muted' in u) dbFields.muted = u.muted ?? false;
     if ('readBy' in u) dbFields.read_by = u.readBy ?? {};
     if ('deletedAt' in u) dbFields.deleted_at = u.deletedAt ?? null;
+    if ('memberIds' in u) dbFields.member_ids = u.memberIds ?? [];
     if (Object.keys(dbFields).length > 0) {
       supabase.from('channels').update(dbFields).eq('id', id)
         .then(({ error }) => { if (error) console.error('updateChannel error:', error); });
@@ -507,6 +511,8 @@ export const useStore = create<AppStore>()((set, get) => ({
       .then(() => supabase.from('channels').delete().eq('id', id))
       .then(({ error }) => { if (error) console.error('permanentlyDeleteChannel error:', error); });
   },
+
+  setUserStatus: (userId, status) => set((s) => ({ userStatuses: { ...s.userStatuses, [userId]: status } })),
 
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
   toggleDarkMode: () => set((s) => ({ darkMode: !s.darkMode })),

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useStore } from '../store';
 import { supabase } from '../lib/supabase';
-import { Hash, Plus, Search, Smile, Paperclip, Send, X, Pencil, Trash2, MessageSquare, Link, MoreHorizontal, Pin, Copy, ChevronDown, BellOff, Bell, RotateCcw, Archive, Bookmark } from 'lucide-react';
+import { Hash, Plus, Search, Smile, Paperclip, Send, X, Pencil, Trash2, MessageSquare, Link, MoreHorizontal, Pin, Copy, ChevronDown, BellOff, Bell, RotateCcw, Archive, Bookmark, ExternalLink, Globe, UserPlus } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 import type { Message, User } from '../types';
 
@@ -17,11 +17,53 @@ const AVATAR_INITIALS: Record<string, string> = {
   sarah: 'S',
 };
 
-function Avatar({ userId, size = 8 }: { userId: string; size?: number }) {
+const STATUS_DOT: Record<string, string> = {
+  online: 'bg-emerald-400',
+  away: 'bg-amber-400',
+  busy: 'bg-red-400',
+  dnd: 'bg-red-500',
+};
+
+function Avatar({ userId, size = 8, status }: { userId: string; size?: number; status?: string }) {
   return (
-    <div className={`w-${size} h-${size} rounded-full flex items-center justify-center flex-shrink-0 text-white font-semibold text-xs ${AVATAR_COLORS[userId] || 'bg-white/20'}`}>
-      {AVATAR_INITIALS[userId] || '?'}
+    <div className="relative flex-shrink-0">
+      <div className={`w-${size} h-${size} rounded-full flex items-center justify-center text-white font-semibold text-xs ${AVATAR_COLORS[userId] || 'bg-white/20'}`}>
+        {AVATAR_INITIALS[userId] || '?'}
+      </div>
+      {status && (
+        <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#0f0f10] ${STATUS_DOT[status] || 'bg-emerald-400'}`} />
+      )}
     </div>
+  );
+}
+
+function extractFirstUrl(text: string): string | null {
+  const m = text.match(/https?:\/\/[^\s<>"()[\]{}]+/);
+  return m ? m[0] : null;
+}
+
+function LinkPreviewCard({ url }: { url: string }) {
+  let domain = '';
+  try { domain = new URL(url).hostname.replace(/^www\./, ''); } catch { return null; }
+  const display = url.replace(/^https?:\/\//, '').slice(0, 70);
+  return (
+    <a
+      href={url} target="_blank" rel="noopener noreferrer"
+      className="mt-2 flex items-center gap-2.5 px-3 py-2 bg-white/[0.03] border border-white/[0.06] rounded-xl hover:bg-white/[0.06] transition-colors max-w-xs group/link"
+      onClick={e => e.stopPropagation()}
+    >
+      <img
+        src={`https://www.google.com/s2/favicons?sz=32&domain=${domain}`}
+        alt=""
+        className="w-4 h-4 rounded flex-shrink-0"
+        onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+      />
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium text-white/60 truncate">{domain}</p>
+        <p className="text-[10px] text-white/30 truncate">{display}</p>
+      </div>
+      <ExternalLink size={11} className="text-white/20 group-hover/link:text-white/50 flex-shrink-0" />
+    </a>
   );
 }
 
@@ -105,9 +147,10 @@ interface BubbleProps {
   isFirstUnread?: boolean;
   isSaved?: boolean;
   onSave?: (id: string) => void;
+  userStatuses?: Record<string, string>;
 }
 
-function MessageBubble({ msg, prevMsg, userNames, users, replyCount, isPinned, onReact, onEdit, onDelete, onOpenThread, onPin, onCopyLink, editing, editValue, onEditChange, onEditSave, onEditCancel, isThread, isFirstUnread, isSaved, onSave }: BubbleProps) {
+function MessageBubble({ msg, prevMsg, userNames, users, replyCount, isPinned, onReact, onEdit, onDelete, onOpenThread, onPin, onCopyLink, editing, editValue, onEditChange, onEditSave, onEditCancel, isThread, isFirstUnread, isSaved, onSave, userStatuses }: BubbleProps) {
   const [showEmoji, setShowEmoji] = useState(false);
   const author = users.find(u => u.id === msg.authorId);
   const isContinuation = prevMsg && prevMsg.authorId === msg.authorId
@@ -137,7 +180,7 @@ function MessageBubble({ msg, prevMsg, userNames, users, replyCount, isPinned, o
         </div>
       ) : (
         <div className="pt-0.5 flex-shrink-0">
-          <Avatar userId={msg.authorId} size={8} />
+          <Avatar userId={msg.authorId} size={8} status={userStatuses?.[msg.authorId]} />
         </div>
       )}
 
@@ -168,6 +211,15 @@ function MessageBubble({ msg, prevMsg, userNames, users, replyCount, isPinned, o
             {isContinuation && msg.editedAt && <span className="text-[10px] text-white/20 ml-1">(edited)</span>}
           </p>
         )}
+
+        {/* Link preview — first URL in body, if not already in attachments */}
+        {(() => {
+          const url = extractFirstUrl(msg.body);
+          if (!url) return null;
+          const alreadyAttached = msg.attachments?.some(a => a.url === url);
+          if (alreadyAttached) return null;
+          return <LinkPreviewCard url={url} />;
+        })()}
 
         {/* Attachments */}
         {msg.attachments && msg.attachments.length > 0 && (
@@ -300,6 +352,7 @@ export default function MessagesPage() {
     setActiveChannel, sendMessage, addReaction,
     updateMessage, deleteMessage, replyToMessage, addNotification, deleteChannel, addChannel,
     updateChannel, pinMessage, unpinMessage, restoreChannel, permanentlyDeleteChannel,
+    userStatuses,
   } = useStore();
 
   const [input, setInput] = useState('');
@@ -328,6 +381,9 @@ export default function MessagesPage() {
   const typingTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [showDeleted, setShowDeleted] = useState(false);
   const [confirmPermDeleteId, setConfirmPermDeleteId] = useState<string | null>(null);
+  const [showMembers, setShowMembers] = useState(false);
+  const [addMemberUserId, setAddMemberUserId] = useState('');
+  const [showChannelBrowser, setShowChannelBrowser] = useState(false);
   const [savedIds, setSavedIds] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem('saved_msg_ids') || '[]')); }
     catch { return new Set<string>(); }
@@ -398,6 +454,7 @@ export default function MessagesPage() {
     setOpenThreadId(null);
     setShowPinned(false);
     setEditingDesc(false);
+    setShowMembers(false);
     setHasNewMessages(!!firstUnreadId);
   }, [activeChannelId]);
 
@@ -622,6 +679,7 @@ export default function MessagesPage() {
           isFirstUnread={isFirstUnread}
           isSaved={savedIds.has(msg.id)}
           onSave={toggleSave}
+          userStatuses={userStatuses}
         />
       );
       // Wrap first-unread message in a ref div so we can scroll to it
@@ -635,7 +693,7 @@ export default function MessagesPage() {
   };
 
   return (
-    <div className="flex-1 flex overflow-hidden">
+    <div className="flex-1 flex overflow-hidden relative">
 
       {/* Channel sidebar */}
       <div className="w-56 flex-shrink-0 flex flex-col bg-[#111113] border-r border-white/[0.06]">
@@ -714,7 +772,10 @@ export default function MessagesPage() {
               <div className="mb-3">
                 <div className="flex items-center justify-between px-3 mb-1">
                   <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Channels</span>
-                  <button onClick={() => setShowNewChannel(v => !v)} className="text-white/30 hover:text-white/60 transition-colors"><Plus size={12} /></button>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setShowChannelBrowser(true)} className="text-white/30 hover:text-white/60 transition-colors" title="Browse channels"><Globe size={11} /></button>
+                    <button onClick={() => setShowNewChannel(v => !v)} className="text-white/30 hover:text-white/60 transition-colors"><Plus size={12} /></button>
+                  </div>
                 </div>
                 {showNewChannel && (
                   <div className="mx-2 mb-2 flex items-center gap-1">
@@ -823,8 +884,13 @@ export default function MessagesPage() {
                           !showSaved && isActive ? 'bg-white/[0.08] text-white' : unread ? 'text-white font-medium hover:bg-white/[0.04]' : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'
                         }`}
                       >
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-semibold text-white ${AVATAR_COLORS[userId] || 'bg-white/20'}`}>
-                          {getDmName(c)[0]}
+                        <div className="relative flex-shrink-0">
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold text-white ${AVATAR_COLORS[userId] || 'bg-white/20'}`}>
+                            {getDmName(c)[0]}
+                          </div>
+                          {userStatuses[userId] && (
+                            <div className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[#111113] ${STATUS_DOT[userStatuses[userId]] || 'bg-emerald-400'}`} />
+                          )}
                         </div>
                         <span className="truncate flex-1 text-left">{getDmName(c)}</span>
                         {!isActive && hasDraft(c.id) && <span className="text-[9px] text-amber-400/70 font-medium flex-shrink-0">DRAFT</span>}
@@ -1032,7 +1098,7 @@ export default function MessagesPage() {
               )
             )}
           </div>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-2 relative">
             {pinnedMessages.length > 0 && (
               <button
                 onClick={() => setShowPinned(v => !v)}
@@ -1042,14 +1108,77 @@ export default function MessagesPage() {
                 <span>{pinnedMessages.length} pinned</span>
               </button>
             )}
-            <div className="flex items-center">
-              {channel?.memberIds.map(id => (
-                <div key={id} className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold text-white border-2 border-[#0f0f10] -ml-1 first:ml-0 ${AVATAR_COLORS[id] || 'bg-white/20'}`}>
-                  {AVATAR_INITIALS[id] || '?'}
+            <button
+              onClick={() => setShowMembers(v => !v)}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs transition-colors ${showMembers ? 'bg-white/[0.08]' : 'hover:bg-white/[0.04]'}`}
+            >
+              <div className="flex items-center">
+                {channel?.memberIds.slice(0, 4).map(id => (
+                  <div key={id} className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold text-white border-2 border-[#0f0f10] -ml-1 first:ml-0 ${AVATAR_COLORS[id] || 'bg-white/20'}`}>
+                    {AVATAR_INITIALS[id] || '?'}
+                  </div>
+                ))}
+              </div>
+              <span className="text-xs text-white/30">{channel?.memberIds.length}</span>
+            </button>
+
+            {/* Member management panel */}
+            {showMembers && channel && (
+              <div className="absolute right-0 top-full mt-1 z-40 w-64 bg-[#1c1c1f] border border-white/[0.1] rounded-xl shadow-xl overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06]">
+                  <span className="text-xs font-semibold text-white/60">{channel.memberIds.length} member{channel.memberIds.length !== 1 ? 's' : ''}</span>
+                  <button onClick={() => setShowMembers(false)} className="text-white/30 hover:text-white/60 transition-colors"><X size={12} /></button>
                 </div>
-              ))}
-              <span className="text-xs text-white/30 ml-1.5">{channel?.memberIds.length}</span>
-            </div>
+                <div className="max-h-52 overflow-y-auto scrollbar-hide">
+                  {channel.memberIds.map(id => {
+                    const u = users.find(u => u.id === id);
+                    return (
+                      <div key={id} className="flex items-center gap-2.5 px-3 py-2 hover:bg-white/[0.03] group">
+                        <Avatar userId={id} size={6} status={userStatuses[id]} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-white/70 truncate">{u?.name || id}</p>
+                          {userStatuses[id] && <p className="text-[10px] text-white/30 capitalize">{userStatuses[id]}</p>}
+                        </div>
+                        {id !== currentUser.id && (
+                          <button
+                            onClick={() => updateChannel(channel.id, { memberIds: channel.memberIds.filter(m => m !== id) })}
+                            className="opacity-0 group-hover:opacity-100 p-0.5 text-white/30 hover:text-red-400 transition-all"
+                            title="Remove"
+                          >
+                            <X size={12} />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {users.filter(u => !channel.memberIds.includes(u.id)).length > 0 && (
+                  <div className="border-t border-white/[0.06] p-2 flex gap-1">
+                    <select
+                      value={addMemberUserId}
+                      onChange={e => setAddMemberUserId(e.target.value)}
+                      className="flex-1 px-2 py-1 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/60 focus:outline-none focus:border-brand-500/40"
+                    >
+                      <option value="">Add member…</option>
+                      {users.filter(u => !channel.memberIds.includes(u.id)).map(u => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => {
+                        if (!addMemberUserId) return;
+                        updateChannel(channel.id, { memberIds: [...channel.memberIds, addMemberUserId] });
+                        setAddMemberUserId('');
+                      }}
+                      disabled={!addMemberUserId}
+                      className="px-2.5 py-1 bg-brand-600 hover:bg-brand-500 disabled:opacity-30 text-white text-xs rounded-lg transition-colors"
+                    >
+                      <UserPlus size={12} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1299,6 +1428,7 @@ export default function MessagesPage() {
                 onEditCancel={() => { setEditingId(null); setEditValue(''); }}
                 isSaved={savedIds.has(threadParentMsg.id)}
                 onSave={toggleSave}
+                userStatuses={userStatuses}
                 isThread
               />
             </div>
@@ -1342,6 +1472,67 @@ export default function MessagesPage() {
               >
                 <Send size={12} className="text-white" />
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Channel Browser modal */}
+      {showChannelBrowser && (
+        <div className="absolute inset-0 z-50 bg-black/60 flex items-center justify-center" onClick={() => setShowChannelBrowser(false)}>
+          <div className="bg-[#1c1c1f] border border-white/[0.1] rounded-2xl shadow-2xl w-[500px] max-h-[580px] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.08]">
+              <div className="flex items-center gap-2">
+                <Globe size={15} className="text-white/40" />
+                <h2 className="text-sm font-semibold text-white">All Channels</h2>
+                <span className="text-xs text-white/30">{groupedChannels.length}</span>
+              </div>
+              <button onClick={() => setShowChannelBrowser(false)} className="text-white/30 hover:text-white/60 transition-colors"><X size={15} /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto scrollbar-hide p-2 space-y-0.5">
+              {groupedChannels.map(c => {
+                const isMember = c.memberIds.includes(currentUser.id);
+                const msgCount = messages.filter(m => m.channelId === c.id).length;
+                return (
+                  <div key={c.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/[0.04] transition-colors">
+                    <Hash size={15} className="text-white/30 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-2">
+                        <button
+                          onClick={() => { setActiveChannel(c.id); setShowChannelBrowser(false); setShowSaved(false); }}
+                          className="text-sm font-medium text-white/80 hover:text-white transition-colors"
+                        >
+                          {c.name}
+                        </button>
+                        <span className="text-[10px] text-white/25">{c.memberIds.length} members · {msgCount} messages</span>
+                      </div>
+                      {c.description && <p className="text-xs text-white/35 truncate mt-0.5">{c.description}</p>}
+                    </div>
+                    {isMember ? (
+                      <button
+                        onClick={() => {
+                          if (c.memberIds.length > 1) updateChannel(c.id, { memberIds: c.memberIds.filter(id => id !== currentUser.id) });
+                        }}
+                        className="flex-shrink-0 px-2.5 py-1 text-xs text-white/40 border border-white/[0.1] rounded-lg hover:border-red-500/40 hover:text-red-400 transition-colors"
+                      >
+                        Joined
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          updateChannel(c.id, { memberIds: [...c.memberIds, currentUser.id] });
+                          setActiveChannel(c.id);
+                          setShowChannelBrowser(false);
+                          setShowSaved(false);
+                        }}
+                        className="flex-shrink-0 px-2.5 py-1 text-xs text-brand-400 border border-brand-500/40 rounded-lg hover:bg-brand-500/10 transition-colors"
+                      >
+                        Join
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

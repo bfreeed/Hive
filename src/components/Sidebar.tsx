@@ -20,12 +20,21 @@ interface SidebarProps {
   onNavigate: (page: string, projectId?: string) => void;
 }
 
+const STATUSES = [
+  { value: 'online', label: 'Online', color: 'bg-emerald-400' },
+  { value: 'away', label: 'Away', color: 'bg-amber-400' },
+  { value: 'busy', label: 'Busy', color: 'bg-red-400' },
+  { value: 'dnd', label: 'Do Not Disturb', color: 'bg-red-500' },
+];
+const STATUS_DOT: Record<string, string> = { online: 'bg-emerald-400', away: 'bg-amber-400', busy: 'bg-red-400', dnd: 'bg-red-500' };
+
 export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
-  const { projects, tasks, users, notifications, channels, messages, darkMode, toggleDarkMode, toggleVoice, sidebarOpen, toggleSidebar, addProject, currentUser, isLoading } = useStore();
+  const { projects, tasks, users, notifications, channels, messages, darkMode, toggleDarkMode, toggleVoice, sidebarOpen, toggleSidebar, addProject, currentUser, isLoading, userStatuses, setUserStatus } = useStore();
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
   };
+  const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [projectsExpanded, setProjectsExpanded] = useState(true);
   const [teamExpanded, setTeamExpanded] = useState(true);
   const [showNewProject, setShowNewProject] = useState(false);
@@ -235,14 +244,21 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
           {sidebarOpen && <span>Settings</span>}
         </button>
 
-        {/* Avatar + Sign Out */}
+        {/* Avatar + status + Sign Out */}
         {sidebarOpen ? (
-          <div className="flex items-center gap-2.5 px-2 py-2 mt-1 group">
-            <div className="w-6 h-6 rounded-full bg-brand-600 flex items-center justify-center flex-shrink-0">
-              <span className="text-xs font-semibold text-white">
-                {(currentUser?.name || 'L').charAt(0).toUpperCase()}
-              </span>
-            </div>
+          <div className="flex items-center gap-2.5 px-2 py-2 mt-1 group relative">
+            <button
+              onClick={() => setShowStatusPicker(v => !v)}
+              className="relative flex-shrink-0"
+              title="Set status"
+            >
+              <div className="w-6 h-6 rounded-full bg-brand-600 flex items-center justify-center">
+                <span className="text-xs font-semibold text-white">
+                  {(currentUser?.name || 'L').charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#111113] ${STATUS_DOT[userStatuses[currentUser.id] || 'online']}`} />
+            </button>
             <span className="text-sm text-white/60 truncate flex-1">{currentUser?.name || 'Lev Freedman'}</span>
             <button
               onClick={handleSignOut}
@@ -251,6 +267,23 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
             >
               <LogOut size={13} />
             </button>
+            {showStatusPicker && (
+              <div className="absolute left-2 bottom-full mb-1 bg-[#1c1c1f] border border-white/[0.1] rounded-xl shadow-xl overflow-hidden z-50 w-44">
+                {STATUSES.map(s => (
+                  <button
+                    key={s.value}
+                    onClick={() => { setUserStatus(currentUser.id, s.value); setShowStatusPicker(false); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-white/60 hover:bg-white/[0.06] transition-colors"
+                  >
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${s.color}`} />
+                    {s.label}
+                    {(userStatuses[currentUser.id] || 'online') === s.value && (
+                      <Check size={11} className="ml-auto text-brand-400" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           <button
