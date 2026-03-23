@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useStore } from '../store';
-import { Hash, Plus, Search, Smile, Paperclip, Send, X, Pencil, Trash2, MessageSquare, Link } from 'lucide-react';
+import { Hash, Plus, Search, Smile, Paperclip, Send, X, Pencil, Trash2, MessageSquare, Link, MoreHorizontal } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 import type { Message, User } from '../types';
 
@@ -239,6 +239,8 @@ export default function MessagesPage() {
   const [editValue, setEditValue] = useState('');
   const [openThreadId, setOpenThreadId] = useState<string | null>(null);
   const [threadInput, setThreadInput] = useState('');
+  const [channelMenuId, setChannelMenuId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showNewChannel, setShowNewChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
   const [showNewDm, setShowNewDm] = useState(false);
@@ -522,28 +524,43 @@ export default function MessagesPage() {
                   return (
                     <div key={c.id} className="group relative mx-1 flex items-center">
                       <button
-                        onClick={() => setActiveChannel(c.id)}
+                        onClick={() => { setActiveChannel(c.id); setChannelMenuId(null); }}
                         className={`flex-1 flex items-center gap-2 px-3 py-1.5 text-sm transition-colors rounded-md ${
-                          isActive
-                            ? 'bg-white/[0.08] text-white'
-                            : unread
-                              ? 'text-white font-medium hover:bg-white/[0.04]'
-                              : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'
+                          isActive ? 'bg-white/[0.08] text-white' : unread ? 'text-white font-medium hover:bg-white/[0.04]' : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'
                         }`}
                       >
                         <Hash size={14} className="flex-shrink-0 text-white/30" />
                         <span className="truncate flex-1 text-left">{c.name}</span>
-                        {unread && !isActive && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-brand-400 flex-shrink-0" />
+                        {unread && !isActive && <span className="w-1.5 h-1.5 rounded-full bg-brand-400 flex-shrink-0" />}
+                      </button>
+                      <div className="relative flex-shrink-0">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setChannelMenuId(channelMenuId === c.id ? null : c.id); setConfirmDeleteId(null); }}
+                          className="opacity-0 group-hover:opacity-100 p-1 mr-1 rounded text-white/30 hover:text-white/60 hover:bg-white/[0.06] transition-all"
+                        >
+                          <MoreHorizontal size={13} />
+                        </button>
+                        {channelMenuId === c.id && (
+                          <div className="absolute right-0 top-full mt-0.5 z-50 bg-[#1c1c1f] border border-white/[0.1] rounded-lg shadow-xl overflow-hidden w-40">
+                            {confirmDeleteId === c.id ? (
+                              <div className="p-2">
+                                <p className="text-xs text-white/60 mb-2">Delete <span className="text-white font-medium">#{c.name}</span> and all its messages?</p>
+                                <div className="flex gap-1">
+                                  <button onClick={() => { deleteChannel(c.id); setChannelMenuId(null); setConfirmDeleteId(null); }} className="flex-1 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs rounded transition-colors">Delete</button>
+                                  <button onClick={() => setConfirmDeleteId(null)} className="flex-1 py-1 bg-white/[0.04] hover:bg-white/[0.08] text-white/50 text-xs rounded transition-colors">Cancel</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setConfirmDeleteId(c.id)}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-white/[0.06] transition-colors"
+                              >
+                                <Trash2 size={12} /> Delete channel
+                              </button>
+                            )}
+                          </div>
                         )}
-                      </button>
-                      <button
-                        onClick={() => deleteChannel(c.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1 mr-1 rounded text-white/30 hover:text-red-400 transition-all flex-shrink-0"
-                        title="Delete channel"
-                      >
-                        <X size={11} />
-                      </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -578,13 +595,9 @@ export default function MessagesPage() {
                   return (
                     <div key={c.id} className="group relative mx-1 flex items-center">
                       <button
-                        onClick={() => setActiveChannel(c.id)}
+                        onClick={() => { setActiveChannel(c.id); setChannelMenuId(null); }}
                         className={`flex-1 flex items-center gap-2 px-3 py-1.5 text-sm transition-colors rounded-md ${
-                          isActive
-                            ? 'bg-white/[0.08] text-white'
-                            : unread
-                              ? 'text-white font-medium hover:bg-white/[0.04]'
-                              : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'
+                          isActive ? 'bg-white/[0.08] text-white' : unread ? 'text-white font-medium hover:bg-white/[0.04]' : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'
                         }`}
                       >
                         <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-semibold text-white ${AVATAR_COLORS[userId] || 'bg-white/20'}`}>
@@ -596,13 +609,34 @@ export default function MessagesPage() {
                           : <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
                         }
                       </button>
-                      <button
-                        onClick={() => deleteChannel(c.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1 mr-1 rounded text-white/30 hover:text-red-400 transition-all flex-shrink-0"
-                        title="Delete conversation"
-                      >
-                        <X size={11} />
-                      </button>
+                      <div className="relative flex-shrink-0">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setChannelMenuId(channelMenuId === c.id ? null : c.id); setConfirmDeleteId(null); }}
+                          className="opacity-0 group-hover:opacity-100 p-1 mr-1 rounded text-white/30 hover:text-white/60 hover:bg-white/[0.06] transition-all"
+                        >
+                          <MoreHorizontal size={13} />
+                        </button>
+                        {channelMenuId === c.id && (
+                          <div className="absolute right-0 top-full mt-0.5 z-50 bg-[#1c1c1f] border border-white/[0.1] rounded-lg shadow-xl overflow-hidden w-44">
+                            {confirmDeleteId === c.id ? (
+                              <div className="p-2">
+                                <p className="text-xs text-white/60 mb-2">Delete conversation with <span className="text-white font-medium">{getDmName(c)}</span>?</p>
+                                <div className="flex gap-1">
+                                  <button onClick={() => { deleteChannel(c.id); setChannelMenuId(null); setConfirmDeleteId(null); }} className="flex-1 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs rounded transition-colors">Delete</button>
+                                  <button onClick={() => setConfirmDeleteId(null)} className="flex-1 py-1 bg-white/[0.04] hover:bg-white/[0.08] text-white/50 text-xs rounded transition-colors">Cancel</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setConfirmDeleteId(c.id)}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-white/[0.06] transition-colors"
+                              >
+                                <Trash2 size={12} /> Delete conversation
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
