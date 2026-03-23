@@ -137,6 +137,8 @@ export interface Channel {
   description?: string;
   lastReadAt?: string;
   pinnedMessageIds?: string[];
+  muted?: boolean;
+  readBy?: Record<string, string>; // userId → ISO timestamp of last read
 }
 
 export interface Message {

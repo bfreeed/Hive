@@ -213,6 +213,8 @@ function dbToChannel(row: any): Channel {
     description: row.description ?? undefined,
     lastReadAt: row.last_read_at ?? undefined,
     pinnedMessageIds: row.pinned_message_ids ?? [],
+    muted: row.muted ?? false,
+    readBy: row.read_by ?? {},
   };
 }
 
@@ -432,10 +434,20 @@ export const useStore = create<AppStore>()((set, get) => ({
 
   setActiveProject: (id) => set({ activeProjectId: id }),
 
-  setActiveChannel: (id) => set((s) => ({
-    activeChannelId: id,
-    channels: s.channels.map(c => c.id === id ? { ...c, lastReadAt: new Date().toISOString() } : c),
-  })),
+  setActiveChannel: (id) => {
+    const now = new Date().toISOString();
+    const { currentUser } = useStore.getState();
+    set((s) => ({
+      activeChannelId: id,
+      channels: s.channels.map(c => c.id === id
+        ? { ...c, lastReadAt: now, readBy: { ...(c.readBy ?? {}), [currentUser.id]: now } }
+        : c
+      ),
+    }));
+    // Persist readBy to Supabase (best-effort, column may not exist yet)
+    supabase.from('channels').update({ read_by: { [currentUser.id]: now } }).eq('id', id)
+      .then(() => {});
+  },
 
   addChannel: (channel) => {
     const newChannel: Channel = { ...channel, id: uid() };
@@ -454,6 +466,8 @@ export const useStore = create<AppStore>()((set, get) => ({
     const dbFields: Record<string, any> = {};
     if ('description' in u) dbFields.description = u.description ?? null;
     if ('pinnedMessageIds' in u) dbFields.pinned_message_ids = u.pinnedMessageIds ?? [];
+    if ('muted' in u) dbFields.muted = u.muted ?? false;
+    if ('readBy' in u) dbFields.read_by = u.readBy ?? {};
     if (Object.keys(dbFields).length > 0) {
       supabase.from('channels').update(dbFields).eq('id', id)
         .then(({ error }) => { if (error) console.error('updateChannel error:', error); });

@@ -54,9 +54,9 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
   const unreadCount = notifications.filter((n) => !n.read).length;
   const questionsCount = tasks.filter((t) => t.flags?.some(f => f.flagId === 'flag-questions')).length;
 
-  // Total unread messages across all channels the current user is a member of
+  // Total unread messages across all non-muted channels the current user is a member of
   const unreadMessages = channels
-    .filter(c => c.memberIds.includes(currentUser.id))
+    .filter(c => c.memberIds.includes(currentUser.id) && !c.muted)
     .reduce((total, ch) => {
       const lastRead = ch.lastReadAt;
       const count = messages.filter(m =>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useStore } from '../store';
-import { Hash, Plus, Search, Smile, Paperclip, Send, X, Pencil, Trash2, MessageSquare, Link, MoreHorizontal, Pin, Copy, ChevronDown } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { Hash, Plus, Search, Smile, Paperclip, Send, X, Pencil, Trash2, MessageSquare, Link, MoreHorizontal, Pin, Copy, ChevronDown, BellOff, Bell } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 import type { Message, User } from '../types';
 
@@ -43,18 +44,40 @@ function isSameDay(a: string, b: string) {
 }
 
 function renderBody(body: string, userNames: string[]): React.ReactNode {
-  const parts = body.split(/(@\w[\w.]*)/g);
+  // Split by inline code first to protect its contents from markdown processing
+  const codeSegments = body.split(/(`[^`\n]+`)/g);
   return (
     <>
-      {parts.map((part, i) => {
-        if (part.startsWith('@')) {
-          const name = part.slice(1).toLowerCase();
-          const isMatch = userNames.some(n => n.toLowerCase() === name || n.toLowerCase().startsWith(name));
-          if (isMatch) {
-            return <span key={i} className="bg-brand-500/20 text-brand-300 rounded px-0.5">{part}</span>;
-          }
+      {codeSegments.map((seg, si) => {
+        if (seg.startsWith('`') && seg.endsWith('`') && seg.length > 2) {
+          return (
+            <code key={si} className="bg-white/[0.08] text-amber-300/90 rounded px-1 py-0.5 text-[0.85em] font-mono">
+              {seg.slice(1, -1)}
+            </code>
+          );
         }
-        return <React.Fragment key={i}>{part}</React.Fragment>;
+        // Process bold, italic, strikethrough, @mentions in plain segments
+        const parts = seg.split(/(\*\*[^*\n]+\*\*|_[^_\n]+_|~~[^~\n]+~~|@\w[\w.]*)/g);
+        return parts.map((part, pi) => {
+          const key = `${si}-${pi}`;
+          if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+            return <strong key={key} className="font-semibold text-white/95">{part.slice(2, -2)}</strong>;
+          }
+          if (part.startsWith('_') && part.endsWith('_') && part.length > 2) {
+            return <em key={key} className="italic text-white/80">{part.slice(1, -1)}</em>;
+          }
+          if (part.startsWith('~~') && part.endsWith('~~') && part.length > 4) {
+            return <del key={key} className="opacity-40">{part.slice(2, -2)}</del>;
+          }
+          if (part.startsWith('@')) {
+            const name = part.slice(1).toLowerCase();
+            const isMatch = userNames.some(n => n.toLowerCase() === name || n.toLowerCase().startsWith(name));
+            if (isMatch) {
+              return <span key={key} className="bg-brand-500/20 text-brand-300 rounded px-0.5">{part}</span>;
+            }
+          }
+          return <React.Fragment key={key}>{part}</React.Fragment>;
+        });
       })}
     </>
   );
@@ -160,16 +183,23 @@ function MessageBubble({ msg, prevMsg, userNames, users, replyCount, isPinned, o
         {/* Reactions */}
         {totalReactions.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-1.5">
-            {totalReactions.map(([emoji, reactors]) => (
-              <button
-                key={emoji}
-                onClick={() => onReact(msg.id, emoji)}
-                className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] text-xs transition-colors"
-              >
-                <span>{emoji}</span>
-                <span className="text-white/50">{reactors.length}</span>
-              </button>
-            ))}
+            {totalReactions.map(([emoji, reactors]) => {
+              const names = reactors.map(id => users.find(u => u.id === id)?.name?.split(' ')[0] || id).join(', ');
+              return (
+                <div key={emoji} className="relative group/rxn">
+                  <button
+                    onClick={() => onReact(msg.id, emoji)}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] text-xs transition-colors"
+                  >
+                    <span>{emoji}</span>
+                    <span className="text-white/50">{reactors.length}</span>
+                  </button>
+                  <div className="absolute bottom-full left-0 mb-1.5 px-2 py-1 bg-[#0f0f10] border border-white/[0.1] rounded-lg text-[10px] text-white/70 whitespace-nowrap opacity-0 group-hover/rxn:opacity-100 transition-opacity pointer-events-none z-30 shadow-xl">
+                    {names}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -282,6 +312,9 @@ export default function MessagesPage() {
   const [descValue, setDescValue] = useState('');
   const [copyToast, setCopyToast] = useState(false);
   const [hasNewMessages, setHasNewMessages] = useState(false);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const typingTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -357,6 +390,30 @@ export default function MessagesPage() {
     if (editingDesc && descInputRef.current) descInputRef.current.focus();
   }, [editingDesc]);
 
+  // Typing indicator: subscribe to broadcast events for current channel
+  useEffect(() => {
+    if (typingChannelRef.current) {
+      supabase.removeChannel(typingChannelRef.current);
+    }
+    setTypingUsers([]);
+    const ch = supabase.channel(`typing-${activeChannelId}`)
+      .on('broadcast', { event: 'typing' }, ({ payload }) => {
+        const uid = payload?.userId as string;
+        if (!uid || uid === currentUser.id) return;
+        setTypingUsers(prev => prev.includes(uid) ? prev : [...prev, uid]);
+        clearTimeout(typingTimeoutsRef.current[uid]);
+        typingTimeoutsRef.current[uid] = setTimeout(() => {
+          setTypingUsers(prev => prev.filter(id => id !== uid));
+        }, 3000);
+      })
+      .subscribe();
+    typingChannelRef.current = ch;
+    return () => {
+      supabase.removeChannel(ch);
+      Object.values(typingTimeoutsRef.current).forEach(clearTimeout);
+    };
+  }, [activeChannelId, currentUser.id]);
+
   const isUnread = (ch: typeof channels[0]) => {
     const lastRead = ch.lastReadAt;
     if (!lastRead) return messages.some(m => m.channelId === ch.id);
@@ -428,6 +485,14 @@ export default function MessagesPage() {
     setPendingUrlName('');
     setShowAttachForm(false);
   };
+
+  const broadcastTyping = useCallback(() => {
+    typingChannelRef.current?.send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: { userId: currentUser.id },
+    });
+  }, [currentUser.id]);
 
   const handleCopyLink = useCallback((msgId: string) => {
     const url = `${window.location.origin}?channel=${activeChannelId}&msg=${msgId}`;
@@ -618,7 +683,8 @@ export default function MessagesPage() {
                       >
                         <Hash size={14} className="flex-shrink-0 text-white/30" />
                         <span className="truncate flex-1 text-left">{c.name}</span>
-                        {unread && !isActive && <span className="w-1.5 h-1.5 rounded-full bg-brand-400 flex-shrink-0" />}
+                        {c.muted && <BellOff size={11} className="text-white/20 flex-shrink-0" />}
+                        {unread && !isActive && !c.muted && <span className="w-1.5 h-1.5 rounded-full bg-brand-400 flex-shrink-0" />}
                       </button>
                       <div className="relative flex-shrink-0">
                         <button
@@ -628,7 +694,7 @@ export default function MessagesPage() {
                           <MoreHorizontal size={13} />
                         </button>
                         {channelMenuId === c.id && (
-                          <div className="absolute right-0 top-full mt-0.5 z-50 bg-[#1c1c1f] border border-white/[0.1] rounded-lg shadow-xl overflow-hidden w-40">
+                          <div className="absolute right-0 top-full mt-0.5 z-50 bg-[#1c1c1f] border border-white/[0.1] rounded-lg shadow-xl overflow-hidden w-44">
                             {confirmDeleteId === c.id ? (
                               <div className="p-2">
                                 <p className="text-xs text-white/60 mb-2">Delete <span className="text-white font-medium">#{c.name}</span> and all its messages?</p>
@@ -638,12 +704,21 @@ export default function MessagesPage() {
                                 </div>
                               </div>
                             ) : (
-                              <button
-                                onClick={() => setConfirmDeleteId(c.id)}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-white/[0.06] transition-colors"
-                              >
-                                <Trash2 size={12} /> Delete channel
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => { updateChannel(c.id, { muted: !c.muted }); setChannelMenuId(null); }}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/60 hover:bg-white/[0.06] transition-colors"
+                                >
+                                  {c.muted ? <Bell size={12} /> : <BellOff size={12} />}
+                                  {c.muted ? 'Unmute channel' : 'Mute channel'}
+                                </button>
+                                <button
+                                  onClick={() => setConfirmDeleteId(c.id)}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-white/[0.06] transition-colors"
+                                >
+                                  <Trash2 size={12} /> Delete channel
+                                </button>
+                              </>
                             )}
                           </div>
                         )}
@@ -714,12 +789,21 @@ export default function MessagesPage() {
                                 </div>
                               </div>
                             ) : (
-                              <button
-                                onClick={() => setConfirmDeleteId(c.id)}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-white/[0.06] transition-colors"
-                              >
-                                <Trash2 size={12} /> Delete conversation
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => { updateChannel(c.id, { muted: !c.muted }); setChannelMenuId(null); }}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/60 hover:bg-white/[0.06] transition-colors"
+                                >
+                                  {c.muted ? <Bell size={12} /> : <BellOff size={12} />}
+                                  {c.muted ? 'Unmute' : 'Mute conversation'}
+                                </button>
+                                <button
+                                  onClick={() => setConfirmDeleteId(c.id)}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-white/[0.06] transition-colors"
+                                >
+                                  <Trash2 size={12} /> Delete conversation
+                                </button>
+                              </>
                             )}
                           </div>
                         )}
@@ -867,6 +951,25 @@ export default function MessagesPage() {
           ) : (
             <>
               {renderMessageList(topLevelMessages)}
+              {/* Read receipts for DMs */}
+              {channel?.type === 'dm' && (() => {
+                const otherId = channel.memberIds.find(id => id !== currentUser.id);
+                const otherReadAt = channel.readBy?.[otherId ?? ''];
+                if (!otherReadAt) return null;
+                // Find the last message sent by current user that the other person has read
+                const lastReadMsg = [...topLevelMessages].reverse().find(
+                  m => m.authorId === currentUser.id && m.createdAt <= otherReadAt
+                );
+                if (!lastReadMsg) return null;
+                const otherUser = users.find(u => u.id === otherId);
+                return (
+                  <div className="px-4 pb-1 text-right">
+                    <span className="text-[10px] text-white/25">
+                      Seen by {otherUser?.name?.split(' ')[0] || 'them'} at {format(new Date(otherReadAt), 'h:mm a')}
+                    </span>
+                  </div>
+                );
+              })()}
               <div ref={bottomRef} />
             </>
           )}
@@ -940,6 +1043,7 @@ export default function MessagesPage() {
                 setInput(e.target.value);
                 e.target.style.height = 'auto';
                 e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+                broadcastTyping();
               }}
               onKeyDown={e => {
                 if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
@@ -959,7 +1063,22 @@ export default function MessagesPage() {
               <Send size={14} className="text-white" />
             </button>
           </div>
-          <p className="text-center text-[10px] text-white/15 mt-1.5">Enter to send · Shift+Enter for new line</p>
+          {/* Typing indicator */}
+          {typingUsers.length > 0 && (
+            <div className="flex items-center gap-1.5 mt-1.5 px-1">
+              <div className="flex gap-0.5">
+                {[0,1,2].map(i => (
+                  <span key={i} className="w-1 h-1 rounded-full bg-white/30 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                ))}
+              </div>
+              <span className="text-[10px] text-white/30">
+                {typingUsers.map(id => users.find(u => u.id === id)?.name?.split(' ')[0] || id).join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing…
+              </span>
+            </div>
+          )}
+          {typingUsers.length === 0 && (
+            <p className="text-center text-[10px] text-white/15 mt-1.5">Enter to send · Shift+Enter for new line</p>
+          )}
         </div>
       </div>
 
