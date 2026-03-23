@@ -60,6 +60,9 @@ export interface Task {
   attachments: Attachment[];
   reminderAt?: string;    // ISO datetime — when to send the SMS reminder
   reminderSent?: boolean; // true after SMS has been fired, prevents double-send
+  parentId?: string;      // subtask: ID of parent task
+  sectionId?: string;     // which project section this task belongs to
+  dependsOn?: string[];   // IDs of tasks that must be done before this one
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
@@ -81,6 +84,13 @@ export interface Attachment {
   source?: 'upload' | 'google_drive';
   driveId?: string;
   createdAt: string;
+}
+
+export interface Section {
+  id: string;
+  name: string;
+  projectId: string;
+  order: number;
 }
 
 export interface Project {

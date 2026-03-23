@@ -14,6 +14,7 @@ import ContactsPage from './pages/ContactsPage';
 import TeamMemberView from './pages/TeamMemberView';
 import MessagesPage from './pages/MessagesPage';
 import NotificationsPage from './pages/NotificationsPage';
+import TodayPage from './pages/TodayPage';
 import { useReminderChecker } from './hooks/useReminderChecker';
 import { useHealthSweep } from './hooks/useHealthSweep';
 
@@ -391,6 +392,7 @@ function AuthenticatedApp() {
   const navigate = (pageName: string, id?: string) => {
     if (pageName === 'home') setPage({ id: 'home' });
     else if (pageName === 'tasks') setPage({ id: 'tasks' });
+    else if (pageName === 'today') setPage({ id: 'today' });
     else if (pageName === 'contacts') setPage({ id: 'contacts' });
     else if (pageName === 'messages') setPage({ id: 'messages' });
     else if (pageName === 'project' && id) setPage({ id: 'project', projectId: id });
@@ -411,6 +413,8 @@ function AuthenticatedApp() {
         return <Home onNavigate={navigate} onOpenTask={setOpenTaskId} />;
       case 'tasks':
         return <TasksPage onOpenTask={setOpenTaskId} />;
+      case 'today':
+        return <TodayPage onOpenTask={setOpenTaskId} />;
       case 'contacts':
         return <ContactsPage />;
       case 'messages':

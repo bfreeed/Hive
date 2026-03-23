@@ -1,6 +1,6 @@
 import React, { forwardRef } from 'react';
 import { useStore } from '../store';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, GitBranch } from 'lucide-react';
 import { format, isPast, isToday, isTomorrow } from 'date-fns';
 import type { Task } from '../types';
 
@@ -19,7 +19,9 @@ interface TaskRowProps {
 }
 
 const TaskRow = forwardRef<HTMLDivElement, TaskRowProps>(function TaskRow({ task, onOpenTask, showProject = false, focused = false }, ref) {
-  const { projects, users, updateTask } = useStore();
+  const { projects, users, tasks, updateTask } = useStore();
+  const subtaskCount = tasks.filter(t => t.parentId === task.id).length;
+  const subtaskDoneCount = tasks.filter(t => t.parentId === task.id && t.status === 'done').length;
   const project = projects.find((p) => p.id === task.projectIds?.[0]);
   const isOverdue = task.dueDate && isPast(new Date(task.dueDate)) && task.status !== 'done';
 
@@ -43,6 +45,12 @@ const TaskRow = forwardRef<HTMLDivElement, TaskRowProps>(function TaskRow({ task
       <span className={`flex-1 min-w-0 text-sm truncate ${task.status === 'done' ? 'line-through text-white/30' : 'text-white/80 group-hover:text-white'}`}>
         {task.title}
       </span>
+      {subtaskCount > 0 && (
+        <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] text-white/30 bg-white/[0.05] px-1.5 py-0.5 rounded-full" title={`${subtaskDoneCount}/${subtaskCount} subtasks`}>
+          <GitBranch size={9} />
+          {subtaskDoneCount}/{subtaskCount}
+        </span>
+      )}
       {task.recurring && task.status !== 'done' && <span className="flex-shrink-0 text-xs text-white/25" title={`Repeats ${task.recurring}`}>↻</span>}
       {task.flags?.map(tf => {
         const applier = users.find(u => u.id === tf.appliedBy);

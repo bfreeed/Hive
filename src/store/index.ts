@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
-import type { Task, Project, Contact, User, UserFlag, Notification, Channel, Message } from '../types';
+import type { Task, Project, Contact, User, UserFlag, Notification, Channel, Message, Section } from '../types';
 
 // ---------------------------------------------------------------------------
 // Fallback seed data (shown while Supabase loads or if it fails)
@@ -29,13 +29,30 @@ const PROJECTS: Project[] = [
   { id: 'jedi', name: 'Jedi Village', description: 'Property in Sebastopol', color: '#f59e0b', status: 'active', memberIds: ['lev'], isPrivate: false, createdAt: now },
 ];
 
+const SECTIONS: Section[] = [
+  { id: 'sec-jedi-1', name: 'Active Work', projectId: 'jedi', order: 0 },
+  { id: 'sec-jedi-2', name: 'Backlog', projectId: 'jedi', order: 1 },
+  { id: 'sec-rff-1', name: 'Grant Cycle', projectId: 'rff', order: 0 },
+  { id: 'sec-rff-2', name: 'Board Items', projectId: 'rff', order: 1 },
+  { id: 'sec-personal-1', name: 'Health & Medical', projectId: 'personal', order: 0 },
+  { id: 'sec-personal-2', name: 'Admin', projectId: 'personal', order: 1 },
+];
+
 const TASKS: Task[] = [
-  { id: 't1', title: 'Fix roof leak', projectIds: ['jedi'], status: 'todo', priority: 'urgent', assigneeIds: ['lev', 'sarah'], flags: [{ flagId: 'flag-72h', appliedBy: 'lev' }], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now, dueDate: in2d },
-  { id: 't2', title: 'Name change with Travis County', projectIds: ['jedi'], status: 'waiting', priority: 'high', assigneeIds: ['lev'], flags: [], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now },
-  { id: 't3', title: 'Schedule dentist appointment', projectIds: ['personal'], status: 'todo', priority: 'medium', assigneeIds: ['sarah'], flags: [{ flagId: 'flag-checkin', appliedBy: 'lev' }], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now, dueDate: in7d },
-  { id: 't4', title: 'Review RFF grant proposal', projectIds: ['rff'], status: 'review', priority: 'high', assigneeIds: ['lev'], flags: [{ flagId: 'flag-questions', appliedBy: 'lev' }], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now },
-  { id: 't5', title: 'Contact storage facility', projectIds: ['jedi'], status: 'todo', priority: 'medium', assigneeIds: ['sarah'], flags: [], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now },
-  { id: 't6', title: 'Annual physical checkup', projectIds: ['personal'], status: 'todo', priority: 'medium', assigneeIds: ['lev'], flags: [], isPrivate: true, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now, dueDate: yest },
+  { id: 't1', title: 'Fix roof leak', projectIds: ['jedi'], sectionId: 'sec-jedi-1', status: 'todo', priority: 'urgent', assigneeIds: ['lev', 'sarah'], flags: [{ flagId: 'flag-72h', appliedBy: 'lev' }], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now, dueDate: in2d },
+  { id: 't2', title: 'Name change with Travis County', projectIds: ['jedi'], sectionId: 'sec-jedi-1', status: 'waiting', priority: 'high', assigneeIds: ['lev'], flags: [], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now },
+  { id: 't3', title: 'Schedule dentist appointment', projectIds: ['personal'], sectionId: 'sec-personal-1', status: 'todo', priority: 'medium', assigneeIds: ['sarah'], flags: [{ flagId: 'flag-checkin', appliedBy: 'lev' }], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now, dueDate: in7d },
+  { id: 't4', title: 'Review RFF grant proposal', projectIds: ['rff'], sectionId: 'sec-rff-1', status: 'review', priority: 'high', assigneeIds: ['lev'], flags: [{ flagId: 'flag-questions', appliedBy: 'lev' }], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now, dependsOn: ['t4-sub2'] },
+  { id: 't5', title: 'Contact storage facility', projectIds: ['jedi'], sectionId: 'sec-jedi-2', status: 'todo', priority: 'medium', assigneeIds: ['sarah'], flags: [], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now },
+  { id: 't6', title: 'Annual physical checkup', projectIds: ['personal'], sectionId: 'sec-personal-1', status: 'todo', priority: 'medium', assigneeIds: ['lev'], flags: [], isPrivate: true, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now, dueDate: yest },
+  // Subtasks for t1
+  { id: 't1-sub1', title: 'Get quotes from 3 contractors', projectIds: ['jedi'], parentId: 't1', status: 'done', priority: 'high', assigneeIds: ['sarah'], flags: [], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: false, createdAt: daysAgo(2), updatedAt: daysAgo(1), completedAt: daysAgo(1) },
+  { id: 't1-sub2', title: 'Schedule repair appointment', projectIds: ['jedi'], parentId: 't1', status: 'todo', priority: 'urgent', assigneeIds: ['sarah'], flags: [], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: false, createdAt: daysAgo(1), updatedAt: now },
+  { id: 't1-sub3', title: 'Arrange property access', projectIds: ['jedi'], parentId: 't1', status: 'todo', priority: 'medium', assigneeIds: ['lev'], flags: [], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: false, createdAt: daysAgo(1), updatedAt: now },
+  // Subtasks for t4
+  { id: 't4-sub1', title: 'Read sections 1–3', projectIds: ['rff'], parentId: 't4', status: 'done', priority: 'medium', assigneeIds: ['lev'], flags: [], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: false, createdAt: daysAgo(3), updatedAt: daysAgo(1), completedAt: daysAgo(1) },
+  { id: 't4-sub2', title: 'Strengthen impact statement (section 3)', projectIds: ['rff'], parentId: 't4', status: 'todo', priority: 'high', assigneeIds: ['lev'], flags: [], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: false, createdAt: daysAgo(2), updatedAt: now },
+  { id: 't4-sub3', title: 'Send final version to board', projectIds: ['rff'], parentId: 't4', status: 'todo', priority: 'high', assigneeIds: ['sarah'], flags: [], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: false, createdAt: daysAgo(1), updatedAt: now, dependsOn: ['t4-sub2'] },
 ];
 
 const CONTACTS: Contact[] = [
@@ -320,6 +337,10 @@ interface AppStore {
   removeUserFlag: (flagId: string) => void;
   userStatuses: Record<string, string>;
   setUserStatus: (userId: string, status: string) => void;
+  sections: Section[];
+  addSection: (s: Omit<Section, 'id'>) => void;
+  updateSection: (id: string, u: Partial<Section>) => void;
+  deleteSection: (id: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -335,6 +356,7 @@ export const useStore = create<AppStore>()((set, get) => ({
   notifications: [],
   channels: CHANNELS,
   messages: MESSAGES,
+  sections: SECTIONS,
   activeChannelId: 'general',
   activeProjectId: null,
   sidebarOpen: true,
@@ -513,6 +535,22 @@ export const useStore = create<AppStore>()((set, get) => ({
   },
 
   setUserStatus: (userId, status) => set((s) => ({ userStatuses: { ...s.userStatuses, [userId]: status } })),
+
+  // -------------------------------------------------------------------------
+  // Sections
+  // -------------------------------------------------------------------------
+  addSection: (s) => {
+    const newSection: Section = { ...s, id: uid() };
+    set((state) => ({ sections: [...state.sections, newSection] }));
+  },
+  updateSection: (id, u) => set((s) => ({
+    sections: s.sections.map(sec => sec.id === id ? { ...sec, ...u } : sec),
+  })),
+  deleteSection: (id) => set((s) => ({
+    sections: s.sections.filter(sec => sec.id !== id),
+    // Remove sectionId from tasks that belonged to this section
+    tasks: s.tasks.map(t => t.sectionId === id ? { ...t, sectionId: undefined } : t),
+  })),
 
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
   toggleDarkMode: () => set((s) => ({ darkMode: !s.darkMode })),

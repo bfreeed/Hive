@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store';
-import { Plus, Search, ArrowUpDown, List, LayoutGrid, GitBranch, GripVertical } from 'lucide-react';
-import type { Task, Priority } from '../types';
+import {
+  Plus, Search, ArrowUpDown, List, LayoutGrid, GitBranch, GripVertical,
+  ChevronDown, ChevronRight, X, Trash2, Pencil, Lock, RotateCcw, AlertCircle,
+} from 'lucide-react';
+import type { Task, Priority, Section } from '../types';
 import TaskRow from '../components/TaskRow';
 import BoardView from '../components/BoardView';
 import { buildGroups, sortTasks } from '../utils/buildGroups';
@@ -19,6 +22,9 @@ const PRIORITY_DOT: Record<Priority, string> = {
   urgent: 'bg-red-400', high: 'bg-orange-400', medium: 'bg-yellow-400', low: 'bg-white/20',
 };
 
+// ---------------------------------------------------------------------------
+// Sortable task row (used in manual DnD mode)
+// ---------------------------------------------------------------------------
 function SortableTaskRow({ task, onOpenTask, showProject, focused, focusRef }: {
   task: Task; onOpenTask: (id: string) => void; showProject: boolean; focused: boolean; focusRef?: React.Ref<HTMLDivElement>;
 }) {
@@ -36,6 +42,28 @@ function SortableTaskRow({ task, onOpenTask, showProject, focused, focusRef }: {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Sortable section row (used in sections DnD mode)
+// ---------------------------------------------------------------------------
+function SortableSection({ section, children, onDragHandleProps }: {
+  section: Section;
+  children: React.ReactNode;
+  onDragHandleProps: Record<string, unknown>;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: section.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
+  return (
+    <div ref={setNodeRef} style={style}>
+      {React.cloneElement(children as React.ReactElement, {
+        dragHandleProps: { ...attributes, ...listeners, ...onDragHandleProps },
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MindMap view
+// ---------------------------------------------------------------------------
 function MindMapView({ tasks, onOpenTask }: { tasks: Task[]; onOpenTask: (id: string) => void }) {
   const { projects } = useStore();
   const groups: Record<string, Task[]> = {};
@@ -79,8 +107,31 @@ function MindMapView({ tasks, onOpenTask }: { tasks: Task[]; onOpenTask: (id: st
   );
 }
 
+// ---------------------------------------------------------------------------
+// Utility: format relative completed time
+// ---------------------------------------------------------------------------
+function formatCompletedAt(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHrs = Math.floor(diffMs / 3600000);
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  const diffDays = Math.floor(diffMs / 86400000);
+  return `${diffDays}d ago`;
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => void }) {
-  const { tasks, projects, users, currentUser, addTask, manualOrder, setManualOrder } = useStore();
+  const {
+    tasks, projects, users, currentUser, addTask, updateTask,
+    manualOrder, setManualOrder,
+    sections, addSection, updateSection, deleteSection,
+  } = useStore();
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -104,7 +155,7 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
   const setSortOrder = (v: BoardSortOrder) => { setSortOrderRaw(v); localStorage.setItem('tasks-sortOrder', v); };
 
   // View
-  const [viewType, setViewTypeRaw] = useState<'list' | 'board' | 'mindmap'>(() => (localStorage.getItem('tasks-viewType') as any) ?? 'list');
+  const [viewType, setViewTypeRaw] = useState<'list' | 'board' | 'mindmap'>(() => (localStorage.getItem('tasks-viewType') as 'list' | 'board' | 'mindmap') ?? 'list');
   const setViewType = (v: 'list' | 'board' | 'mindmap') => { setViewTypeRaw(v); localStorage.setItem('tasks-viewType', v); };
 
   // Keyboard navigation
@@ -116,7 +167,23 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskProject, setNewTaskProject] = useState('');
 
-  // --- Filter ---
+  // Subtask state
+  const [collapsedSubtasks, setCollapsedSubtasks] = useState<Set<string>>(new Set());
+  const [newSubtaskParent, setNewSubtaskParent] = useState<string | null>(null);
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+
+  // Section state
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
+  const [editingSectionName, setEditingSectionName] = useState('');
+  const [showAddSection, setShowAddSection] = useState(false);
+  const [newSectionName, setNewSectionName] = useState('');
+  const [addTaskSectionId, setAddTaskSectionId] = useState<string | null>(null);
+  const [addTaskSectionTitle, setAddTaskSectionTitle] = useState('');
+
+  // ---------------------------------------------------------------------------
+  // Filter helpers
+  // ---------------------------------------------------------------------------
   const baseFilter = (t: Task) => {
     if (filterProject !== 'all' && !(t.projectIds ?? []).includes(filterProject)) return false;
     if (filterPriority !== 'all' && t.priority !== filterPriority) return false;
@@ -127,7 +194,6 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
     return true;
   };
 
-  // List view respects status filter; board/mindmap show all statuses as columns
   const filtered = tasks.filter((t) => {
     if (filterStatus === 'active' && t.status === 'done') return false;
     if (filterStatus === 'done' && t.status !== 'done') return false;
@@ -138,12 +204,26 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
     return baseFilter(t);
   });
 
-  // Board/mindmap ignore status filter — columns represent statuses
+  // Board/mindmap ignore status filter
   const filteredAllStatuses = tasks.filter(baseFilter);
 
-  // --- Sort ---
-  const isManual = sortBy === 'manual' as any;
-  const baseSorted = sortTasks(filtered, isManual ? 'date' : sortBy, sortOrder, projects, users);
+  // Feature 1: filter out subtasks from top-level list
+  const filteredTopLevel = filtered.filter(t => !t.parentId);
+
+  // Build subtask map
+  const subtasksByParent: Record<string, Task[]> = {};
+  tasks.forEach(t => {
+    if (t.parentId) {
+      if (!subtasksByParent[t.parentId]) subtasksByParent[t.parentId] = [];
+      subtasksByParent[t.parentId].push(t);
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Sort
+  // ---------------------------------------------------------------------------
+  const isManual = sortBy === ('manual' as BoardSortBy);
+  const baseSorted = sortTasks(filteredTopLevel, isManual ? 'date' : sortBy, sortOrder, projects, users);
   const sorted = isManual
     ? [...baseSorted].sort((a, b) => {
         const ai = manualOrder.indexOf(a.id);
@@ -156,20 +236,27 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
     : baseSorted;
   const sortedAllStatuses = sortTasks(filteredAllStatuses, isManual ? 'date' : sortBy, sortOrder, projects, users);
 
-  // --- Group ---
-  // List groups: respect status filter, use selected groupBy
+  // ---------------------------------------------------------------------------
+  // Groups (for regular list view)
+  // ---------------------------------------------------------------------------
   const groups = buildGroups(sorted, groupBy, projects, users);
-  // Board groups: ignore status filter (columns = statuses by default), use selected groupBy
   const boardGroups = buildGroups(sortedAllStatuses, groupBy === 'none' ? 'status' : groupBy, projects, users);
 
+  // ---------------------------------------------------------------------------
+  // Dependency blocked helper
+  // ---------------------------------------------------------------------------
+  const isBlocked = (task: Task): boolean =>
+    (task.dependsOn ?? []).some(depId => tasks.find(t => t.id === depId)?.status !== 'done');
+
+  // ---------------------------------------------------------------------------
   // Keyboard navigation (list view only)
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (viewType !== 'list') return;
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
       if (e.key === 'n' || e.key === 'N') {
-        // 'N' for new task is handled by Home; here N = next task
         if (sorted.length === 0) return;
         e.preventDefault();
         setFocusedIdx(prev => prev === null ? 0 : Math.min(prev + 1, sorted.length - 1));
@@ -190,14 +277,17 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
     return () => window.removeEventListener('keydown', handler);
   }, [viewType, sorted, focusedIdx, onOpenTask]);
 
-  // Scroll focused row into view
   useEffect(() => {
     focusedRowRef.current?.scrollIntoView({ block: 'nearest' });
   }, [focusedIdx]);
 
-  // Reset focus when filters/sort change
-  useEffect(() => { setFocusedIdx(null); }, [filterProject, filterStatus, filterPriority, filterAssignee, filterFlag, search, sortBy, sortOrder, groupBy]);
+  useEffect(() => {
+    setFocusedIdx(null);
+  }, [filterProject, filterStatus, filterPriority, filterAssignee, filterFlag, search, sortBy, sortOrder, groupBy]);
 
+  // ---------------------------------------------------------------------------
+  // Handlers
+  // ---------------------------------------------------------------------------
   const handleAddTask = () => {
     if (!newTaskTitle.trim()) return;
     addTask({
@@ -215,6 +305,25 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
     setShowNewTask(false);
   };
 
+  const handleAddSubtask = (parentTask: Task) => {
+    if (!newSubtaskTitle.trim()) return;
+    addTask({
+      title: newSubtaskTitle.trim(),
+      parentId: parentTask.id,
+      projectIds: parentTask.projectIds,
+      sectionId: parentTask.sectionId,
+      status: 'todo',
+      priority: 'medium',
+      assigneeIds: [currentUser.id],
+      flags: [],
+      isPrivate: false,
+      linkedContactIds: [],
+      linkedDocIds: [],
+    });
+    setNewSubtaskTitle('');
+    setNewSubtaskParent(null);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -224,7 +333,486 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
     setManualOrder(arrayMove(ids, oldIdx, newIdx));
   };
 
+  const handleSectionDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const projectSections = sections
+      .filter(s => s.projectId === filterProject)
+      .sort((a, b) => a.order - b.order);
+    const ids = projectSections.map(s => s.id);
+    const oldIdx = ids.indexOf(active.id as string);
+    const newIdx = ids.indexOf(over.id as string);
+    const reordered = arrayMove(ids, oldIdx, newIdx);
+    reordered.forEach((id, idx) => {
+      updateSection(id, { order: idx });
+    });
+  };
+
+  const handleAddSection = () => {
+    if (!newSectionName.trim() || filterProject === 'all') return;
+    const projectSections = sections.filter(s => s.projectId === filterProject);
+    addSection({ name: newSectionName.trim(), projectId: filterProject, order: projectSections.length });
+    setNewSectionName('');
+    setShowAddSection(false);
+  };
+
+  const handleAddTaskToSection = (sectionId: string | undefined) => {
+    if (!addTaskSectionTitle.trim() || filterProject === 'all') return;
+    addTask({
+      title: addTaskSectionTitle.trim(),
+      projectIds: [filterProject],
+      sectionId,
+      status: 'todo',
+      priority: 'medium',
+      assigneeIds: [currentUser.id],
+      flags: [],
+      isPrivate: false,
+      linkedContactIds: [],
+      linkedDocIds: [],
+    });
+    setAddTaskSectionTitle('');
+    setAddTaskSectionId(null);
+  };
+
+  const toggleSubtasks = (taskId: string) => {
+    setCollapsedSubtasks(prev => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  };
+
+  const toggleSection = (sectionId: string) => {
+    setCollapsedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(sectionId)) next.delete(sectionId);
+      else next.add(sectionId);
+      return next;
+    });
+  };
+
   const sortActive = groupBy !== 'none' || sortBy !== 'date' || sortOrder !== 'asc';
+
+  // ---------------------------------------------------------------------------
+  // Render helpers
+  // ---------------------------------------------------------------------------
+
+  // Render a single task row with subtask expand/collapse, progress, blocked indicator, and subtask form
+  const renderTaskWithSubtasks = (
+    task: Task,
+    opts: {
+      focused?: boolean;
+      focusRef?: React.Ref<HTMLDivElement>;
+      showProject?: boolean;
+      showCompletedAt?: boolean;
+      onReopen?: () => void;
+    } = {},
+  ) => {
+    const subs = subtasksByParent[task.id] ?? [];
+    const hasSubs = subs.length > 0;
+    const isCollapsed = collapsedSubtasks.has(task.id);
+    const doneSubs = subs.filter(s => s.status === 'done').length;
+    const blocked = isBlocked(task);
+
+    return (
+      <div key={task.id}>
+        {/* Parent task row */}
+        <div className="relative group/taskrow flex items-center gap-1">
+          {/* Subtask collapse chevron */}
+          {hasSubs ? (
+            <button
+              onClick={() => toggleSubtasks(task.id)}
+              className="flex-shrink-0 text-white/30 hover:text-white/70 transition-colors p-0.5"
+            >
+              {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+            </button>
+          ) : (
+            <span className="w-4 flex-shrink-0" />
+          )}
+
+          {/* Progress indicator */}
+          {hasSubs && (
+            <span className="flex-shrink-0 text-[10px] text-white/25 font-medium tabular-nums mr-0.5">
+              {doneSubs}/{subs.length}
+            </span>
+          )}
+
+          <div className="flex-1 min-w-0">
+            <TaskRow
+              task={task}
+              onOpenTask={onOpenTask}
+              showProject={opts.showProject ?? true}
+              focused={opts.focused ?? false}
+              ref={opts.focusRef}
+            />
+          </div>
+
+          {/* Blocked indicator */}
+          {blocked && (
+            <div className="flex-shrink-0 flex items-center gap-0.5 px-1.5 py-0.5 rounded text-amber-400/70" title="Blocked by incomplete dependency">
+              <Lock size={10} />
+            </div>
+          )}
+
+          {/* Add subtask button (hover) */}
+          <button
+            onClick={() => { setNewSubtaskParent(task.id); setNewSubtaskTitle(''); }}
+            className="flex-shrink-0 opacity-0 group-hover/taskrow:opacity-100 transition-opacity text-white/30 hover:text-white/70 p-0.5"
+            title="Add subtask"
+          >
+            <Plus size={12} />
+          </button>
+
+          {/* Reopen button for completed log */}
+          {opts.onReopen && (
+            <button
+              onClick={opts.onReopen}
+              className="flex-shrink-0 opacity-0 group-hover/taskrow:opacity-100 transition-opacity text-white/30 hover:text-white/60 p-0.5"
+              title="Reopen task"
+            >
+              <RotateCcw size={12} />
+            </button>
+          )}
+        </div>
+
+        {/* Completed label */}
+        {opts.showCompletedAt && task.completedAt && (
+          <div className="ml-5 text-[10px] text-white/20 mb-0.5">
+            Completed {formatCompletedAt(task.completedAt)}
+          </div>
+        )}
+
+        {/* Inline subtask creation form */}
+        {newSubtaskParent === task.id && (
+          <div className="ml-6 pl-3 border-l border-white/[0.06] mt-0.5 mb-1 flex items-center gap-2">
+            <input
+              autoFocus
+              value={newSubtaskTitle}
+              onChange={e => setNewSubtaskTitle(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleAddSubtask(task);
+                if (e.key === 'Escape') { setNewSubtaskParent(null); setNewSubtaskTitle(''); }
+              }}
+              placeholder="Subtask title..."
+              className="flex-1 bg-transparent text-xs text-white placeholder-white/20 focus:outline-none py-1"
+            />
+            <button onClick={() => handleAddSubtask(task)} className="text-xs text-brand-400 hover:text-brand-300">Add</button>
+            <button onClick={() => { setNewSubtaskParent(null); setNewSubtaskTitle(''); }} className="text-white/30 hover:text-white/60">
+              <X size={12} />
+            </button>
+          </div>
+        )}
+
+        {/* Subtasks */}
+        {hasSubs && !isCollapsed && (
+          <div className="ml-6 pl-3 border-l border-white/[0.06] space-y-0.5 mt-0.5">
+            {subs.map(sub => {
+              const subBlocked = isBlocked(sub);
+              return (
+                <div key={sub.id} className="relative group/subtaskrow flex items-center gap-1">
+                  <div className="flex-1 min-w-0">
+                    <TaskRow task={sub} onOpenTask={onOpenTask} showProject={false} focused={false} />
+                  </div>
+                  {subBlocked && (
+                    <div className="flex-shrink-0 text-amber-400/70" title="Blocked">
+                      <Lock size={10} />
+                    </div>
+                  )}
+                  {opts.onReopen && sub.status === 'done' && (
+                    <button
+                      onClick={() => updateTask(sub.id, { status: 'todo', completedAt: undefined })}
+                      className="flex-shrink-0 opacity-0 group-hover/subtaskrow:opacity-100 transition-opacity text-white/30 hover:text-white/60 p-0.5"
+                      title="Reopen"
+                    >
+                      <RotateCcw size={12} />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ---------------------------------------------------------------------------
+  // Sections view
+  // ---------------------------------------------------------------------------
+  const renderSectionsView = () => {
+    const projectSections = sections
+      .filter(s => s.projectId === filterProject)
+      .sort((a, b) => a.order - b.order);
+
+    const tasksInProject = filteredTopLevel.filter(t => (t.projectIds ?? []).includes(filterProject));
+
+    const renderSectionBody = (sectionIdFilter: string | undefined, sectionKey: string) => {
+      const sectionTasks = tasksInProject.filter(t =>
+        sectionIdFilter === undefined ? !t.sectionId : t.sectionId === sectionIdFilter,
+      );
+
+      if (collapsedSections.has(sectionKey)) return null;
+
+      return (
+        <div className="space-y-0.5 mt-1">
+          {sectionTasks.map(task => renderTaskWithSubtasks(task, { showProject: false }))}
+          {/* Add task to this section */}
+          {addTaskSectionId === sectionKey ? (
+            <div className="flex items-center gap-2 px-2 py-1">
+              <input
+                autoFocus
+                value={addTaskSectionTitle}
+                onChange={e => setAddTaskSectionTitle(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleAddTaskToSection(sectionIdFilter);
+                  if (e.key === 'Escape') { setAddTaskSectionId(null); setAddTaskSectionTitle(''); }
+                }}
+                placeholder="Task title..."
+                className="flex-1 bg-transparent text-xs text-white placeholder-white/20 focus:outline-none py-1"
+              />
+              <button onClick={() => handleAddTaskToSection(sectionIdFilter)} className="text-xs text-brand-400 hover:text-brand-300">Add</button>
+              <button onClick={() => { setAddTaskSectionId(null); setAddTaskSectionTitle(''); }} className="text-white/30 hover:text-white/60">
+                <X size={12} />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => { setAddTaskSectionId(sectionKey); setAddTaskSectionTitle(''); }}
+              className="flex items-center gap-1.5 px-2 py-1 text-xs text-white/25 hover:text-white/50 transition-colors"
+            >
+              <Plus size={11} /> Add task
+            </button>
+          )}
+        </div>
+      );
+    };
+
+    const renderSectionHeader = (
+      label: string,
+      taskCount: number,
+      sectionKey: string,
+      section?: Section,
+      dragHandleProps?: Record<string, unknown>,
+    ) => {
+      const isCollapsed = collapsedSections.has(sectionKey);
+      const isEditing = editingSectionId === sectionKey;
+
+      return (
+        <div className="flex items-center gap-2 group/section py-1">
+          {/* Drag handle for real sections */}
+          {section && dragHandleProps && (
+            <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing text-white/15 hover:text-white/40 transition-colors flex-shrink-0">
+              <GripVertical size={13} />
+            </div>
+          )}
+
+          {/* Collapse toggle */}
+          <button onClick={() => toggleSection(sectionKey)} className="flex-shrink-0 text-white/30 hover:text-white/60 transition-colors">
+            {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+          </button>
+
+          {/* Section name */}
+          {isEditing ? (
+            <input
+              autoFocus
+              value={editingSectionName}
+              onChange={e => setEditingSectionName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && section) {
+                  updateSection(section.id, { name: editingSectionName });
+                  setEditingSectionId(null);
+                }
+                if (e.key === 'Escape') setEditingSectionId(null);
+              }}
+              onBlur={() => {
+                if (section && editingSectionName.trim()) {
+                  updateSection(section.id, { name: editingSectionName });
+                }
+                setEditingSectionId(null);
+              }}
+              className="bg-transparent border-b border-white/20 text-xs font-semibold text-white/70 focus:outline-none"
+            />
+          ) : (
+            <span
+              className="text-xs font-semibold text-white/40 uppercase tracking-wider cursor-default"
+              onDoubleClick={() => {
+                if (section) {
+                  setEditingSectionId(sectionKey);
+                  setEditingSectionName(section.name);
+                }
+              }}
+            >
+              {label}
+            </span>
+          )}
+
+          <span className="text-xs text-white/20">{taskCount}</span>
+
+          {/* Separator line */}
+          <div className="flex-1 h-px bg-white/[0.06]" />
+
+          {/* Section actions (hover) */}
+          {section && (
+            <div className="opacity-0 group-hover/section:opacity-100 transition-opacity flex items-center gap-1">
+              <button
+                onClick={() => { setEditingSectionId(sectionKey); setEditingSectionName(section.name); }}
+                className="p-1 text-white/25 hover:text-white/60 transition-colors"
+                title="Rename section"
+              >
+                <Pencil size={11} />
+              </button>
+              <button
+                onClick={() => deleteSection(section.id)}
+                className="p-1 text-white/25 hover:text-red-400/70 transition-colors"
+                title="Delete section"
+              >
+                <Trash2 size={11} />
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    return (
+      <div className="space-y-4">
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSectionDragEnd}>
+          <SortableContext items={projectSections.map(s => s.id)} strategy={verticalListSortingStrategy}>
+            {projectSections.map(section => {
+              const sectionTasks = tasksInProject.filter(t => t.sectionId === section.id);
+              return (
+                <SortableSectionWrapper key={section.id} section={section}>
+                  {(dragHandleProps: Record<string, unknown>) => (
+                    <div>
+                      {renderSectionHeader(section.name, sectionTasks.length, section.id, section, dragHandleProps)}
+                      {renderSectionBody(section.id, section.id)}
+                    </div>
+                  )}
+                </SortableSectionWrapper>
+              );
+            })}
+          </SortableContext>
+        </DndContext>
+
+        {/* Unsectioned */}
+        {(() => {
+          const unsectionedTasks = tasksInProject.filter(t => !t.sectionId);
+          if (unsectionedTasks.length === 0 && projectSections.length > 0) return null;
+          return (
+            <div>
+              {renderSectionHeader('No Section', unsectionedTasks.length, '__unsectioned__')}
+              {renderSectionBody(undefined, '__unsectioned__')}
+            </div>
+          );
+        })()}
+
+        {/* Add section */}
+        {showAddSection ? (
+          <div className="flex items-center gap-2 px-1">
+            <input
+              autoFocus
+              value={newSectionName}
+              onChange={e => setNewSectionName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleAddSection();
+                if (e.key === 'Escape') { setShowAddSection(false); setNewSectionName(''); }
+              }}
+              placeholder="Section name..."
+              className="flex-1 bg-transparent border-b border-white/20 text-xs text-white placeholder-white/20 focus:outline-none py-1"
+            />
+            <button onClick={handleAddSection} className="text-xs text-brand-400 hover:text-brand-300">Add</button>
+            <button onClick={() => { setShowAddSection(false); setNewSectionName(''); }} className="text-white/30 hover:text-white/60">
+              <X size={12} />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowAddSection(true)}
+            className="flex items-center gap-1.5 px-1 py-1 text-xs text-white/20 hover:text-white/50 transition-colors"
+          >
+            <Plus size={11} /> Add section
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  // ---------------------------------------------------------------------------
+  // Completed log view (filterStatus === 'done' && viewType === 'list')
+  // ---------------------------------------------------------------------------
+  const renderCompletedLog = () => {
+    const doneTasks = tasks
+      .filter(t => t.status === 'done' && baseFilter(t) && !t.parentId)
+      .sort((a, b) => {
+        const aAt = a.completedAt ?? a.updatedAt;
+        const bAt = b.completedAt ?? b.updatedAt;
+        return bAt.localeCompare(aAt);
+      });
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfYesterday = new Date(startOfToday.getTime() - 86400000);
+    const startOfWeek = new Date(startOfToday.getTime() - startOfToday.getDay() * 86400000);
+
+    const buckets: { label: string; tasks: Task[] }[] = [
+      { label: 'Today', tasks: [] },
+      { label: 'Yesterday', tasks: [] },
+      { label: 'This Week', tasks: [] },
+      { label: 'Earlier', tasks: [] },
+    ];
+
+    doneTasks.forEach(t => {
+      const at = new Date(t.completedAt ?? t.updatedAt);
+      if (at >= startOfToday) buckets[0].tasks.push(t);
+      else if (at >= startOfYesterday) buckets[1].tasks.push(t);
+      else if (at >= startOfWeek) buckets[2].tasks.push(t);
+      else buckets[3].tasks.push(t);
+    });
+
+    if (doneTasks.length === 0) {
+      return (
+        <div className="py-16 text-center">
+          <p className="text-white/20">No completed tasks</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        {buckets.filter(b => b.tasks.length > 0).map(bucket => (
+          <div key={bucket.label}>
+            <div className="flex items-center gap-2 mb-2 px-1">
+              <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">{bucket.label}</span>
+              <span className="text-xs text-white/20">{bucket.tasks.length}</span>
+              <div className="flex-1 h-px bg-white/[0.06]" />
+            </div>
+            <div className="space-y-1">
+              {bucket.tasks.map(task =>
+                renderTaskWithSubtasks(task, {
+                  showProject: true,
+                  showCompletedAt: true,
+                  onReopen: () => updateTask(task.id, { status: 'todo', completedAt: undefined }),
+                }),
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // ---------------------------------------------------------------------------
+  // Determine which list rendering to use
+  // ---------------------------------------------------------------------------
+  const showSectionsView =
+    viewType === 'list' &&
+    filterProject !== 'all' &&
+    filterStatus !== 'done';
+
+  const showCompletedLog =
+    viewType === 'list' &&
+    filterStatus === 'done';
 
   const SelectFilter = ({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: React.ReactNode }) => (
     <select
@@ -253,41 +841,40 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
 
         {/* Row 1: filters */}
         <div className="relative mb-1.5">
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pr-8">
-
-          <SelectFilter value={filterFlag} onChange={setFilterFlag}>
-            <option value="all">All Flags</option>
-            {(currentUser.flags || []).map(f => (
-              <option key={f.id} value={f.id}>{f.name}</option>
-            ))}
-            <option value="private">Private</option>
-          </SelectFilter>
-          <SelectFilter value={filterProject} onChange={setFilterProject}>
-            <option value="all">All Projects</option>
-            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </SelectFilter>
-          <SelectFilter value={filterStatus} onChange={setFilterStatus}>
-            <option value="active">Active</option>
-            <option value="all">All Statuses</option>
-            <option value="todo">To Do</option>
-            <option value="doing">Doing</option>
-            <option value="waiting">Waiting</option>
-            <option value="review">In Review</option>
-            <option value="done">Done</option>
-          </SelectFilter>
-          <SelectFilter value={filterPriority} onChange={setFilterPriority}>
-            <option value="all">All Priorities</option>
-            <option value="urgent">Urgent</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </SelectFilter>
-          <SelectFilter value={filterAssignee} onChange={setFilterAssignee}>
-            <option value="all">All Assignees</option>
-            {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-          </SelectFilter>
-        </div>
-        <div className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-[#0d0d0f] to-transparent" />
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pr-8">
+            <SelectFilter value={filterFlag} onChange={setFilterFlag}>
+              <option value="all">All Flags</option>
+              {(currentUser.flags || []).map(f => (
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+              <option value="private">Private</option>
+            </SelectFilter>
+            <SelectFilter value={filterProject} onChange={setFilterProject}>
+              <option value="all">All Projects</option>
+              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </SelectFilter>
+            <SelectFilter value={filterStatus} onChange={setFilterStatus}>
+              <option value="active">Active</option>
+              <option value="all">All Statuses</option>
+              <option value="todo">To Do</option>
+              <option value="doing">Doing</option>
+              <option value="waiting">Waiting</option>
+              <option value="review">In Review</option>
+              <option value="done">Done</option>
+            </SelectFilter>
+            <SelectFilter value={filterPriority} onChange={setFilterPriority}>
+              <option value="all">All Priorities</option>
+              <option value="urgent">Urgent</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </SelectFilter>
+            <SelectFilter value={filterAssignee} onChange={setFilterAssignee}>
+              <option value="all">All Assignees</option>
+              {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </SelectFilter>
+          </div>
+          <div className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-[#0d0d0f] to-transparent" />
         </div>
 
         {/* Row 2: view switcher + search + sort */}
@@ -299,7 +886,7 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
           ].map((v) => (
             <button
               key={v.id}
-              onClick={() => setViewType(v.id as any)}
+              onClick={() => setViewType(v.id as 'list' | 'board' | 'mindmap')}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${viewType === v.id ? 'bg-white/[0.08] text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'}`}
             >
               {v.icon}{v.label}
@@ -348,13 +935,13 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
             <div className="w-px h-4 bg-white/10" />
             <div className="flex items-center gap-2">
               <span className="text-xs text-white/30 font-medium w-8">Sort</span>
-              <SelectFilter value={sortBy} onChange={v => { setSortBy(v as BoardSortBy); if (v === 'manual' as any) setGroupBy('none'); }}>
+              <SelectFilter value={sortBy} onChange={v => { setSortBy(v as BoardSortBy); if (v === ('manual' as BoardSortBy)) setGroupBy('none'); }}>
                 <option value="date">Date</option>
                 <option value="priority">Priority</option>
                 <option value="assignee">Assignee</option>
                 <option value="status">Status</option>
                 <option value="project">Project</option>
-                <option value={'manual' as any}>Manual Order</option>
+                <option value={'manual' as BoardSortBy}>Manual Order</option>
               </SelectFilter>
             </div>
             <div className="w-px h-4 bg-white/10" />
@@ -409,7 +996,11 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
           <BoardView groups={boardGroups} onOpenTask={onOpenTask} />
         ) : viewType === 'mindmap' ? (
           <MindMapView tasks={sortedAllStatuses} onOpenTask={onOpenTask} />
-        ) : filtered.length === 0 ? (
+        ) : showCompletedLog ? (
+          renderCompletedLog()
+        ) : showSectionsView ? (
+          renderSectionsView()
+        ) : filteredTopLevel.length === 0 ? (
           <div className="py-16 text-center">
             <p className="text-white/20">No tasks found</p>
           </div>
@@ -437,7 +1028,6 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
           <div className="space-y-6">
             {groups.map((group, gi) => (
               <div key={gi}>
-                {/* Group header */}
                 {group.label && (
                   <div className="flex items-center gap-2 mb-1 px-1">
                     {group.color && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: group.color }} />}
@@ -445,21 +1035,15 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
                     <span className="text-xs text-white/20">{group.tasks.length}</span>
                   </div>
                 )}
-                {/* Tasks */}
-                <div className="space-y-0.5">
+                <div className="space-y-1">
                   {group.tasks.map(task => {
                     const idx = sorted.findIndex(t => t.id === task.id);
                     const isFocused = focusedIdx === idx;
-                    return (
-                      <TaskRow
-                        key={task.id}
-                        task={task}
-                        onOpenTask={onOpenTask}
-                        showProject={groupBy !== 'project'}
-                        focused={isFocused}
-                        ref={isFocused ? focusedRowRef : undefined}
-                      />
-                    );
+                    return renderTaskWithSubtasks(task, {
+                      focused: isFocused,
+                      focusRef: isFocused ? focusedRowRef : undefined,
+                      showProject: groupBy !== 'project',
+                    });
                   })}
                 </div>
               </div>
@@ -467,8 +1051,30 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
           </div>
         )}
 
-        <p className="text-xs text-white/20 mt-6 text-center">{filtered.length} task{filtered.length !== 1 ? 's' : ''}</p>
+        <p className="text-xs text-white/20 mt-6 text-center">
+          {filteredTopLevel.length} task{filteredTopLevel.length !== 1 ? 's' : ''}
+        </p>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SortableSectionWrapper — separate component so useSortable hook rules are satisfied
+// ---------------------------------------------------------------------------
+function SortableSectionWrapper({
+  section,
+  children,
+}: {
+  section: Section;
+  children: (dragHandleProps: Record<string, unknown>) => React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: section.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
+  const dragHandleProps: Record<string, unknown> = { ...attributes, ...listeners };
+  return (
+    <div ref={setNodeRef} style={style}>
+      {children(dragHandleProps)}
     </div>
   );
 }

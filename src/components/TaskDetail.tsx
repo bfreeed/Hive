@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useStore } from '../store';
-import { X, Trash2, Paperclip, FileText, Lock, Cloud, Calendar, Check, RefreshCw, Clock, BellOff, Bell } from 'lucide-react';
+import { X, Trash2, Paperclip, FileText, Lock, Cloud, Calendar, Check, RefreshCw, Clock, BellOff, Bell, Plus, GitBranch, Link2, ChevronDown, ChevronRight } from 'lucide-react';
 import type { Task, TaskStatus, Priority } from '../types';
 import { format } from 'date-fns';
 import { useGooglePicker } from '../hooks/useGooglePicker';
@@ -22,10 +22,16 @@ const PRIORITY_OPTIONS: { value: Priority; label: string; dot: string; active: s
 ];
 
 export default function TaskDetail({ taskId, onClose }: { taskId: string; onClose: () => void }) {
-  const { tasks, projects, users, currentUser, updateTask, deleteTask, addComment } = useStore();
+  const { tasks, projects, users, currentUser, sections, updateTask, deleteTask, addComment, addTask } = useStore();
   const task = tasks.find(t => t.id === taskId);
   const [commentText, setCommentText] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showSubtasks, setShowSubtasks] = useState(true);
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+  const [showNewSubtask, setShowNewSubtask] = useState(false);
+  const [showDeps, setShowDeps] = useState(true);
+  const [depSearch, setDepSearch] = useState('');
+  const [showDepPicker, setShowDepPicker] = useState(false);
   const [calSyncing, setCalSyncing] = useState(false);
   const [calSynced, setCalSynced] = useState(false);
   const [needsAuth, setNeedsAuth] = useState(false);
@@ -645,6 +651,153 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                 </div>
               </div>
             </div>
+
+            {/* Subtasks */}
+            {!task.parentId && (() => {
+              const subtasks = tasks.filter(t => t.parentId === taskId);
+              const doneCount = subtasks.filter(t => t.status === 'done').length;
+              return (
+                <div className="mt-6 pt-5 border-t border-white/[0.06]">
+                  <button
+                    onClick={() => setShowSubtasks(v => !v)}
+                    className="flex items-center gap-2 w-full mb-3 group"
+                  >
+                    {showSubtasks ? <ChevronDown size={13} className="text-white/30" /> : <ChevronRight size={13} className="text-white/30" />}
+                    <GitBranch size={13} className="text-white/40" />
+                    <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">Subtasks</span>
+                    {subtasks.length > 0 && (
+                      <span className="text-xs text-white/30 ml-1">{doneCount}/{subtasks.length}</span>
+                    )}
+                  </button>
+                  {showSubtasks && (
+                    <div className="space-y-1">
+                      {subtasks.map(sub => (
+                        <div key={sub.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.03] group/sub">
+                          <button
+                            onClick={() => updateTask(sub.id, { status: sub.status === 'done' ? 'todo' : 'done', completedAt: sub.status !== 'done' ? new Date().toISOString() : undefined })}
+                            className={`w-3.5 h-3.5 rounded border-2 flex-shrink-0 transition-colors ${sub.status === 'done' ? 'border-emerald-500 bg-emerald-500/20' : 'border-white/20 hover:border-brand-400'}`}
+                          >
+                            {sub.status === 'done' && <span className="text-emerald-400 text-[7px] flex items-center justify-center">✓</span>}
+                          </button>
+                          <span className={`flex-1 text-sm ${sub.status === 'done' ? 'line-through text-white/25' : 'text-white/70'}`}>{sub.title}</span>
+                          <button
+                            onClick={() => deleteTask(sub.id)}
+                            className="opacity-0 group-hover/sub:opacity-100 p-0.5 text-white/20 hover:text-red-400 transition-all"
+                          >
+                            <X size={11} />
+                          </button>
+                        </div>
+                      ))}
+                      {showNewSubtask ? (
+                        <div className="flex items-center gap-2 px-2 py-1.5 bg-white/[0.03] border border-brand-500/30 rounded-lg">
+                          <input
+                            autoFocus
+                            value={newSubtaskTitle}
+                            onChange={e => setNewSubtaskTitle(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter' && newSubtaskTitle.trim()) {
+                                addTask({ title: newSubtaskTitle.trim(), parentId: taskId, projectIds: task.projectIds, sectionId: task.sectionId, status: 'todo', priority: 'medium', assigneeIds: [currentUser.id], flags: [], isPrivate: false, linkedContactIds: [], linkedDocIds: [] });
+                                setNewSubtaskTitle('');
+                                setShowNewSubtask(false);
+                              }
+                              if (e.key === 'Escape') { setShowNewSubtask(false); setNewSubtaskTitle(''); }
+                            }}
+                            placeholder="Subtask title..."
+                            className="flex-1 bg-transparent text-sm text-white/80 placeholder-white/25 focus:outline-none"
+                          />
+                          <button onClick={() => { setShowNewSubtask(false); setNewSubtaskTitle(''); }} className="text-white/30 hover:text-white/60">
+                            <X size={11} />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setShowNewSubtask(true)}
+                          className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-white/30 hover:text-white/60 transition-colors rounded-lg hover:bg-white/[0.03] w-full"
+                        >
+                          <Plus size={12} /> Add subtask
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Dependencies */}
+            {(() => {
+              const deps = (task.dependsOn ?? []).map(id => tasks.find(t => t.id === id)).filter(Boolean) as typeof tasks;
+              const depSearchLower = depSearch.toLowerCase();
+              const depCandidates = tasks.filter(t =>
+                t.id !== taskId &&
+                !t.parentId &&
+                t.status !== 'done' &&
+                !(task.dependsOn ?? []).includes(t.id) &&
+                (!depSearch || t.title.toLowerCase().includes(depSearchLower))
+              ).slice(0, 8);
+              return (
+                <div className="mt-6 pt-5 border-t border-white/[0.06]">
+                  <button
+                    onClick={() => setShowDeps(v => !v)}
+                    className="flex items-center gap-2 w-full mb-3"
+                  >
+                    {showDeps ? <ChevronDown size={13} className="text-white/30" /> : <ChevronRight size={13} className="text-white/30" />}
+                    <Link2 size={13} className="text-white/40" />
+                    <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">Blocked by</span>
+                    {deps.length > 0 && <span className="text-xs text-white/30 ml-1">{deps.length}</span>}
+                  </button>
+                  {showDeps && (
+                    <div className="space-y-1">
+                      {deps.map(dep => (
+                        <div key={dep.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-white/[0.03] group/dep">
+                          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dep.status === 'done' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                          <span className="flex-1 text-sm text-white/60 truncate">{dep.title}</span>
+                          <span className="text-[10px] text-white/25 capitalize">{dep.status}</span>
+                          <button
+                            onClick={() => updateTask(taskId, { dependsOn: (task.dependsOn ?? []).filter(id => id !== dep.id) })}
+                            className="opacity-0 group-hover/dep:opacity-100 p-0.5 text-white/20 hover:text-red-400 transition-all"
+                          >
+                            <X size={11} />
+                          </button>
+                        </div>
+                      ))}
+                      {showDepPicker ? (
+                        <div className="mt-1 p-2 bg-white/[0.04] border border-white/[0.08] rounded-xl space-y-1">
+                          <input
+                            autoFocus
+                            value={depSearch}
+                            onChange={e => setDepSearch(e.target.value)}
+                            placeholder="Search tasks..."
+                            className="w-full bg-transparent text-xs text-white/80 placeholder-white/25 focus:outline-none px-1"
+                          />
+                          {depCandidates.length === 0 ? (
+                            <p className="text-xs text-white/25 px-1 py-1">No matching tasks</p>
+                          ) : (
+                            depCandidates.map(t => (
+                              <button
+                                key={t.id}
+                                onClick={() => { updateTask(taskId, { dependsOn: [...(task.dependsOn ?? []), t.id] }); setDepSearch(''); setShowDepPicker(false); }}
+                                className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.06] text-xs text-white/60 hover:text-white/80 transition-colors"
+                              >
+                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${t.priority === 'urgent' ? 'bg-red-400' : t.priority === 'high' ? 'bg-orange-400' : 'bg-yellow-400'}`} />
+                                {t.title}
+                              </button>
+                            ))
+                          )}
+                          <button onClick={() => { setShowDepPicker(false); setDepSearch(''); }} className="text-xs text-white/25 hover:text-white/50 mt-1 px-1">Cancel</button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setShowDepPicker(true)}
+                          className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-white/30 hover:text-white/60 transition-colors rounded-lg hover:bg-white/[0.03] w-full"
+                        >
+                          <Plus size={12} /> Add dependency
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Footer space */}
             <div className="h-4" />
