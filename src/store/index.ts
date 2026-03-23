@@ -434,21 +434,34 @@ export const useStore = create<AppStore>()((set, get) => ({
     channels: s.channels.map(c => c.id === id ? { ...c, lastReadAt: new Date().toISOString() } : c),
   })),
 
-  addChannel: (channel) => set((s) => ({
-    channels: [...s.channels, { ...channel, id: uid() }],
-  })),
+  addChannel: (channel) => {
+    const newChannel: Channel = { ...channel, id: uid() };
+    set((s) => ({ channels: [...s.channels, newChannel] }));
+    supabase.from('channels').insert({
+      id: newChannel.id,
+      name: newChannel.name,
+      type: newChannel.type,
+      member_ids: newChannel.memberIds,
+      description: newChannel.description ?? null,
+    }).then(({ error }) => { if (error) console.error('addChannel error:', error); });
+  },
 
   updateChannel: (id, u) => set((s) => ({
     channels: s.channels.map(c => c.id === id ? { ...c, ...u } : c),
   })),
 
-  deleteChannel: (id) => set((s) => ({
-    channels: s.channels.filter(c => c.id !== id),
-    messages: s.messages.filter(m => m.channelId !== id),
-    activeChannelId: s.activeChannelId === id
-      ? (s.channels.find(c => c.id !== id)?.id ?? s.activeChannelId)
-      : s.activeChannelId,
-  })),
+  deleteChannel: (id) => {
+    set((s) => ({
+      channels: s.channels.filter(c => c.id !== id),
+      messages: s.messages.filter(m => m.channelId !== id),
+      activeChannelId: s.activeChannelId === id
+        ? (s.channels.find(c => c.id !== id)?.id ?? s.activeChannelId)
+        : s.activeChannelId,
+    }));
+    supabase.from('messages').delete().eq('channel_id', id)
+      .then(() => supabase.from('channels').delete().eq('id', id))
+      .then(({ error }) => { if (error) console.error('deleteChannel error:', error); });
+  },
 
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
   toggleDarkMode: () => set((s) => ({ darkMode: !s.darkMode })),
