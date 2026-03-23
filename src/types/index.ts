@@ -136,6 +136,7 @@ export interface Channel {
   memberIds: string[];
   description?: string;
   lastReadAt?: string;
+  pinnedMessageIds?: string[];
 }
 
 export interface Message {

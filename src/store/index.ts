@@ -212,6 +212,7 @@ function dbToChannel(row: any): Channel {
     memberIds: row.member_ids ?? [],
     description: row.description ?? undefined,
     lastReadAt: row.last_read_at ?? undefined,
+    pinnedMessageIds: row.pinned_message_ids ?? [],
   };
 }
 
@@ -307,6 +308,8 @@ interface AppStore {
   deleteMessage: (id: string) => void;
   replyToMessage: (parentId: string, channelId: string, body: string) => void;
   addReaction: (messageId: string, emoji: string) => void;
+  pinMessage: (messageId: string, channelId: string) => void;
+  unpinMessage: (messageId: string, channelId: string) => void;
   addUserFlag: (flag: Omit<UserFlag, 'id'>) => void;
   updateUserFlag: (flagId: string, changes: Partial<Omit<UserFlag, 'id'>>) => void;
   removeUserFlag: (flagId: string) => void;
@@ -446,9 +449,16 @@ export const useStore = create<AppStore>()((set, get) => ({
     }).then(({ error }) => { if (error) console.error('addChannel error:', error); });
   },
 
-  updateChannel: (id, u) => set((s) => ({
-    channels: s.channels.map(c => c.id === id ? { ...c, ...u } : c),
-  })),
+  updateChannel: (id, u) => {
+    set((s) => ({ channels: s.channels.map(c => c.id === id ? { ...c, ...u } : c) }));
+    const dbFields: Record<string, any> = {};
+    if ('description' in u) dbFields.description = u.description ?? null;
+    if ('pinnedMessageIds' in u) dbFields.pinned_message_ids = u.pinnedMessageIds ?? [];
+    if (Object.keys(dbFields).length > 0) {
+      supabase.from('channels').update(dbFields).eq('id', id)
+        .then(({ error }) => { if (error) console.error('updateChannel error:', error); });
+    }
+  },
 
   deleteChannel: (id) => {
     set((s) => ({
@@ -737,6 +747,23 @@ export const useStore = create<AppStore>()((set, get) => ({
       parent_id: newMsg.parentId,
       created_at: newMsg.createdAt,
     }).then(({ error }) => { if (error) console.error('replyToMessage error:', error); });
+  },
+
+  pinMessage: (messageId, channelId) => {
+    const s = useStore.getState();
+    const ch = s.channels.find(c => c.id === channelId);
+    if (!ch) return;
+    const pins = [...(ch.pinnedMessageIds ?? [])];
+    if (!pins.includes(messageId)) pins.push(messageId);
+    useStore.getState().updateChannel(channelId, { pinnedMessageIds: pins });
+  },
+
+  unpinMessage: (messageId, channelId) => {
+    const s = useStore.getState();
+    const ch = s.channels.find(c => c.id === channelId);
+    if (!ch) return;
+    const pins = (ch.pinnedMessageIds ?? []).filter(id => id !== messageId);
+    useStore.getState().updateChannel(channelId, { pinnedMessageIds: pins });
   },
 
   // -------------------------------------------------------------------------

@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useStore } from '../store';
-import { Hash, Plus, Search, Smile, Paperclip, Send, X, Pencil, Trash2, MessageSquare, Link, MoreHorizontal } from 'lucide-react';
+import { Hash, Plus, Search, Smile, Paperclip, Send, X, Pencil, Trash2, MessageSquare, Link, MoreHorizontal, Pin, Copy, ChevronDown } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 import type { Message, User } from '../types';
 
@@ -66,19 +66,23 @@ interface BubbleProps {
   userNames: string[];
   users: User[];
   replyCount: number;
+  isPinned?: boolean;
   onReact: (id: string, emoji: string) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
   onOpenThread: (id: string) => void;
+  onPin: (id: string) => void;
+  onCopyLink: (id: string) => void;
   editing: boolean;
   editValue: string;
   onEditChange: (v: string) => void;
   onEditSave: () => void;
   onEditCancel: () => void;
   isThread?: boolean;
+  isFirstUnread?: boolean;
 }
 
-function MessageBubble({ msg, prevMsg, userNames, users, replyCount, onReact, onEdit, onDelete, onOpenThread, editing, editValue, onEditChange, onEditSave, onEditCancel, isThread }: BubbleProps) {
+function MessageBubble({ msg, prevMsg, userNames, users, replyCount, isPinned, onReact, onEdit, onDelete, onOpenThread, onPin, onCopyLink, editing, editValue, onEditChange, onEditSave, onEditCancel, isThread, isFirstUnread }: BubbleProps) {
   const [showEmoji, setShowEmoji] = useState(false);
   const author = users.find(u => u.id === msg.authorId);
   const isContinuation = prevMsg && prevMsg.authorId === msg.authorId
@@ -88,8 +92,16 @@ function MessageBubble({ msg, prevMsg, userNames, users, replyCount, onReact, on
   const totalReactions = Object.entries(msg.reactions).filter(([, us]) => us.length > 0);
 
   return (
+    <>
+      {isFirstUnread && (
+        <div className="flex items-center gap-3 px-4 py-2 my-1">
+          <div className="flex-1 h-px bg-brand-500/40" />
+          <span className="text-[10px] font-semibold text-brand-400 uppercase tracking-wider flex-shrink-0">New messages</span>
+          <div className="flex-1 h-px bg-brand-500/40" />
+        </div>
+      )}
     <div
-      className="group relative flex gap-3 px-4 py-0.5 hover:bg-white/[0.02] rounded-lg transition-colors"
+      className={`group relative flex gap-3 px-4 py-0.5 hover:bg-white/[0.02] rounded-lg transition-colors ${isPinned ? 'bg-amber-500/[0.03] border-l-2 border-amber-500/30 ml-0 pl-3' : ''}`}
       onMouseLeave={() => setShowEmoji(false)}
     >
       {isContinuation ? (
@@ -214,6 +226,20 @@ function MessageBubble({ msg, prevMsg, userNames, users, replyCount, onReact, on
             <Pencil size={14} />
           </button>
           <button
+            onClick={() => onPin(msg.id)}
+            className={`p-1.5 rounded-md hover:bg-white/[0.08] transition-colors ${isPinned ? 'text-amber-400' : 'text-white/30 hover:text-white/60'}`}
+            title={isPinned ? 'Unpin' : 'Pin message'}
+          >
+            <Pin size={14} />
+          </button>
+          <button
+            onClick={() => onCopyLink(msg.id)}
+            className="p-1.5 rounded-md hover:bg-white/[0.08] text-white/30 hover:text-white/60 transition-colors"
+            title="Copy link"
+          >
+            <Copy size={14} />
+          </button>
+          <button
             onClick={() => onDelete(msg.id)}
             className="p-1.5 rounded-md hover:bg-white/[0.08] text-red-400/50 hover:text-red-400 transition-colors"
             title="Delete"
@@ -223,6 +249,7 @@ function MessageBubble({ msg, prevMsg, userNames, users, replyCount, onReact, on
         </div>
       )}
     </div>
+    </>
   );
 }
 
@@ -231,6 +258,7 @@ export default function MessagesPage() {
     channels, messages, users, currentUser, activeChannelId,
     setActiveChannel, sendMessage, addReaction,
     updateMessage, deleteMessage, replyToMessage, addNotification, deleteChannel, addChannel,
+    updateChannel, pinMessage, unpinMessage,
   } = useStore();
 
   const [input, setInput] = useState('');
@@ -249,11 +277,18 @@ export default function MessagesPage() {
   const [pendingUrl, setPendingUrl] = useState('');
   const [pendingUrlName, setPendingUrlName] = useState('');
   const [pendingAttachments, setPendingAttachments] = useState<{ name: string; url: string; type: string }[]>([]);
+  const [showPinned, setShowPinned] = useState(false);
+  const [editingDesc, setEditingDesc] = useState(false);
+  const [descValue, setDescValue] = useState('');
+  const [copyToast, setCopyToast] = useState(false);
+  const [hasNewMessages, setHasNewMessages] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const threadBottomRef = useRef<HTMLDivElement>(null);
   const threadInputRef = useRef<HTMLTextAreaElement>(null);
+  const firstUnreadRef = useRef<HTMLDivElement>(null);
+  const descInputRef = useRef<HTMLInputElement>(null);
 
   const channel = channels.find(c => c.id === activeChannelId);
   const channelMessages = messages.filter(m => m.channelId === activeChannelId);
@@ -264,6 +299,16 @@ export default function MessagesPage() {
   const groupedChannels = channels.filter(c => c.type === 'channel');
   const dmChannels = channels.filter(c => c.type === 'dm');
   const userNames = users.map(u => u.name);
+  const pinnedIds = new Set(channel?.pinnedMessageIds ?? []);
+  const pinnedMessages = topLevelMessages.filter(m => pinnedIds.has(m.id));
+
+  // First unread message: from another user, created after lastReadAt
+  const firstUnreadId = useMemo(() => {
+    const lastRead = channel?.lastReadAt;
+    if (!lastRead) return null;
+    const msg = topLevelMessages.find(m => m.authorId !== currentUser.id && m.createdAt > lastRead);
+    return msg?.id ?? null;
+  }, [topLevelMessages, channel?.lastReadAt, currentUser.id]);
 
   // Reply count per message
   const replyCountMap = useMemo(() => {
@@ -298,7 +343,19 @@ export default function MessagesPage() {
   // Close thread panel when switching channels
   useEffect(() => {
     setOpenThreadId(null);
+    setShowPinned(false);
+    setEditingDesc(false);
+    setHasNewMessages(!!firstUnreadId);
   }, [activeChannelId]);
+
+  // Show "new messages" indicator when new messages arrive while channel is open
+  useEffect(() => {
+    if (firstUnreadId) setHasNewMessages(true);
+  }, [firstUnreadId]);
+
+  useEffect(() => {
+    if (editingDesc && descInputRef.current) descInputRef.current.focus();
+  }, [editingDesc]);
 
   const isUnread = (ch: typeof channels[0]) => {
     const lastRead = ch.lastReadAt;
@@ -372,6 +429,25 @@ export default function MessagesPage() {
     setShowAttachForm(false);
   };
 
+  const handleCopyLink = useCallback((msgId: string) => {
+    const url = `${window.location.origin}?channel=${activeChannelId}&msg=${msgId}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopyToast(true);
+      setTimeout(() => setCopyToast(false), 2000);
+    });
+  }, [activeChannelId]);
+
+  const handleSaveDesc = () => {
+    if (!channel) return;
+    updateChannel(channel.id, { description: descValue.trim() || undefined });
+    setEditingDesc(false);
+  };
+
+  const handleJumpToUnread = () => {
+    firstUnreadRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setHasNewMessages(false);
+  };
+
   const handleAddChannel = () => {
     if (!newChannelName.trim()) return;
     addChannel({ name: newChannelName.trim(), type: 'channel', memberIds: [currentUser.id] });
@@ -400,6 +476,7 @@ export default function MessagesPage() {
     const items: React.ReactNode[] = [];
     msgs.forEach((msg, i) => {
       const prev = msgs[i - 1];
+      const isFirstUnread = !isThread && msg.id === firstUnreadId;
       if (!isThread && (!prev || !isSameDay(prev.createdAt, msg.createdAt))) {
         items.push(
           <div key={`divider-${msg.id}`} className="flex items-center gap-3 px-4 my-4">
@@ -409,7 +486,7 @@ export default function MessagesPage() {
           </div>
         );
       }
-      items.push(
+      const bubble = (
         <MessageBubble
           key={msg.id}
           msg={msg}
@@ -417,6 +494,7 @@ export default function MessagesPage() {
           userNames={userNames}
           users={users}
           replyCount={replyCountMap[msg.id] || 0}
+          isPinned={pinnedIds.has(msg.id)}
           onReact={(id, emoji) => addReaction(id, emoji)}
           onEdit={handleEditStart}
           onDelete={(id) => {
@@ -424,14 +502,23 @@ export default function MessagesPage() {
             if (openThreadId === id) setOpenThreadId(null);
           }}
           onOpenThread={setOpenThreadId}
+          onPin={(id) => pinnedIds.has(id) ? unpinMessage(id, activeChannelId) : pinMessage(id, activeChannelId)}
+          onCopyLink={handleCopyLink}
           editing={editingId === msg.id}
           editValue={editValue}
           onEditChange={setEditValue}
           onEditSave={handleEditSave}
           onEditCancel={() => { setEditingId(null); setEditValue(''); }}
           isThread={isThread}
+          isFirstUnread={isFirstUnread}
         />
       );
+      // Wrap first-unread message in a ref div so we can scroll to it
+      if (isFirstUnread) {
+        items.push(<div key={msg.id} ref={firstUnreadRef}>{bubble}</div>);
+      } else {
+        items.push(bubble);
+      }
     });
     return items;
   };
@@ -657,26 +744,107 @@ export default function MessagesPage() {
               {channel ? getDmName(channel)[0] : '?'}
             </div>
           )}
-          <div>
+          <div className="min-w-0">
             <h2 className="text-sm font-semibold text-white">
               {channel?.type === 'channel' ? `#${channel.name}` : channel ? getDmName(channel) : ''}
             </h2>
-            {channel?.description && (
-              <p className="text-xs text-white/30 leading-none">{channel.description}</p>
+            {channel?.type === 'channel' && (
+              editingDesc ? (
+                <div className="flex items-center gap-1 mt-0.5">
+                  <input
+                    ref={descInputRef}
+                    value={descValue}
+                    onChange={e => setDescValue(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleSaveDesc(); if (e.key === 'Escape') setEditingDesc(false); }}
+                    onBlur={handleSaveDesc}
+                    placeholder="Add a description..."
+                    className="text-xs bg-white/[0.06] border border-brand-500/40 rounded px-1.5 py-0.5 text-white/70 placeholder-white/20 focus:outline-none w-48"
+                  />
+                </div>
+              ) : (
+                <button
+                  onClick={() => { setDescValue(channel?.description || ''); setEditingDesc(true); }}
+                  className="flex items-center gap-1 group/desc"
+                >
+                  <p className="text-xs text-white/30 leading-none group-hover/desc:text-white/50 transition-colors">
+                    {channel?.description || 'Add description…'}
+                  </p>
+                  <Pencil size={9} className="text-white/20 opacity-0 group-hover/desc:opacity-100 transition-opacity" />
+                </button>
+              )
             )}
           </div>
-          <div className="ml-auto flex items-center gap-1">
-            {channel?.memberIds.map(id => (
-              <div key={id} className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold text-white border-2 border-[#0f0f10] -ml-1 first:ml-0 ${AVATAR_COLORS[id] || 'bg-white/20'}`}>
-                {AVATAR_INITIALS[id] || '?'}
-              </div>
-            ))}
-            <span className="text-xs text-white/30 ml-1">{channel?.memberIds.length}</span>
+          <div className="ml-auto flex items-center gap-2">
+            {pinnedMessages.length > 0 && (
+              <button
+                onClick={() => setShowPinned(v => !v)}
+                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors ${showPinned ? 'bg-amber-500/20 text-amber-400' : 'text-white/30 hover:text-white/60 hover:bg-white/[0.04]'}`}
+              >
+                <Pin size={12} />
+                <span>{pinnedMessages.length} pinned</span>
+              </button>
+            )}
+            <div className="flex items-center">
+              {channel?.memberIds.map(id => (
+                <div key={id} className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold text-white border-2 border-[#0f0f10] -ml-1 first:ml-0 ${AVATAR_COLORS[id] || 'bg-white/20'}`}>
+                  {AVATAR_INITIALS[id] || '?'}
+                </div>
+              ))}
+              <span className="text-xs text-white/30 ml-1.5">{channel?.memberIds.length}</span>
+            </div>
           </div>
         </div>
 
+        {/* Pinned messages panel */}
+        {showPinned && pinnedMessages.length > 0 && (
+          <div className="border-b border-white/[0.06] bg-white/[0.02] flex-shrink-0 max-h-48 overflow-y-auto scrollbar-hide">
+            <div className="flex items-center gap-2 px-4 py-2 border-b border-white/[0.04]">
+              <Pin size={12} className="text-amber-400" />
+              <span className="text-xs font-semibold text-amber-400">{pinnedMessages.length} pinned message{pinnedMessages.length !== 1 ? 's' : ''}</span>
+            </div>
+            {pinnedMessages.map(msg => {
+              const author = users.find(u => u.id === msg.authorId);
+              return (
+                <div key={msg.id} className="flex items-start gap-3 px-4 py-2 hover:bg-white/[0.02] transition-colors group">
+                  <Avatar userId={msg.authorId} size={6} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-xs font-semibold text-white/60">{author?.name}</span>
+                      <span className="text-[10px] text-white/25">{formatTime(msg.createdAt)}</span>
+                    </div>
+                    <p className="text-xs text-white/50 truncate">{msg.body}</p>
+                  </div>
+                  <button
+                    onClick={() => unpinMessage(msg.id, activeChannelId)}
+                    className="opacity-0 group-hover:opacity-100 p-1 text-white/30 hover:text-white/60 transition-all"
+                    title="Unpin"
+                  >
+                    <X size={11} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto scrollbar-hide py-4">
+        <div className="flex-1 overflow-y-auto scrollbar-hide py-4 relative">
+          {/* Jump to unread button */}
+          {hasNewMessages && firstUnreadId && (
+            <button
+              onClick={handleJumpToUnread}
+              className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs rounded-full shadow-lg transition-colors"
+            >
+              <ChevronDown size={13} />
+              Jump to new messages
+            </button>
+          )}
+          {/* Copy toast */}
+          {copyToast && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 px-3 py-1.5 bg-[#1c1c1f] border border-white/[0.1] rounded-lg text-xs text-white/70 shadow-lg">
+              Link copied
+            </div>
+          )}
           {topLevelMessages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center px-8">
               <div className="w-14 h-14 rounded-2xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center mb-4">
@@ -821,10 +989,13 @@ export default function MessagesPage() {
                 userNames={userNames}
                 users={users}
                 replyCount={0}
+                isPinned={pinnedIds.has(threadParentMsg.id)}
                 onReact={(id, emoji) => addReaction(id, emoji)}
                 onEdit={handleEditStart}
                 onDelete={(id) => { deleteMessage(id); setOpenThreadId(null); }}
                 onOpenThread={() => {}}
+                onPin={(id) => pinnedIds.has(id) ? unpinMessage(id, activeChannelId) : pinMessage(id, activeChannelId)}
+                onCopyLink={handleCopyLink}
                 editing={editingId === threadParentMsg.id}
                 editValue={editValue}
                 onEditChange={setEditValue}
