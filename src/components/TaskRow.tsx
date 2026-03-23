@@ -19,7 +19,7 @@ interface TaskRowProps {
 }
 
 const TaskRow = forwardRef<HTMLDivElement, TaskRowProps>(function TaskRow({ task, onOpenTask, showProject = false, focused = false }, ref) {
-  const { projects, updateTask } = useStore();
+  const { projects, users, updateTask } = useStore();
   const project = projects.find((p) => p.id === task.projectIds?.[0]);
   const isOverdue = task.dueDate && isPast(new Date(task.dueDate)) && task.status !== 'done';
 
@@ -44,8 +44,16 @@ const TaskRow = forwardRef<HTMLDivElement, TaskRowProps>(function TaskRow({ task
         {task.title}
       </span>
       {task.recurring && task.status !== 'done' && <span className="flex-shrink-0 text-xs text-white/25" title={`Repeats ${task.recurring}`}>↻</span>}
-      {task.within72Hours && <span className="flex-shrink-0 text-xs px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 font-medium">72h</span>}
-      {task.questionsForLev && <span className="flex-shrink-0 text-xs px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 font-medium">?</span>}
+      {task.flags?.map(tf => {
+        const applier = users.find(u => u.id === tf.appliedBy);
+        const flagDef = applier?.flags?.find(f => f.id === tf.flagId);
+        if (!flagDef) return null;
+        return (
+          <span key={`${tf.flagId}-${tf.appliedBy}`} className="flex-shrink-0 text-xs px-1.5 py-0.5 rounded font-medium" style={{ background: flagDef.color + '1a', color: flagDef.color }}>
+            {flagDef.name.length > 8 ? flagDef.name.slice(0, 8) + '…' : flagDef.name}
+          </span>
+        );
+      })}
       <span className={`flex-shrink-0 w-1.5 h-1.5 rounded-full ${PRIORITY_DOT[task.priority]}`} title={task.priority} />
       {showProject && project && (
         <span className="flex-shrink-0 text-xs opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: project.color + 'cc' }}>

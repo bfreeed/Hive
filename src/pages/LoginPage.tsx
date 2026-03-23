@@ -8,6 +8,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +37,8 @@ export default function LoginPage() {
           });
           if (profileError) console.error('Profile insert error:', profileError);
         }
+        setConfirmed(true);
+        return;
       }
     } catch (err: any) {
       setError(err.message || 'Something went wrong');
@@ -43,6 +46,28 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  if (confirmed) {
+    return (
+      <div className="min-h-screen bg-[#0d0d0f] flex items-center justify-center px-4">
+        <div className="w-full max-w-sm text-center">
+          <div className="w-12 h-12 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center mx-auto mb-6">
+            <svg className="w-6 h-6 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-white mb-2">Account created</h2>
+          <p className="text-sm text-white/40 mb-8">Check your email to confirm your address, then sign in.</p>
+          <button
+            onClick={() => { setConfirmed(false); setMode('signin'); setPassword(''); }}
+            className="w-full py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium rounded-xl transition-colors"
+          >
+            Go to Sign In
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0d0d0f] flex items-center justify-center px-4">

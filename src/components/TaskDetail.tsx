@@ -308,20 +308,54 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
             <div>
               <p className="text-xs text-white/30 uppercase tracking-wider mb-2">Flags</p>
               <div className="flex flex-wrap gap-1.5">
-                {[
-                  { key: 'within72Hours',  label: '⚡ 72h Priority',     on: 'bg-red-500/15 text-red-400 ring-1 ring-red-500/25' },
-                  { key: 'questionsForLev', label: '? Question for Lev', on: 'bg-purple-500/15 text-purple-400 ring-1 ring-purple-500/25' },
-                  { key: 'updateAtCheckin', label: '✓ Sarah\'s Update',  on: 'bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/25' },
-                  { key: 'isPrivate',       label: '🔒 Private',          on: 'bg-white/10 text-white/60 ring-1 ring-white/20' },
-                ].map(f => (
-                  <button
-                    key={f.key}
-                    onClick={() => update(f.key as keyof Task, !(task as any)[f.key])}
-                    className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${(task as any)[f.key] ? f.on : 'bg-white/[0.04] text-white/25 hover:text-white/50 hover:bg-white/[0.06]'}`}
-                  >
-                    {f.label}
-                  </button>
-                ))}
+                {/* Current user's own flags — toggleable */}
+                {(currentUser.flags || []).map(f => {
+                  const active = task.flags.some(tf => tf.flagId === f.id && tf.appliedBy === currentUser.id);
+                  return (
+                    <button
+                      key={f.id}
+                      onClick={() => {
+                        const next = active
+                          ? task.flags.filter(tf => !(tf.flagId === f.id && tf.appliedBy === currentUser.id))
+                          : [...task.flags, { flagId: f.id, appliedBy: currentUser.id }];
+                        update('flags', next);
+                      }}
+                      style={active ? { backgroundColor: f.color + '25', color: f.color, boxShadow: `0 0 0 1px ${f.color}40` } : {}}
+                      className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${active ? '' : 'bg-white/[0.04] text-white/25 hover:text-white/50 hover:bg-white/[0.06]'}`}
+                    >
+                      {f.name}
+                    </button>
+                  );
+                })}
+                {/* Private flag */}
+                <button
+                  onClick={() => update('isPrivate', !task.isPrivate)}
+                  className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${task.isPrivate ? 'bg-white/10 text-white/60 ring-1 ring-white/20' : 'bg-white/[0.04] text-white/25 hover:text-white/50 hover:bg-white/[0.06]'}`}
+                >
+                  🔒 Private
+                </button>
+                {/* Other users' flags on this task — shown with attribution, removable */}
+                {task.flags.filter(tf => tf.appliedBy !== currentUser.id).map(tf => {
+                  const applier = users.find(u => u.id === tf.appliedBy);
+                  const flagDef = applier?.flags?.find(fd => fd.id === tf.flagId);
+                  if (!flagDef) return null;
+                  return (
+                    <span
+                      key={`${tf.flagId}-${tf.appliedBy}`}
+                      className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-white/[0.04]"
+                      style={{ color: flagDef.color + 'aa' }}
+                    >
+                      <span>{flagDef.name}</span>
+                      <span className="text-white/20 text-[10px]">by {applier?.name.split(' ')[0]}</span>
+                      <button
+                        onClick={() => update('flags', task.flags.filter(f => !(f.flagId === tf.flagId && f.appliedBy === tf.appliedBy)))}
+                        className="ml-0.5 text-white/20 hover:text-white/50 transition-colors"
+                      >
+                        <X size={10} />
+                      </button>
+                    </span>
+                  );
+                })}
               </div>
             </div>
 

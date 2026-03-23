@@ -80,7 +80,7 @@ function MindMapView({ tasks, onOpenTask }: { tasks: Task[]; onOpenTask: (id: st
 }
 
 export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => void }) {
-  const { tasks, projects, users, addTask, manualOrder, setManualOrder } = useStore();
+  const { tasks, projects, users, currentUser, addTask, manualOrder, setManualOrder } = useStore();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -121,10 +121,8 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
     if (filterProject !== 'all' && !(t.projectIds ?? []).includes(filterProject)) return false;
     if (filterPriority !== 'all' && t.priority !== filterPriority) return false;
     if (filterAssignee !== 'all' && !t.assigneeIds.includes(filterAssignee)) return false;
-    if (filterFlag === '72h' && !t.within72Hours) return false;
-    if (filterFlag === 'questions' && !t.questionsForLev) return false;
-    if (filterFlag === 'checkin' && !t.updateAtCheckin) return false;
     if (filterFlag === 'private' && !t.isPrivate) return false;
+    if (filterFlag !== 'all' && filterFlag !== 'private' && !t.flags.some(f => f.flagId === filterFlag)) return false;
     if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   };
@@ -207,10 +205,8 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
       projectIds: newTaskProject ? [newTaskProject] : [],
       status: 'todo',
       priority: 'medium',
-      assigneeIds: ['lev'],
-      within72Hours: false,
-      questionsForLev: false,
-      updateAtCheckin: false,
+      assigneeIds: [currentUser.id],
+      flags: [],
       isPrivate: false,
       linkedContactIds: [],
       linkedDocIds: [],
@@ -261,9 +257,9 @@ export default function TasksPage({ onOpenTask }: { onOpenTask: (id: string) => 
 
           <SelectFilter value={filterFlag} onChange={setFilterFlag}>
             <option value="all">All Flags</option>
-            <option value="72h">72h Priority</option>
-            <option value="questions">Questions for Lev</option>
-            <option value="checkin">Sarah's Update</option>
+            {(currentUser.flags || []).map(f => (
+              <option key={f.id} value={f.id}>{f.name}</option>
+            ))}
             <option value="private">Private</option>
           </SelectFilter>
           <SelectFilter value={filterProject} onChange={setFilterProject}>

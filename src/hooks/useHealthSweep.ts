@@ -105,7 +105,7 @@ export function useHealthSweep(currentUserId: string) {
 
         // --- WITHIN 72 HOURS ---
         if (
-          task.within72Hours &&
+          task.flags?.some(f => f.flagId === 'flag-72h') &&
           task.status === 'todo' &&
           !alreadySentToday(currentUserId, 'within72hrs', task.id)
         ) {

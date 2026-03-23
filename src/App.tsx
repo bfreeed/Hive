@@ -11,13 +11,14 @@ import Home from './pages/Home';
 import ProjectHub from './pages/ProjectHub';
 import TasksPage from './pages/TasksPage';
 import ContactsPage from './pages/ContactsPage';
-import SarahView from './pages/SarahView';
+import TeamMemberView from './pages/TeamMemberView';
 import MessagesPage from './pages/MessagesPage';
 import NotificationsPage from './pages/NotificationsPage';
 import { useReminderChecker } from './hooks/useReminderChecker';
 import { useHealthSweep } from './hooks/useHealthSweep';
 
 function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: any; darkMode: boolean; toggleDarkMode: () => void }) {
+  const { addUserFlag, updateUserFlag, removeUserFlag } = useStore();
   const clientIdRef = useRef<HTMLInputElement>(null);
   const apiKeyRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
@@ -26,6 +27,19 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
   const [phoneSaved, setPhoneSaved] = useState(false);
   const [importPreview, setImportPreview] = useState<any>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [newFlagName, setNewFlagName] = useState('');
+  const [newFlagColor, setNewFlagColor] = useState('#6366f1');
+  const [editingFlagId, setEditingFlagId] = useState<string | null>(null);
+  const [editingFlagName, setEditingFlagName] = useState('');
+
+  const FLAG_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#10b981', '#06b6d4', '#6366f1', '#a855f7', '#ec4899'];
+
+  const handleAddFlag = () => {
+    if (!newFlagName.trim()) return;
+    addUserFlag({ name: newFlagName.trim(), color: newFlagColor });
+    setNewFlagName('');
+    setNewFlagColor('#6366f1');
+  };
 
   const handleExport = () => {
     const state = useStore.getState();
@@ -158,6 +172,82 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
           </div>
         </div>
 
+        {/* My Flags */}
+        <div className="mb-8">
+          <h2 className="text-xs font-semibold text-white/30 uppercase tracking-wider mb-3">My Flags</h2>
+          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 space-y-3">
+            <p className="text-xs text-white/40">Flags you can apply to any task. Other users see their own flags.</p>
+            {/* Existing flags */}
+            <div className="space-y-1.5">
+              {(currentUser?.flags || []).map((f: any) => (
+                <div key={f.id} className="flex items-center gap-2.5 py-1">
+                  {editingFlagId === f.id ? (
+                    <>
+                      <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: f.color }} />
+                      <input
+                        autoFocus
+                        value={editingFlagName}
+                        onChange={e => setEditingFlagName(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') { updateUserFlag(f.id, { name: editingFlagName.trim() || f.name }); setEditingFlagId(null); }
+                          if (e.key === 'Escape') setEditingFlagId(null);
+                        }}
+                        onBlur={() => { updateUserFlag(f.id, { name: editingFlagName.trim() || f.name }); setEditingFlagId(null); }}
+                        className="flex-1 bg-white/[0.06] border border-white/[0.12] rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:border-brand-500/50"
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: f.color }} />
+                      <span
+                        className="flex-1 text-sm text-white/70 cursor-pointer hover:text-white transition-colors"
+                        onClick={() => { setEditingFlagId(f.id); setEditingFlagName(f.name); }}
+                      >
+                        {f.name}
+                      </span>
+                      <button
+                        onClick={() => removeUserFlag(f.id)}
+                        className="text-white/15 hover:text-red-400 transition-colors text-xs px-1.5 py-0.5 rounded"
+                      >
+                        Remove
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+            {/* Add new flag */}
+            <div className="pt-2 border-t border-white/[0.06] space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  value={newFlagName}
+                  onChange={e => setNewFlagName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleAddFlag(); }}
+                  placeholder="New flag name..."
+                  className="flex-1 px-3 py-1.5 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white/70 placeholder-white/20 focus:outline-none focus:border-brand-500/40"
+                />
+                <button
+                  onClick={handleAddFlag}
+                  disabled={!newFlagName.trim()}
+                  className="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-colors"
+                >
+                  Add
+                </button>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {FLAG_COLORS.map(c => (
+                  <button
+                    key={c}
+                    onClick={() => setNewFlagColor(c)}
+                    className="w-5 h-5 rounded-full transition-transform hover:scale-110"
+                    style={{ background: c, boxShadow: newFlagColor === c ? `0 0 0 2px #fff4, 0 0 0 3px ${c}` : 'none' }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Data */}
         <div className="mb-8">
           <h2 className="text-xs font-semibold text-white/30 uppercase tracking-wider mb-3">Data</h2>
@@ -262,7 +352,7 @@ type Page =
   | { id: 'contacts' }
   | { id: 'messages' }
   | { id: 'project'; projectId: string }
-  | { id: 'sarah' }
+  | { id: 'team-member'; userId: string }
   | { id: 'notifications' }
   | { id: 'settings' };
 
@@ -304,12 +394,16 @@ function AuthenticatedApp() {
     else if (pageName === 'contacts') setPage({ id: 'contacts' });
     else if (pageName === 'messages') setPage({ id: 'messages' });
     else if (pageName === 'project' && id) setPage({ id: 'project', projectId: id });
-    else if (pageName === 'sarah') setPage({ id: 'sarah' });
+    else if (pageName === 'team-member' && id) setPage({ id: 'team-member', userId: id });
     else if (pageName === 'notifications') setPage({ id: 'notifications' });
     else if (pageName === 'settings') setPage({ id: 'settings' });
   };
 
-  const activePage = page.id === 'project' ? `project-${(page as any).projectId}` : page.id;
+  const activePage = page.id === 'project'
+    ? `project-${(page as any).projectId}`
+    : page.id === 'team-member'
+    ? `team-member-${(page as any).userId}`
+    : page.id;
 
   const renderPage = () => {
     switch (page.id) {
@@ -323,8 +417,8 @@ function AuthenticatedApp() {
         return <MessagesPage />;
       case 'project':
         return <ProjectHub projectId={(page as any).projectId} onNavigate={navigate} onOpenTask={setOpenTaskId} />;
-      case 'sarah':
-        return <SarahView onOpenTask={setOpenTaskId} />;
+      case 'team-member':
+        return <TeamMemberView userId={(page as any).userId} onOpenTask={setOpenTaskId} />;
       case 'notifications':
         return <NotificationsPage onNavigate={navigate} onOpenTask={setOpenTaskId} />;
       case 'settings':

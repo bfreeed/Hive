@@ -21,12 +21,13 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
-  const { projects, tasks, notifications, darkMode, toggleDarkMode, toggleVoice, sidebarOpen, toggleSidebar, addProject, currentUser } = useStore();
+  const { projects, tasks, users, notifications, darkMode, toggleDarkMode, toggleVoice, sidebarOpen, toggleSidebar, addProject, currentUser, isLoading } = useStore();
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
   };
   const [projectsExpanded, setProjectsExpanded] = useState(true);
+  const [teamExpanded, setTeamExpanded] = useState(true);
   const [showNewProject, setShowNewProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectColor, setNewProjectColor] = useState(PROJECT_COLORS[0]);
@@ -52,7 +53,7 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
   const unreadMentions = notifications.filter((n) => n.type === 'mention' && !n.read).length;
-  const questionsCount = tasks.filter((t) => t.questionsForLev).length;
+  const questionsCount = tasks.filter((t) => t.flags?.some(f => f.flagId === 'flag-questions')).length;
 
   return (
     <aside className={`flex flex-col h-full bg-[#111113] border-r border-white/[0.06] transition-all duration-200 ${sidebarOpen ? 'w-60' : 'w-14'} flex-shrink-0`}>
@@ -155,22 +156,48 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
           )}
         </div>
 
-        {/* Sarah's View */}
-        {sidebarOpen && (
-          <div className="pt-3">
-            <p className="px-2 py-1 text-xs font-medium text-white/30 uppercase tracking-wider">Team</p>
-            <button
-              onClick={() => onNavigate('sarah')}
-              className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm transition-colors ${activePage === 'sarah' ? 'bg-white/[0.08] text-white' : 'text-white/60 hover:text-white hover:bg-white/[0.04]'}`}
-            >
-              <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
-                <span className="text-[10px] font-medium text-emerald-400">S</span>
-              </div>
-              <span>Sarah's View</span>
-            </button>
-          </div>
-        )}
       </nav>
+
+      {/* Team members — only users who share at least one project */}
+      {sidebarOpen && !isLoading && (() => {
+        const teammates = users.filter(u =>
+          u.id !== currentUser.id &&
+          u.email !== currentUser.email &&
+          u.name !== currentUser.name &&
+          tasks.some(t => t.assigneeIds.includes(u.id))
+        );
+        if (teammates.length === 0) return null;
+        return (
+          <div className="border-t border-white/[0.06] px-2 py-2">
+            <button
+              onClick={() => setTeamExpanded(v => !v)}
+              className="w-full flex items-center justify-between px-2 py-1 group mb-0.5"
+            >
+              <span className="text-xs font-medium text-white/30 uppercase tracking-wider">Team</span>
+              <ChevronDown size={12} className={`text-white/20 group-hover:text-white/40 transition-transform ${teamExpanded ? '' : '-rotate-90'}`} />
+            </button>
+            {teamExpanded && teammates.map(u => {
+              const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#a855f7', '#ec4899', '#06b6d4'];
+              let hash = 0;
+              for (const c of u.id) hash = (hash * 31 + c.charCodeAt(0)) & 0xffff;
+              const color = COLORS[hash % COLORS.length];
+              const isActive = activePage === `team-member-${u.id}`;
+              return (
+                <button
+                  key={u.id}
+                  onClick={() => onNavigate('team-member', u.id)}
+                  className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm transition-colors ${isActive ? 'bg-white/[0.08] text-white' : 'text-white/60 hover:text-white hover:bg-white/[0.04]'}`}
+                >
+                  <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: color + '33' }}>
+                    <span className="text-[10px] font-medium" style={{ color }}>{u.name[0].toUpperCase()}</span>
+                  </div>
+                  <span>{u.name.split(' ')[0]}</span>
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* Bottom */}
       <div className="border-t border-white/[0.06] p-2 space-y-0.5">

@@ -1,13 +1,19 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
-import type { Task, Project, Contact, User, Notification, Channel, Message } from '../types';
+import type { Task, Project, Contact, User, UserFlag, Notification, Channel, Message } from '../types';
 
 // ---------------------------------------------------------------------------
 // Fallback seed data (shown while Supabase loads or if it fails)
 // ---------------------------------------------------------------------------
 
-const LEV: User = { id: 'lev', name: 'Lev Freedman', email: 'lev@example.com', role: 'owner' };
-const SARAH: User = { id: 'sarah', name: 'Sarah', email: 'sarah@example.com', role: 'assistant' };
+const DEFAULT_FLAGS: UserFlag[] = [
+  { id: 'flag-72h', name: '72h Priority', color: '#ef4444' },
+  { id: 'flag-questions', name: 'Questions for Me', color: '#a855f7' },
+  { id: 'flag-checkin', name: 'Update at Checkin', color: '#10b981' },
+];
+
+const LEV: User = { id: 'lev', name: 'Lev Freedman', email: 'lev@example.com', role: 'owner', flags: DEFAULT_FLAGS };
+const SARAH: User = { id: 'sarah', name: 'Sarah', email: 'sarah@example.com', role: 'assistant', flags: DEFAULT_FLAGS };
 
 const now = new Date().toISOString();
 const in2d = new Date(Date.now() + 2 * 864e5).toISOString();
@@ -24,12 +30,12 @@ const PROJECTS: Project[] = [
 ];
 
 const TASKS: Task[] = [
-  { id: 't1', title: 'Fix roof leak', projectIds: ['jedi'], status: 'todo', priority: 'urgent', assigneeIds: ['lev', 'sarah'], within72Hours: true, questionsForLev: false, updateAtCheckin: false, isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now, dueDate: in2d },
-  { id: 't2', title: 'Name change with Travis County', projectIds: ['jedi'], status: 'waiting', priority: 'high', assigneeIds: ['lev'], within72Hours: false, questionsForLev: false, updateAtCheckin: false, isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now },
-  { id: 't3', title: 'Schedule dentist appointment', projectIds: ['personal'], status: 'todo', priority: 'medium', assigneeIds: ['sarah'], within72Hours: false, questionsForLev: false, updateAtCheckin: true, isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now, dueDate: in7d },
-  { id: 't4', title: 'Review RFF grant proposal', projectIds: ['rff'], status: 'review', priority: 'high', assigneeIds: ['lev'], within72Hours: false, questionsForLev: true, updateAtCheckin: false, isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now },
-  { id: 't5', title: 'Contact storage facility', projectIds: ['jedi'], status: 'todo', priority: 'medium', assigneeIds: ['sarah'], within72Hours: false, questionsForLev: false, updateAtCheckin: false, isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now },
-  { id: 't6', title: 'Annual physical checkup', projectIds: ['personal'], status: 'todo', priority: 'medium', assigneeIds: ['lev'], within72Hours: false, questionsForLev: false, updateAtCheckin: false, isPrivate: true, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now, dueDate: yest },
+  { id: 't1', title: 'Fix roof leak', projectIds: ['jedi'], status: 'todo', priority: 'urgent', assigneeIds: ['lev', 'sarah'], flags: [{ flagId: 'flag-72h', appliedBy: 'lev' }], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now, dueDate: in2d },
+  { id: 't2', title: 'Name change with Travis County', projectIds: ['jedi'], status: 'waiting', priority: 'high', assigneeIds: ['lev'], flags: [], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now },
+  { id: 't3', title: 'Schedule dentist appointment', projectIds: ['personal'], status: 'todo', priority: 'medium', assigneeIds: ['sarah'], flags: [{ flagId: 'flag-checkin', appliedBy: 'lev' }], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now, dueDate: in7d },
+  { id: 't4', title: 'Review RFF grant proposal', projectIds: ['rff'], status: 'review', priority: 'high', assigneeIds: ['lev'], flags: [{ flagId: 'flag-questions', appliedBy: 'lev' }], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now },
+  { id: 't5', title: 'Contact storage facility', projectIds: ['jedi'], status: 'todo', priority: 'medium', assigneeIds: ['sarah'], flags: [], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now },
+  { id: 't6', title: 'Annual physical checkup', projectIds: ['personal'], status: 'todo', priority: 'medium', assigneeIds: ['lev'], flags: [], isPrivate: true, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now, dueDate: yest },
 ];
 
 const CONTACTS: Contact[] = [
@@ -92,9 +98,7 @@ function dbToTask(row: any): Task {
     label: row.label ?? undefined,
     recurring: row.recurring ?? undefined,
     isPrivate: row.is_private ?? false,
-    within72Hours: row.within_72_hours ?? false,
-    questionsForLev: row.questions_for_lev ?? false,
-    updateAtCheckin: row.update_at_checkin ?? false,
+    flags: row.flags ?? [],
     linkedContactIds: row.linked_contact_ids ?? [],
     linkedDocIds: row.linked_doc_ids ?? [],
     comments: row.comments ?? [],
@@ -128,9 +132,7 @@ function taskToDb(t: Task) {
     label: t.label ?? null,
     recurring: t.recurring ?? null,
     is_private: t.isPrivate,
-    within_72_hours: t.within72Hours,
-    questions_for_lev: t.questionsForLev,
-    update_at_checkin: t.updateAtCheckin,
+    flags: t.flags ?? [],
     linked_contact_ids: t.linkedContactIds,
     linked_doc_ids: t.linkedDocIds,
     comments: t.comments,
@@ -247,6 +249,7 @@ function dbToUser(row: any): User {
     email: row.email,
     avatar: row.avatar ?? undefined,
     role: row.role ?? 'collaborator',
+    flags: row.flags ?? DEFAULT_FLAGS,
   };
 }
 
@@ -302,6 +305,9 @@ interface AppStore {
   deleteMessage: (id: string) => void;
   replyToMessage: (parentId: string, channelId: string, body: string) => void;
   addReaction: (messageId: string, emoji: string) => void;
+  addUserFlag: (flag: Omit<UserFlag, 'id'>) => void;
+  updateUserFlag: (flagId: string, changes: Partial<Omit<UserFlag, 'id'>>) => void;
+  removeUserFlag: (flagId: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -378,7 +384,8 @@ export const useStore = create<AppStore>()((set, get) => ({
       // Build users list from profiles
       if (profilesRes.data && profilesRes.data.length > 0) {
         const dbUsers = profilesRes.data.map(dbToUser);
-        // Ensure LEV and SARAH fallbacks are included if not in DB yet
+        // Keep seed users with string IDs (lev/sarah) because DB tasks still reference
+        // those seed IDs in assigneeIds. Filter out seeds whose ID already exists in DB.
         const ids = new Set(dbUsers.map(u => u.id));
         const extras = [LEV, SARAH].filter(u => !ids.has(u.id));
         updates.users = [...dbUsers, ...extras];
@@ -493,8 +500,16 @@ export const useStore = create<AppStore>()((set, get) => ({
       id: uid(), type, title, body, taskId: id, read: false, createdAt: ts,
     });
     const nn: Notification[] = [];
-    if (u.questionsForLev === true && !prev.questionsForLev) nn.push(mkn('questions', 'Questions for Lev', prev.title));
-    if (u.updateAtCheckin === true && !prev.updateAtCheckin) nn.push(mkn('checkin', 'Update at Check-in', prev.title));
+    // Notify when a flag is newly added
+    if (u.flags && prev.flags) {
+      const prevFlagIds = new Set(prev.flags.map(f => f.flagId));
+      const allUsers = s.users;
+      u.flags.filter(f => !prevFlagIds.has(f.flagId)).forEach(f => {
+        const applier = allUsers.find(u2 => u2.id === f.appliedBy);
+        const flagDef = applier?.flags?.find(fd => fd.id === f.flagId);
+        if (flagDef) nn.push(mkn('flag', `Flagged: ${flagDef.name}`, prev.title));
+      });
+    }
     const isShared = prev.assigneeIds.length > 1;
     if (isShared) {
       if (u.status && u.status !== prev.status) nn.push(mkn('status_change', 'Task updated', prev.title + ' \u2192 ' + u.status));
@@ -580,7 +595,7 @@ export const useStore = create<AppStore>()((set, get) => ({
       existing = s.users.find(u => u.email.toLowerCase() === email.toLowerCase());
       if (existing) return s;
       const derivedName = name?.trim() || email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-      newUser = { id: uid(), name: derivedName, email: email.toLowerCase(), role: 'collaborator' };
+      newUser = { id: uid(), name: derivedName, email: email.toLowerCase(), role: 'collaborator', flags: DEFAULT_FLAGS };
       return { users: [...s.users, newUser] };
     });
     return (existing || newUser)!;
@@ -695,6 +710,76 @@ export const useStore = create<AppStore>()((set, get) => ({
       parent_id: newMsg.parentId,
       created_at: newMsg.createdAt,
     }).then(({ error }) => { if (error) console.error('replyToMessage error:', error); });
+  },
+
+  // -------------------------------------------------------------------------
+  // User Flags
+  // -------------------------------------------------------------------------
+  addUserFlag: (flag) => {
+    const newFlag: UserFlag = { ...flag, id: uid() };
+    set((s) => {
+      const updated = { ...s.currentUser, flags: [...(s.currentUser.flags || []), newFlag] };
+      return {
+        currentUser: updated,
+        users: s.users.map(u => u.id === s.currentUser.id ? updated : u),
+      };
+    });
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      const flags = get().currentUser.flags;
+      supabase.from('profiles').update({ flags }).eq('id', user.id)
+        .then(({ error }) => { if (error) console.error('addUserFlag error:', error); });
+    });
+  },
+
+  updateUserFlag: (flagId, changes) => {
+    set((s) => {
+      const updated = {
+        ...s.currentUser,
+        flags: (s.currentUser.flags || []).map(f => f.id === flagId ? { ...f, ...changes } : f),
+      };
+      return {
+        currentUser: updated,
+        users: s.users.map(u => u.id === s.currentUser.id ? updated : u),
+      };
+    });
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      const flags = get().currentUser.flags;
+      supabase.from('profiles').update({ flags }).eq('id', user.id)
+        .then(({ error }) => { if (error) console.error('updateUserFlag error:', error); });
+    });
+  },
+
+  removeUserFlag: (flagId) => {
+    set((s) => {
+      const updated = {
+        ...s.currentUser,
+        flags: (s.currentUser.flags || []).filter(f => f.id !== flagId),
+      };
+      // Remove this flag from all tasks (only entries applied by this user)
+      const tasks = s.tasks.map(t => ({
+        ...t,
+        flags: t.flags.filter(tf => !(tf.flagId === flagId && tf.appliedBy === s.currentUser.id)),
+      }));
+      return {
+        currentUser: updated,
+        users: s.users.map(u => u.id === s.currentUser.id ? updated : u),
+        tasks,
+      };
+    });
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return;
+      const flags = get().currentUser.flags;
+      await supabase.from('profiles').update({ flags }).eq('id', user.id);
+      // Update all tasks that had this flag
+      const affectedTasks = get().tasks;
+      await Promise.all(
+        affectedTasks.map(t =>
+          supabase.from('tasks').update({ flags: t.flags }).eq('id', t.id)
+        )
+      );
+    });
   },
 
   addReaction: (messageId, emoji) => {

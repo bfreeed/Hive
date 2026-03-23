@@ -3,12 +3,24 @@ export type TaskStatus = 'todo' | 'doing' | 'waiting' | 'review' | 'done';
 export type ViewType = 'list' | 'board' | 'calendar' | 'mindmap';
 export type GroupBy = 'project' | 'priority' | 'dueDate' | 'status' | 'label' | 'assignee';
 
+export interface UserFlag {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export interface TaskFlag {
+  flagId: string;
+  appliedBy: string; // userId
+}
+
 export interface User {
   id: string;
   name: string;
   email: string;
   avatar?: string;
   role: 'owner' | 'assistant' | 'collaborator';
+  flags: UserFlag[];
 }
 
 export interface Comment {
@@ -40,9 +52,7 @@ export interface Task {
   label?: string;
   recurring?: 'daily' | 'weekly' | 'monthly' | 'custom';
   isPrivate: boolean;
-  within72Hours: boolean;
-  questionsForLev: boolean;
-  updateAtCheckin: boolean;
+  flags: TaskFlag[];
   linkedContactIds: string[];
   linkedDocIds: string[];
   comments: Comment[];

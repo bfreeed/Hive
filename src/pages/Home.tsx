@@ -44,7 +44,7 @@ export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: st
       t.status !== 'done' && (t.priority === 'urgent' || t.priority === 'high') &&
       !(t.dueDate && t.dueDate < todayStr)
     );
-    const sarahTasks = tasks.filter(t => t.status !== 'done' && t.updateAtCheckin);
+    const sarahTasks = tasks.filter(t => t.status !== 'done' && t.flags?.some(f => f.flagId === 'flag-checkin'));
 
     // Build natural-language speech
     const sentences: string[] = [];
@@ -114,9 +114,7 @@ export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: st
       status: 'todo',
       priority: 'medium',
       assigneeIds: ['lev'],
-      within72Hours: false,
-      questionsForLev: false,
-      updateAtCheckin: false,
+      flags: [],
       isPrivate: selectedProject?.isPrivate ?? false,
       linkedContactIds: [],
       linkedDocIds: [],
@@ -132,12 +130,12 @@ export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: st
     return true;
   });
 
-  const within72 = activeTasks.filter((t) => t.within72Hours);
-  const questionsForLev = activeTasks.filter((t) => t.questionsForLev);
-  const updateAtCheckin = activeTasks.filter((t) => t.updateAtCheckin);
-  const overdue = activeTasks.filter((t) => t.dueDate && isPast(new Date(t.dueDate)) && !t.within72Hours);
+  const within72 = activeTasks.filter((t) => t.flags?.some(f => f.flagId === 'flag-72h'));
+  const questionsForLev = activeTasks.filter((t) => t.flags?.some(f => f.flagId === 'flag-questions'));
+  const updateAtCheckin = activeTasks.filter((t) => t.flags?.some(f => f.flagId === 'flag-checkin'));
+  const overdue = activeTasks.filter((t) => t.dueDate && isPast(new Date(t.dueDate)) && !within72.includes(t));
   const todayTasks = activeTasks.filter((t) => {
-    if (!t.dueDate || t.within72Hours || overdue.includes(t)) return false;
+    if (!t.dueDate || within72.includes(t) || overdue.includes(t)) return false;
     const d = new Date(t.dueDate);
     return d.toDateString() === new Date().toDateString();
   });

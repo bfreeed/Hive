@@ -22,8 +22,8 @@ export default function VoicePanel() {
   const getContextSummary = (query: string): string => {
     const activeTasks = tasks.filter((t) => t.status !== 'done');
     const overdue = activeTasks.filter((t) => t.dueDate && new Date(t.dueDate) < new Date());
-    const within72 = activeTasks.filter((t) => t.within72Hours);
-    const questions = activeTasks.filter((t) => t.questionsForLev);
+    const within72 = activeTasks.filter((t) => t.flags?.some(f => f.flagId === 'flag-72h'));
+    const questions = activeTasks.filter((t) => t.flags?.some(f => f.flagId === 'flag-questions'));
     const high = activeTasks.filter((t) => t.priority === 'urgent' || t.priority === 'high');
 
     const q = query.toLowerCase();
