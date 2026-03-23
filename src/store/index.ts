@@ -864,3 +864,29 @@ supabase.auth.onAuthStateChange((event) => {
     });
   }
 });
+
+// ---------------------------------------------------------------------------
+// Real-time subscriptions — messages appear instantly for all users
+// ---------------------------------------------------------------------------
+supabase
+  .channel('messages-realtime')
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+    const newMsg = dbToMessage(payload.new);
+    const state = useStore.getState();
+    // Skip if we already have this message (sent by current user, already in state)
+    if (state.messages.some(m => m.id === newMsg.id)) return;
+    useStore.setState((s) => ({ messages: [...s.messages, newMsg] }));
+  })
+  .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
+    const updated = dbToMessage(payload.new);
+    useStore.setState((s) => ({
+      messages: s.messages.map(m => m.id === updated.id ? updated : m),
+    }));
+  })
+  .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, (payload) => {
+    const id = payload.old?.id;
+    if (id) {
+      useStore.setState((s) => ({ messages: s.messages.filter(m => m.id !== id) }));
+    }
+  })
+  .subscribe();

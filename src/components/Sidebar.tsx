@@ -21,7 +21,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
-  const { projects, tasks, users, notifications, darkMode, toggleDarkMode, toggleVoice, sidebarOpen, toggleSidebar, addProject, currentUser, isLoading } = useStore();
+  const { projects, tasks, users, notifications, channels, messages, darkMode, toggleDarkMode, toggleVoice, sidebarOpen, toggleSidebar, addProject, currentUser, isLoading } = useStore();
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -52,8 +52,20 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
   };
 
   const unreadCount = notifications.filter((n) => !n.read).length;
-  const unreadMentions = notifications.filter((n) => n.type === 'mention' && !n.read).length;
   const questionsCount = tasks.filter((t) => t.flags?.some(f => f.flagId === 'flag-questions')).length;
+
+  // Total unread messages across all channels the current user is a member of
+  const unreadMessages = channels
+    .filter(c => c.memberIds.includes(currentUser.id))
+    .reduce((total, ch) => {
+      const lastRead = ch.lastReadAt;
+      const count = messages.filter(m =>
+        m.channelId === ch.id &&
+        m.authorId !== currentUser.id &&
+        (lastRead ? m.createdAt > lastRead : true)
+      ).length;
+      return total + count;
+    }, 0);
 
   return (
     <aside className={`flex flex-col h-full bg-[#111113] border-r border-white/[0.06] transition-all duration-200 ${sidebarOpen ? 'w-60' : 'w-14'} flex-shrink-0`}>
@@ -72,7 +84,7 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
         <NavBtn icon={<Home size={16} />} label="Home" id="home" active={activePage === 'home'} expanded={sidebarOpen} onClick={() => onNavigate('home')} />
         <NavBtn icon={<CheckSquare size={16} />} label="My Tasks" id="tasks" active={activePage === 'tasks'} expanded={sidebarOpen} onClick={() => onNavigate('tasks')} badge={questionsCount || undefined} />
         <NavBtn icon={<Users size={16} />} label="Contacts" id="contacts" active={activePage === 'contacts'} expanded={sidebarOpen} onClick={() => onNavigate('contacts')} />
-        <NavBtn icon={<MessageSquare size={16} />} label="Messages" id="messages" active={activePage === 'messages'} expanded={sidebarOpen} onClick={() => onNavigate('messages')} badge={unreadMentions || undefined} />
+        <NavBtn icon={<MessageSquare size={16} />} label="Messages" id="messages" active={activePage === 'messages'} expanded={sidebarOpen} onClick={() => onNavigate('messages')} badge={unreadMessages || undefined} />
         <NavBtn icon={<Bell size={16} />} label="Notifications" id="notifications" active={activePage === 'notifications'} expanded={sidebarOpen} onClick={() => onNavigate('notifications')} badge={unreadCount || undefined} />
 
         {/* Projects */}
