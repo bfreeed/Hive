@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store';
 import {
-  Plus, Search, ArrowUpDown, GripVertical,
+  Plus, Search, ArrowUpDown, GripVertical, List, LayoutGrid,
   ChevronDown, ChevronRight, X, Trash2, Pencil, Lock, RotateCcw,
 } from 'lucide-react';
 import type { Task, Priority, Section } from '../types';
@@ -102,12 +102,35 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
   const [search, setSearch] = useState('');
   const filterProject = filterProjectProp ?? 'all';
 
-  // Sort — persisted across navigation
+  // Per-tab settings: each tab stores its own viewMode + sort
+  type TabSettings = { viewMode: 'list' | 'board'; sortBy: BoardSortBy; sortOrder: BoardSortOrder };
+  const DEFAULT_TAB_SETTINGS: Record<ActiveTab, TabSettings> = {
+    status:    { viewMode: 'board', sortBy: 'priority', sortOrder: 'asc' },
+    priority:  { viewMode: 'board', sortBy: 'date',     sortOrder: 'asc' },
+    project:   { viewMode: 'board', sortBy: 'priority', sortOrder: 'asc' },
+    date:      { viewMode: 'list',  sortBy: 'date',     sortOrder: 'asc' },
+    today:     { viewMode: 'list',  sortBy: 'priority', sortOrder: 'asc' },
+    completed: { viewMode: 'list',  sortBy: 'date',     sortOrder: 'desc' },
+  };
+  const [tabSettings, setTabSettings] = useState<Record<ActiveTab, TabSettings>>(() => {
+    try {
+      const saved = localStorage.getItem('tasks-tab-settings');
+      return saved ? { ...DEFAULT_TAB_SETTINGS, ...JSON.parse(saved) } : DEFAULT_TAB_SETTINGS;
+    } catch { return DEFAULT_TAB_SETTINGS; }
+  });
+  const updateTabSettings = (updates: Partial<TabSettings>) => {
+    setTabSettings(prev => {
+      const next = { ...prev, [activeTab]: { ...prev[activeTab], ...updates } };
+      localStorage.setItem('tasks-tab-settings', JSON.stringify(next));
+      return next;
+    });
+  };
+  const { viewMode, sortBy, sortOrder } = tabSettings[activeTab];
+  const setSortBy = (v: BoardSortBy) => updateTabSettings({ sortBy: v });
+  const setSortOrder = (v: BoardSortOrder) => updateTabSettings({ sortOrder: v });
+  const setViewMode = (v: 'list' | 'board') => updateTabSettings({ viewMode: v });
+
   const [showSort, setShowSort] = useState(false);
-  const [sortBy, setSortByRaw] = useState<BoardSortBy>(() => (localStorage.getItem('tasks-sortBy') as BoardSortBy) ?? 'date');
-  const [sortOrder, setSortOrderRaw] = useState<BoardSortOrder>(() => (localStorage.getItem('tasks-sortOrder') as BoardSortOrder) ?? 'asc');
-  const setSortBy = (v: BoardSortBy) => { setSortByRaw(v); localStorage.setItem('tasks-sortBy', v); };
-  const setSortOrder = (v: BoardSortOrder) => { setSortOrderRaw(v); localStorage.setItem('tasks-sortOrder', v); };
 
   // Keyboard navigation
   const [focusedIdx, setFocusedIdx] = useState<number | null>(null);
@@ -133,10 +156,11 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
   // ---------------------------------------------------------------------------
   // Derive view settings from activeTab
   // ---------------------------------------------------------------------------
-  const isBoard = ['status', 'priority', 'project'].includes(activeTab);
+  const isBoard = viewMode === 'board';
   const boardGroupBy: BoardGroupBy =
     activeTab === 'priority' ? 'priority' :
     activeTab === 'project' ? 'project' :
+    activeTab === 'date' ? 'date' :
     'status';
   const filterToday = activeTab === 'today';
   // Tab definitions
@@ -837,19 +861,38 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
                 )}
               </button>
             ))}
-          {/* Sort button */}
-          <button
-            onClick={() => setShowSort(v => !v)}
-            className={`ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
-              sortActive
-                ? 'bg-brand-600/20 border-brand-500/40 text-brand-300'
-                : 'bg-white/[0.04] border-white/[0.08] text-white/50 hover:text-white/70'
-            }`}
-          >
-            <ArrowUpDown size={13} />
-            Sort
-            {sortActive && <span className="w-1.5 h-1.5 rounded-full bg-brand-400" />}
-          </button>
+          {/* View toggle + Sort */}
+          <div className="ml-auto flex items-center gap-1">
+            {([
+              { id: 'list' as const,  icon: <List size={14} />,       label: 'List'  },
+              { id: 'board' as const, icon: <LayoutGrid size={14} />, label: 'Board' },
+            ]).map(v => (
+              <button
+                key={v.id}
+                onClick={() => setViewMode(v.id)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                  viewMode === v.id
+                    ? 'bg-white/[0.08] text-white'
+                    : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
+                }`}
+              >
+                {v.icon}{v.label}
+              </button>
+            ))}
+            <span className="w-px h-4 bg-white/[0.08] mx-1" />
+            <button
+              onClick={() => setShowSort(v => !v)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                sortActive
+                  ? 'bg-brand-600/20 text-brand-300'
+                  : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
+              }`}
+            >
+              <ArrowUpDown size={13} />
+              Sort
+              {sortActive && <span className="w-1.5 h-1.5 rounded-full bg-brand-400" />}
+            </button>
+          </div>
         </div>
 
         {/* Sort panel */}
