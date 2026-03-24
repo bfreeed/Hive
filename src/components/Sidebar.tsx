@@ -3,10 +3,38 @@ import { useStore } from '../store';
 import { supabase } from '../lib/supabase';
 import {
   Home, CheckSquare, Users, Bell, Settings, ChevronDown, ChevronRight,
-  Plus, FolderOpen, Mic, Moon, Sun, Menu, MessageSquare, Check, Lock, LogOut
+  Plus, FolderOpen, Mic, Moon, Sun, Menu, MessageSquare, Check, Lock, LogOut, GripVertical
 } from 'lucide-react';
+import {
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext, verticalListSortingStrategy, useSortable, arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 const PROJECT_COLORS = ['#6366f1','#10b981','#f59e0b','#ef4444','#3b82f6','#8b5cf6','#ec4899','#14b8a6'];
+
+const DEFAULT_NAV_ORDER = ['home', 'tasks', 'contacts', 'messages', 'notifications'];
+const NAV_ITEMS_MAP: Record<string, { label: string; icon: React.ReactNode; getBadge?: (store: any) => number | undefined }> = {
+  home:          { label: 'Home',          icon: <Home size={16} /> },
+  tasks:         { label: 'My Tasks',      icon: <CheckSquare size={16} />, getBadge: (s) => s.tasks.filter((t: any) => t.flags?.some((f: any) => f.flagId === 'flag-questions')).length || undefined },
+  contacts:      { label: 'Contacts',      icon: <Users size={16} /> },
+  messages:      { label: 'Messages',      icon: <MessageSquare size={16} />, getBadge: (s) => {
+    const unread = s.channels
+      .filter((c: any) => c.memberIds.includes(s.currentUser.id) && !c.muted)
+      .reduce((total: number, ch: any) => {
+        const count = s.messages.filter((m: any) =>
+          m.channelId === ch.id && m.authorId !== s.currentUser.id &&
+          (ch.lastReadAt ? m.createdAt > ch.lastReadAt : true)
+        ).length;
+        return total + count;
+      }, 0);
+    return unread || undefined;
+  }},
+  notifications: { label: 'Notifications', icon: <Bell size={16} />, getBadge: (s) => s.notifications.filter((n: any) => !n.read).length || undefined },
+};
 
 interface NavItem {
   label: string;
@@ -29,11 +57,40 @@ const STATUSES = [
 const STATUS_DOT: Record<string, string> = { online: 'bg-emerald-400', away: 'bg-amber-400', busy: 'bg-red-400', dnd: 'bg-red-500' };
 
 export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
-  const { projects, tasks, users, notifications, channels, messages, darkMode, toggleDarkMode, toggleVoice, sidebarOpen, toggleSidebar, addProject, currentUser, isLoading, userStatuses, setUserStatus } = useStore();
+  const store = useStore();
+  const { projects, tasks, users, notifications, channels, messages, darkMode, toggleDarkMode, toggleVoice, sidebarOpen, toggleSidebar, addProject, currentUser, isLoading, userStatuses, setUserStatus } = store;
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
   };
+
+  const [navOrder, setNavOrder] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('sidebar-nav-order');
+      if (saved) {
+        const parsed = JSON.parse(saved) as string[];
+        // Validate all items are still valid
+        if (parsed.length === DEFAULT_NAV_ORDER.length && parsed.every(id => NAV_ITEMS_MAP[id])) return parsed;
+      }
+    } catch {}
+    return DEFAULT_NAV_ORDER;
+  });
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  const handleNavDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setNavOrder(prev => {
+        const oldIndex = prev.indexOf(active.id as string);
+        const newIndex = prev.indexOf(over.id as string);
+        const next = arrayMove(prev, oldIndex, newIndex);
+        localStorage.setItem('sidebar-nav-order', JSON.stringify(next));
+        return next;
+      });
+    }
+  };
+
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [projectsExpanded, setProjectsExpanded] = useState(true);
   const [teamExpanded, setTeamExpanded] = useState(true);
@@ -60,22 +117,6 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
     setShowNewProject(false);
   };
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
-  const questionsCount = tasks.filter((t) => t.flags?.some(f => f.flagId === 'flag-questions')).length;
-
-  // Total unread messages across all non-muted channels the current user is a member of
-  const unreadMessages = channels
-    .filter(c => c.memberIds.includes(currentUser.id) && !c.muted)
-    .reduce((total, ch) => {
-      const lastRead = ch.lastReadAt;
-      const count = messages.filter(m =>
-        m.channelId === ch.id &&
-        m.authorId !== currentUser.id &&
-        (lastRead ? m.createdAt > lastRead : true)
-      ).length;
-      return total + count;
-    }, 0);
-
   return (
     <aside className={`flex flex-col h-full bg-[#111113] border-r border-white/[0.06] transition-all duration-200 ${sidebarOpen ? 'w-60' : 'w-14'} flex-shrink-0`}>
       {/* Header */}
@@ -90,11 +131,27 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto scrollbar-hide py-2 px-2 space-y-0.5">
-        <NavBtn icon={<Home size={16} />} label="Home" id="home" active={activePage === 'home'} expanded={sidebarOpen} onClick={() => onNavigate('home')} />
-        <NavBtn icon={<CheckSquare size={16} />} label="My Tasks" id="tasks" active={activePage === 'tasks'} expanded={sidebarOpen} onClick={() => onNavigate('tasks')} badge={questionsCount || undefined} />
-        <NavBtn icon={<Users size={16} />} label="Contacts" id="contacts" active={activePage === 'contacts'} expanded={sidebarOpen} onClick={() => onNavigate('contacts')} />
-        <NavBtn icon={<MessageSquare size={16} />} label="Messages" id="messages" active={activePage === 'messages'} expanded={sidebarOpen} onClick={() => onNavigate('messages')} badge={unreadMessages || undefined} />
-        <NavBtn icon={<Bell size={16} />} label="Notifications" id="notifications" active={activePage === 'notifications'} expanded={sidebarOpen} onClick={() => onNavigate('notifications')} badge={unreadCount || undefined} />
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleNavDragEnd}>
+          <SortableContext items={navOrder} strategy={verticalListSortingStrategy}>
+            {navOrder.map(id => {
+              const item = NAV_ITEMS_MAP[id];
+              if (!item) return null;
+              const badge = item.getBadge ? item.getBadge(store) : undefined;
+              return (
+                <SortableNavBtn
+                  key={id}
+                  id={id}
+                  icon={item.icon}
+                  label={item.label}
+                  active={activePage === id}
+                  expanded={sidebarOpen}
+                  onClick={() => onNavigate(id)}
+                  badge={badge}
+                />
+              );
+            })}
+          </SortableContext>
+        </DndContext>
 
         {/* Projects */}
         <div className="pt-3">
@@ -299,20 +356,38 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
   );
 }
 
-function NavBtn({ icon, label, id, active, expanded, onClick, badge }: {
+function SortableNavBtn({ icon, label, id, active, expanded, onClick, badge }: {
   icon: React.ReactNode; label: string; id: string; active: boolean;
   expanded: boolean; onClick: () => void; badge?: number;
 }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
   return (
-    <button
-      onClick={onClick}
-      className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm transition-colors ${active ? 'bg-white/[0.08] text-white' : 'text-white/60 hover:text-white hover:bg-white/[0.04]'}`}
-    >
-      <span className="flex-shrink-0">{icon}</span>
-      {expanded && <span className="flex-1 text-left">{label}</span>}
-      {expanded && badge ? (
-        <span className="bg-brand-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium">{badge}</span>
-      ) : null}
-    </button>
+    <div ref={setNodeRef} style={style} className="flex items-center group/nav">
+      {expanded && (
+        <span
+          {...attributes}
+          {...listeners}
+          className="flex-shrink-0 w-4 flex items-center justify-center text-white/0 group-hover/nav:text-white/20 hover:!text-white/40 cursor-grab active:cursor-grabbing transition-colors mr-0.5"
+        >
+          <GripVertical size={12} />
+        </span>
+      )}
+      <button
+        onClick={onClick}
+        className={`flex-1 flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm transition-colors ${active ? 'bg-white/[0.08] text-white' : 'text-white/60 hover:text-white hover:bg-white/[0.04]'} ${!expanded ? 'w-full' : ''}`}
+      >
+        <span className="flex-shrink-0">{icon}</span>
+        {expanded && <span className="flex-1 text-left">{label}</span>}
+        {expanded && badge ? (
+          <span className="bg-brand-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium">{badge}</span>
+        ) : null}
+      </button>
+    </div>
   );
 }
