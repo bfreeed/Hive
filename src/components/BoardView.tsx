@@ -52,7 +52,7 @@ function BoardColumn({
   };
 
   return (
-    <div className="flex-shrink-0 w-72">
+    <div className="flex-shrink-0 w-64">
       <div className="flex items-center gap-2 mb-3">
         {group.color && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: group.color }} />}
         <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">{group.label || 'Tasks'}</span>
@@ -63,10 +63,10 @@ function BoardColumn({
           <div
             key={task.id}
             onClick={() => onOpenTask(task.id)}
-            className="bg-white/[0.03] rounded-xl p-3.5 border border-white/[0.07] hover:border-white/[0.15] hover:bg-white/[0.05] cursor-pointer transition-all"
+            className="bg-white/[0.03] rounded-xl p-3 border border-white/[0.07] hover:border-white/[0.15] hover:bg-white/[0.05] cursor-pointer transition-all"
           >
             {/* Title row */}
-            <div className="flex items-start gap-2 mb-3">
+            <div className="flex items-start gap-2 mb-2">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
