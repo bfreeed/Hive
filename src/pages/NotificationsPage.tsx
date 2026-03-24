@@ -47,30 +47,24 @@ function NotifCard({ n, config, onClick, onMarkRead }: {
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-start gap-3 px-4 py-3 rounded-xl border transition-colors text-left ${
-        n.read
-          ? 'border-white/[0.04] bg-white/[0.02] hover:bg-white/[0.04]'
-          : 'border-brand-500/20 bg-brand-600/5 hover:bg-brand-600/10'
-      }`}
+      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/[0.04] transition-colors text-left group"
     >
       <span
         onClick={onMarkRead}
-        className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 cursor-pointer transition-opacity ${
-          n.read ? 'bg-white/[0.12] opacity-40' : 'bg-brand-400 hover:opacity-80'
+        className={`w-1.5 h-1.5 rounded-full flex-shrink-0 cursor-pointer transition-opacity ${
+          n.read ? 'bg-transparent' : 'bg-brand-400 hover:opacity-70'
         }`}
       />
       {config && (
-        <span className={`mt-0.5 flex-shrink-0 ${config.colorClass}`}>{config.icon}</span>
+        <span className={`flex-shrink-0 ${config.colorClass}`}>{config.icon}</span>
       )}
-      <div className="flex-1 min-w-0">
-        <p className={`text-sm ${n.read ? 'text-white/60' : 'text-white/90 font-medium'}`}>
-          {n.title}
-        </p>
+      <span className={`flex-1 min-w-0 text-sm truncate ${n.read ? 'text-white/40' : 'text-white/80 group-hover:text-white'}`}>
+        {n.title}
         {n.body && (
-          <p className="text-xs text-white/40 mt-0.5 truncate">{n.body}</p>
+          <span className="text-white/30 font-normal"> — {n.body}</span>
         )}
-        <p className="text-xs text-white/25 mt-0.5">{formatTime(n.createdAt)}</p>
-      </div>
+      </span>
+      <span className="flex-shrink-0 text-xs text-white/20">{formatTime(n.createdAt)}</span>
     </button>
   );
 }
@@ -269,7 +263,7 @@ export default function NotificationsPage({ onNavigate, onOpenTask }: Notificati
                   </h2>
                   <span className="text-xs text-white/20">{group.items.length}</span>
                 </div>
-                <div className="space-y-1">
+                <div>
                   {group.items.map(n => (
                     <NotifCard
                       key={n.id}
