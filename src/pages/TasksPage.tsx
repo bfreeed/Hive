@@ -54,7 +54,7 @@ function SortableSection({ section, children, onDragHandleProps }: {
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
   return (
     <div ref={setNodeRef} style={style}>
-      {React.cloneElement(children as React.ReactElement, {
+      {React.cloneElement(children as React.ReactElement<Record<string, unknown>>, {
         dragHandleProps: { ...attributes, ...listeners, ...onDragHandleProps },
       })}
     </div>
