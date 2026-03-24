@@ -1,57 +1,33 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
-import { Plus, Search, ArrowUpDown, List, LayoutGrid, GitBranch } from 'lucide-react';
-import type { Task, Priority } from '../types';
+import { Plus, Search, ArrowUpDown, List, LayoutGrid } from 'lucide-react';
+import type { Task } from '../types';
 import TaskRow from '../components/TaskRow';
 import BoardView from '../components/BoardView';
 import { buildGroups, sortTasks } from '../utils/buildGroups';
 import type { BoardGroupBy, BoardSortBy, BoardSortOrder } from '../utils/buildGroups';
 
-const PRIORITY_DOT: Record<Priority, string> = {
-  urgent: 'bg-red-400', high: 'bg-orange-400', medium: 'bg-yellow-400', low: 'bg-white/20',
+type ActiveTab = 'status' | 'priority' | 'project' | 'date' | 'today' | 'completed';
+
+type TabSettings = { viewMode: 'list' | 'board'; sortBy: BoardSortBy; sortOrder: BoardSortOrder };
+
+const DEFAULT_TAB_SETTINGS: Record<ActiveTab, TabSettings> = {
+  status:    { viewMode: 'board', sortBy: 'priority', sortOrder: 'asc' },
+  priority:  { viewMode: 'board', sortBy: 'date',     sortOrder: 'asc' },
+  project:   { viewMode: 'board', sortBy: 'priority', sortOrder: 'asc' },
+  date:      { viewMode: 'list',  sortBy: 'date',     sortOrder: 'asc' },
+  today:     { viewMode: 'list',  sortBy: 'priority', sortOrder: 'asc' },
+  completed: { viewMode: 'list',  sortBy: 'date',     sortOrder: 'desc' },
 };
 
-function MindMapView({ tasks, rootLabel, onOpenTask }: { tasks: Task[]; rootLabel: string; onOpenTask: (id: string) => void }) {
-  const { projects } = useStore();
-  const groups: Record<string, Task[]> = {};
-  tasks.forEach((t) => {
-    const key = projects.find(p => p.id === t.projectIds?.[0])?.name || t.priority;
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(t);
-  });
-  return (
-    <div className="flex flex-col items-center py-8">
-      <div className="bg-brand-600 text-white px-6 py-3 rounded-2xl font-semibold text-sm mb-8 shadow-lg shadow-brand-600/20">
-        {rootLabel}
-      </div>
-      <div className="flex flex-wrap justify-center gap-8">
-        {Object.entries(groups).map(([group, groupTasks]) => (
-          <div key={group} className="flex flex-col items-center gap-2 max-w-[200px]">
-            <div className="bg-white/[0.08] border border-white/10 px-4 py-2 rounded-xl text-xs font-semibold text-white/60 uppercase tracking-wider">
-              {group}
-            </div>
-            <div className="w-px h-4 bg-white/10" />
-            <div className="space-y-2 w-full">
-              {groupTasks.map((task) => (
-                <div
-                  key={task.id}
-                  onClick={() => onOpenTask(task.id)}
-                  className="bg-white/[0.04] border border-white/[0.06] hover:border-white/10 rounded-lg px-3 py-2 cursor-pointer transition-colors"
-                >
-                  <p className="text-xs text-white/70">{task.title}</p>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <span className={`w-1 h-1 rounded-full ${PRIORITY_DOT[task.priority]}`} />
-                    <span className="text-[10px] text-white/30 capitalize">{task.status}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+const TABS: { id: ActiveTab; label: string }[] = [
+  { id: 'status',    label: 'By Status'   },
+  { id: 'priority',  label: 'By Priority' },
+  { id: 'project',   label: 'By Project'  },
+  { id: 'date',      label: 'By Date'     },
+  { id: 'today',     label: 'Today'       },
+  { id: 'completed', label: 'Completed'   },
+];
 
 const SelectFilter = ({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: React.ReactNode }) => (
   <select
@@ -69,13 +45,12 @@ export default function TeamMemberView({ userId, onOpenTask }: { userId: string;
   const member = users.find(u => u.id === userId);
   if (!member) return null;
 
-  // Avatar color derived from user id
   const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#a855f7', '#ec4899', '#06b6d4'];
   let hash = 0;
   for (const c of userId) hash = (hash * 31 + c.charCodeAt(0)) & 0xffff;
   const avatarColor = COLORS[hash % COLORS.length];
 
-  // Base: tasks assigned to this member, excluding private ones the viewer shouldn't see
+  // Base: tasks assigned to this member
   const memberTasks = tasks.filter((t) => {
     if (!t.assigneeIds.includes(userId)) return false;
     if (t.isPrivate && !t.assigneeIds.includes(currentUser.id)) return false;
@@ -84,47 +59,70 @@ export default function TeamMemberView({ userId, onOpenTask }: { userId: string;
     return true;
   });
 
-  // Filters
+  // Tab + per-tab settings
+  const [activeTab, setActiveTab] = useState<ActiveTab>('status');
+  const storageKey = `member-tab-settings-${userId}`;
+  const [tabSettings, setTabSettings] = useState<Record<ActiveTab, TabSettings>>(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      return saved ? { ...DEFAULT_TAB_SETTINGS, ...JSON.parse(saved) } : DEFAULT_TAB_SETTINGS;
+    } catch { return DEFAULT_TAB_SETTINGS; }
+  });
+  const updateTabSettings = (updates: Partial<TabSettings>) => {
+    setTabSettings(prev => {
+      const next = { ...prev, [activeTab]: { ...prev[activeTab], ...updates } };
+      localStorage.setItem(storageKey, JSON.stringify(next));
+      return next;
+    });
+  };
+  const { viewMode, sortBy, sortOrder } = tabSettings[activeTab];
+  const setSortBy = (v: BoardSortBy) => updateTabSettings({ sortBy: v });
+  const setSortOrder = (v: BoardSortOrder) => updateTabSettings({ sortOrder: v });
+  const setViewMode = (v: 'list' | 'board') => updateTabSettings({ viewMode: v });
+
+  // Derived
+  const isBoard = viewMode === 'board';
+  const boardGroupBy: BoardGroupBy =
+    activeTab === 'priority' ? 'priority' :
+    activeTab === 'project'  ? 'project'  :
+    activeTab === 'date'     ? 'date'     :
+    'status';
+
+  // Search + sort panel
   const [search, setSearch] = useState('');
-  const [filterProject, setFilterProject] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('active');
-  const [filterPriority, setFilterPriority] = useState('all');
-
-  // Sort & Group
   const [showSort, setShowSort] = useState(false);
-  const [groupBy, setGroupBy] = useState<BoardGroupBy>('none');
-  const [sortBy, setSortBy] = useState<BoardSortBy>('date');
-  const [sortOrder, setSortOrder] = useState<BoardSortOrder>('asc');
-
-  // View
-  const [viewType, setViewType] = useState<'list' | 'board' | 'mindmap'>('list');
 
   // New task
   const [showNewTask, setShowNewTask] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskProject, setNewTaskProject] = useState('');
 
-  const baseFilter = (t: Task) => {
-    if (filterProject !== 'all' && !(t.projectIds ?? []).includes(filterProject)) return false;
-    if (filterPriority !== 'all' && t.priority !== filterPriority) return false;
-    if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  };
-
+  // Filter tasks by tab
   const filtered = memberTasks.filter((t) => {
-    if (filterStatus === 'active' && t.status === 'done') return false;
-    if (filterStatus !== 'active' && filterStatus !== 'all' && t.status !== filterStatus) return false;
-    return baseFilter(t);
+    if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false;
+    if (activeTab === 'completed') return t.status === 'done';
+    if (activeTab === 'today') {
+      if (t.status === 'done' || !t.dueDate) return false;
+      const d = new Date(t.dueDate);
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      return d <= today;
+    }
+    return t.status !== 'done';
   });
 
-  const filteredAllStatuses = memberTasks.filter(baseFilter);
-
   const sorted = sortTasks(filtered, sortBy, sortOrder, projects, users);
-  const sortedAllStatuses = sortTasks(filteredAllStatuses, sortBy, sortOrder, projects, users);
-  const groups = buildGroups(sorted, groupBy, projects, users);
-  const boardGroups = buildGroups(sortedAllStatuses, groupBy === 'none' ? 'status' : groupBy, projects, users);
+  const listGroups = buildGroups(sorted, activeTab === 'date' ? 'date' : 'none', projects, users);
+  const boardGroups = buildGroups(
+    sortTasks(memberTasks.filter(t => {
+      if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false;
+      return t.status !== 'done';
+    }), sortBy, sortOrder, projects, users),
+    boardGroupBy,
+    projects,
+    users,
+  );
 
-  const sortActive = groupBy !== 'none' || sortBy !== 'date' || sortOrder !== 'asc';
+  const sortActive = sortBy !== 'priority' || sortOrder !== 'asc';
 
   const activeTasks = memberTasks.filter(t => t.status !== 'done');
   const doingCount = activeTasks.filter(t => t.status === 'doing' || t.status === 'todo').length;
@@ -150,13 +148,13 @@ export default function TeamMemberView({ userId, onOpenTask }: { userId: string;
 
   return (
     <div className="flex-1 overflow-y-auto scrollbar-hide">
-      <div className="max-w-5xl mx-auto px-5 py-8">
+      <div className={`mx-auto px-8 py-8 ${isBoard ? 'max-w-full' : 'max-w-4xl'}`}>
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <div
-              className="w-10 h-10 rounded-2xl flex items-center justify-center text-lg font-semibold"
+              className="w-10 h-10 rounded-2xl flex items-center justify-center text-lg font-semibold flex-shrink-0"
               style={{ backgroundColor: avatarColor + '33', color: avatarColor }}
             >
               {member.name[0].toUpperCase()}
@@ -168,93 +166,75 @@ export default function TeamMemberView({ userId, onOpenTask }: { userId: string;
               </p>
             </div>
           </div>
-          <button
-            onClick={() => setShowNewTask(true)}
-            className="flex items-center gap-2 px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-sm rounded-lg transition-colors"
-          >
-            <Plus size={14} /> New Task
-          </button>
-        </div>
-
-        {/* Row 1: filters */}
-        <div className="relative mb-1.5">
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pr-8">
-            <SelectFilter value={filterProject} onChange={setFilterProject}>
-              <option value="all">All Projects</option>
-              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </SelectFilter>
-            <SelectFilter value={filterStatus} onChange={setFilterStatus}>
-              <option value="active">Active</option>
-              <option value="all">All Statuses</option>
-              <option value="todo">To Do</option>
-              <option value="doing">Doing</option>
-              <option value="waiting">Waiting</option>
-              <option value="review">In Review</option>
-              <option value="done">Done</option>
-            </SelectFilter>
-            <SelectFilter value={filterPriority} onChange={setFilterPriority}>
-              <option value="all">All Priorities</option>
-              <option value="urgent">Urgent</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </SelectFilter>
-          </div>
-          <div className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-[#0d0d0f] to-transparent" />
-        </div>
-
-        {/* Row 2: view switcher + search + sort */}
-        <div className="flex items-center gap-1 mb-2">
-          {[
-            { id: 'list', icon: <List size={14} />, label: 'List' },
-            { id: 'board', icon: <LayoutGrid size={14} />, label: 'Board' },
-            { id: 'mindmap', icon: <GitBranch size={14} />, label: 'Map' },
-          ].map((v) => (
+          <div className="flex items-center gap-2">
+            {/* Search */}
+            <div className="relative">
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/30" />
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search..."
+                className="bg-white/[0.04] border border-white/[0.08] rounded-lg pl-8 pr-3 py-1.5 text-xs text-white/70 placeholder-white/20 focus:outline-none focus:border-brand-500/50 w-40"
+              />
+            </div>
             <button
-              key={v.id}
-              onClick={() => setViewType(v.id as any)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${viewType === v.id ? 'bg-white/[0.08] text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'}`}
+              onClick={() => setShowNewTask(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs rounded-lg transition-colors"
             >
-              {v.icon}{v.label}
+              <Plus size={13} /> New Task
+            </button>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex items-center border-b border-white/[0.06] mb-6">
+          {TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-3 py-2 text-sm transition-colors relative ${
+                activeTab === tab.id ? 'text-white font-medium' : 'text-white/40 hover:text-white/70'
+              }`}
+            >
+              {tab.label}
+              {activeTab === tab.id && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500 rounded-full" />
+              )}
             </button>
           ))}
-          <div className="relative ml-auto">
-            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/30" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search..."
-              className="pl-7 pr-3 py-1.5 w-24 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/80 placeholder-white/20 focus:outline-none focus:border-brand-500/50"
-            />
+          {/* View + Sort */}
+          <div className="ml-auto flex items-center gap-1">
+            {([
+              { id: 'list' as const,  icon: <List size={14} />,       label: 'List'  },
+              { id: 'board' as const, icon: <LayoutGrid size={14} />, label: 'Board' },
+            ]).map(v => (
+              <button
+                key={v.id}
+                onClick={() => setViewMode(v.id)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                  viewMode === v.id ? 'bg-white/[0.08] text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
+                }`}
+              >
+                {v.icon}{v.label}
+              </button>
+            ))}
+            <span className="w-px h-4 bg-white/[0.08] mx-1" />
+            <button
+              onClick={() => setShowSort(v => !v)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                sortActive ? 'bg-brand-600/20 text-brand-300' : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
+              }`}
+            >
+              <ArrowUpDown size={13} />
+              Sort
+              {sortActive && <span className="w-1.5 h-1.5 rounded-full bg-brand-400" />}
+            </button>
           </div>
-          <button
-            onClick={() => setShowSort(v => !v)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
-              sortActive
-                ? 'bg-brand-600/20 border-brand-500/40 text-brand-300'
-                : 'bg-white/[0.04] border-white/[0.08] text-white/50 hover:text-white/70'
-            }`}
-          >
-            <ArrowUpDown size={13} />
-            Sort
-            {sortActive && <span className="w-1.5 h-1.5 rounded-full bg-brand-400" />}
-          </button>
         </div>
 
-        {/* Sort/Group panel */}
+        {/* Sort panel */}
         {showSort && (
           <div className="flex items-center gap-3 mb-4 px-3 py-2.5 bg-white/[0.03] border border-white/[0.06] rounded-xl">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-white/30 w-12">Group</span>
-              <SelectFilter value={groupBy} onChange={v => setGroupBy(v as BoardGroupBy)}>
-                <option value="none">No Grouping</option>
-                <option value="priority">Priority</option>
-                <option value="date">Date</option>
-                <option value="status">Status</option>
-                <option value="project">Project</option>
-              </SelectFilter>
-            </div>
-            <div className="w-px h-4 bg-white/10" />
             <div className="flex items-center gap-2">
               <span className="text-xs text-white/30 font-medium w-8">Sort</span>
               <SelectFilter value={sortBy} onChange={v => setSortBy(v as BoardSortBy)}>
@@ -278,8 +258,8 @@ export default function TeamMemberView({ userId, onOpenTask }: { userId: string;
             </div>
             {sortActive && (
               <button
-                onClick={() => { setGroupBy('none'); setSortBy('date'); setSortOrder('asc'); }}
-                className="ml-auto text-xs text-white/30 hover:text-white/60 transition-colors"
+                onClick={() => { setSortBy('priority'); setSortOrder('asc'); }}
+                className="ml-auto text-xs text-white/30 hover:text-white/60"
               >
                 Reset
               </button>
@@ -293,40 +273,38 @@ export default function TeamMemberView({ userId, onOpenTask }: { userId: string;
             <input
               autoFocus
               value={newTaskTitle}
-              onChange={(e) => setNewTaskTitle(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleAddTask(); if (e.key === 'Escape') setShowNewTask(false); }}
+              onChange={e => setNewTaskTitle(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleAddTask(); if (e.key === 'Escape') setShowNewTask(false); }}
               placeholder="Task title..."
               className="flex-1 bg-transparent text-sm text-white placeholder-white/20 focus:outline-none"
             />
             <select
               value={newTaskProject}
-              onChange={(e) => setNewTaskProject(e.target.value)}
+              onChange={e => setNewTaskProject(e.target.value)}
               className="text-xs bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-1.5 text-white/60 focus:outline-none"
             >
               <option value="">No project</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
-            <button onClick={handleAddTask} className="px-3 py-1.5 bg-brand-600 text-white text-xs rounded-lg hover:bg-brand-500 transition-colors">Add</button>
+            <button onClick={handleAddTask} className="px-3 py-1.5 bg-brand-600 text-white text-xs rounded-lg hover:bg-brand-500">Add</button>
             <button onClick={() => setShowNewTask(false)} className="text-white/30 hover:text-white/60 text-xs">Cancel</button>
           </div>
         )}
 
-        {/* Task list / board / mindmap */}
-        {viewType === 'board' ? (
-          <BoardView groups={boardGroups} onOpenTask={onOpenTask} />
-        ) : viewType === 'mindmap' ? (
-          <MindMapView tasks={sortedAllStatuses} rootLabel={member.name} onOpenTask={onOpenTask} />
+        {/* Content */}
+        {isBoard ? (
+          <BoardView groups={boardGroups} onOpenTask={onOpenTask} addTask={addTask} filterProject="all" />
         ) : filtered.length === 0 ? (
           <div className="py-16 text-center">
-            <p className="text-white/20">No tasks found</p>
+            <p className="text-white/20">No tasks</p>
           </div>
-        ) : (
-          <div className="space-y-6">
-            {groups.map((group, gi) => (
+        ) : activeTab === 'completed' ? (
+          // Completed log grouped by date
+          <div className="space-y-5">
+            {listGroups.map((group, gi) => (
               <div key={gi}>
                 {group.label && (
-                  <div className="flex items-center gap-2 mb-1 px-1">
-                    {group.color && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: group.color }} />}
+                  <div className="flex items-center gap-2 mb-1 px-3">
                     <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">{group.label}</span>
                     <span className="text-xs text-white/20">{group.tasks.length}</span>
                   </div>
@@ -337,6 +315,12 @@ export default function TeamMemberView({ userId, onOpenTask }: { userId: string;
                   ))}
                 </div>
               </div>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-0.5">
+            {sorted.map(task => (
+              <TaskRow key={task.id} task={task} onOpenTask={onOpenTask} showProject />
             ))}
           </div>
         )}
