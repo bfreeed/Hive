@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useStore } from '../store';
+import { getPushoverKey, getHealthNotifKey, getBriefingKey } from '../lib/storageKeys';
 
 // Notification types fired by the health sweep
 type SweepType = 'overdue' | 'due_tomorrow' | 'within72hrs' | 'snooze_wake' | 'wait_expired';
@@ -12,12 +13,12 @@ function localDateStr(d: Date): string {
 // Check if a notification has already been sent today for this task+type
 function alreadySentToday(userId: string, type: SweepType, taskId: string): boolean {
   const today = localDateStr(new Date());
-  return localStorage.getItem(`health_notif_${userId}_${type}_${taskId}_${today}`) === '1';
+  return localStorage.getItem(getHealthNotifKey(userId, type, taskId, today)) === '1';
 }
 
 function markSentToday(userId: string, type: SweepType, taskId: string): void {
   const today = localDateStr(new Date());
-  localStorage.setItem(`health_notif_${userId}_${type}_${taskId}_${today}`, '1');
+  localStorage.setItem(getHealthNotifKey(userId, type, taskId, today), '1');
 }
 
 async function sendPush(
@@ -49,7 +50,7 @@ export function useHealthSweep(currentUserId: string) {
 
   useEffect(() => {
     const sweep = async () => {
-      const userKey = localStorage.getItem(`pushover_user_key_${currentUserId}`);
+      const userKey = localStorage.getItem(getPushoverKey(currentUserId));
       const today = localDateStr(new Date());
       const todayMs = new Date(today).getTime();
       const tomorrowMs = todayMs + 86_400_000;
@@ -164,7 +165,7 @@ export function useHealthSweep(currentUserId: string) {
       // --- MORNING BRIEFING ---
       // Fire once per day between 5am–11am if Pushover key is set
       if (userKey) {
-        const briefingKey = `briefing_sent_${currentUserId}_${today}`;
+        const briefingKey = getBriefingKey(currentUserId, today);
         const hour = new Date().getHours();
         if (hour >= 5 && hour < 11 && !localStorage.getItem(briefingKey)) {
           const urgentCount = tasks.filter(

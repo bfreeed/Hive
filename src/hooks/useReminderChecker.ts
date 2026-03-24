@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useStore } from '../store';
+import { getPushoverKey, getReminderLockKey } from '../lib/storageKeys';
 
 const FIRE_WINDOW_MS = 5 * 60 * 1000; // 5-minute window to catch reminders if app was briefly closed
 const TAB_LOCK_TTL_MS = 15_000;        // Multi-tab dedup: lock expires after 15s
@@ -34,7 +35,7 @@ export function useReminderChecker(currentUserId: string) {
         if (!(t <= now && t > now - FIRE_WINDOW_MS)) continue;
 
         // Multi-tab dedup: only one tab fires per task reminder
-        const lockKey = `reminder_lock_${task.id}`;
+        const lockKey = getReminderLockKey(task.id);
         const lockVal = localStorage.getItem(lockKey);
         if (lockVal && now - Number(lockVal) < TAB_LOCK_TTL_MS) continue;
         localStorage.setItem(lockKey, String(now));
@@ -45,7 +46,7 @@ export function useReminderChecker(currentUserId: string) {
 
         let anySent = false;
         for (const userId of recipientIds) {
-          const userKey = localStorage.getItem(`pushover_user_key_${userId}`);
+          const userKey = localStorage.getItem(getPushoverKey(userId));
           if (!userKey) {
             if (userId === currentUserId) {
               console.warn(`[Reminder] Skipped "${task.title}" — no Pushover key for ${userId}. Go to Settings → Reminders.`);

@@ -17,6 +17,7 @@ import NotificationsPage from './pages/NotificationsPage';
 import TodayPage from './pages/TodayPage';
 import { useReminderChecker } from './hooks/useReminderChecker';
 import { useHealthSweep } from './hooks/useHealthSweep';
+import { getPushoverKey, GOOGLE_CLIENT_ID_KEY, GOOGLE_API_KEY_KEY } from './lib/storageKeys';
 
 function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: any; darkMode: boolean; toggleDarkMode: () => void }) {
   const { addUserFlag, updateUserFlag, removeUserFlag } = useStore();
@@ -100,8 +101,8 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
   const userId = currentUser?.id || 'lev';
 
   const saveCredentials = () => {
-    if (clientIdRef.current) localStorage.setItem('google_client_id', clientIdRef.current.value.trim());
-    if (apiKeyRef.current) localStorage.setItem('google_api_key', apiKeyRef.current.value.trim());
+    if (clientIdRef.current) localStorage.setItem(GOOGLE_CLIENT_ID_KEY, clientIdRef.current.value.trim());
+    if (apiKeyRef.current) localStorage.setItem(GOOGLE_API_KEY_KEY, apiKeyRef.current.value.trim());
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -109,8 +110,8 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
   const savePhone = () => {
     if (phoneRef.current) {
       const val = phoneRef.current.value.trim();
-      if (val) localStorage.setItem(`pushover_user_key_${userId}`, val);
-      else localStorage.removeItem(`pushover_user_key_${userId}`);
+      if (val) localStorage.setItem(getPushoverKey(userId), val);
+      else localStorage.removeItem(getPushoverKey(userId));
     }
     setPhoneSaved(true);
     setTimeout(() => setPhoneSaved(false), 2000);
@@ -158,7 +159,7 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
               <input
                 ref={phoneRef}
                 type="text"
-                defaultValue={localStorage.getItem(`pushover_user_key_${userId}`) || ''}
+                defaultValue={localStorage.getItem(getPushoverKey(userId)) || ''}
                 placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxx"
                 className="w-full px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white/60 placeholder-white/20 focus:outline-none focus:border-brand-500/40 font-mono"
               />
@@ -289,7 +290,7 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
               <input
                 ref={clientIdRef}
                 type="text"
-                defaultValue={localStorage.getItem('google_client_id') || ''}
+                defaultValue={localStorage.getItem(GOOGLE_CLIENT_ID_KEY) || ''}
                 placeholder="xxxxxxxx.apps.googleusercontent.com"
                 className="w-full px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white/60 placeholder-white/20 focus:outline-none focus:border-brand-500/40 font-mono"
               />
@@ -299,7 +300,7 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
               <input
                 ref={apiKeyRef}
                 type="text"
-                defaultValue={localStorage.getItem('google_api_key') || ''}
+                defaultValue={localStorage.getItem(GOOGLE_API_KEY_KEY) || ''}
                 placeholder="AIzaSy..."
                 className="w-full px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white/60 placeholder-white/20 focus:outline-none focus:border-brand-500/40 font-mono"
               />
