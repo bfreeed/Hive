@@ -73,7 +73,7 @@ export default function NotificationsPage({ onNavigate, onOpenTask }: Notificati
   const { notifications, tasks, projects, markNotificationRead, markAllNotificationsRead } = useStore();
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [viewType, setViewType] = useState<'list' | 'board'>('list');
-  const [groupBy, setGroupBy] = useState<'type' | 'project'>('type');
+  const [groupBy, setGroupBy] = useState<'date' | 'project'>('date');
 
   const unreadCount = notifications.filter(n => !n.read).length;
   const filtered = showUnreadOnly ? notifications.filter(n => !n.read) : notifications;
@@ -122,16 +122,30 @@ export default function NotificationsPage({ onNavigate, onOpenTask }: Notificati
       }));
     }
 
-    // Default: group by type category
-    const byType: Record<string, Notification[]> = {};
+    // Default: group by date
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+    const yesterdayStr = new Date(now.getTime() - 86400000).toISOString().slice(0, 10);
+    const weekAgo = new Date(now.getTime() - 7 * 86400000);
+
+    const getDateGroup = (iso: string) => {
+      const d = iso.slice(0, 10);
+      if (d === todayStr) return 'Today';
+      if (d === yesterdayStr) return 'Yesterday';
+      if (new Date(iso) >= weekAgo) return 'This Week';
+      return 'Earlier';
+    };
+
+    const DATE_ORDER = ['Today', 'Yesterday', 'This Week', 'Earlier'];
+    const byDate: Record<string, Notification[]> = {};
     for (const n of filtered) {
-      const group = TYPE_CONFIG[n.type]?.group ?? 'Other';
-      if (!byType[group]) byType[group] = [];
-      byType[group].push(n);
+      const group = getDateGroup(n.createdAt);
+      if (!byDate[group]) byDate[group] = [];
+      byDate[group].push(n);
     }
-    return GROUP_ORDER
-      .filter(g => byType[g]?.length > 0)
-      .map(name => ({ label: name, color: undefined, items: byType[name] }));
+    return DATE_ORDER
+      .filter(g => byDate[g]?.length > 0)
+      .map(name => ({ label: name, color: undefined, items: byDate[name] }));
   };
 
   // ── Board view ─────────────────────────────────────────────────────────────
@@ -211,7 +225,7 @@ export default function NotificationsPage({ onNavigate, onOpenTask }: Notificati
             {viewType === 'list' && (
               <div className="flex items-center bg-white/[0.04] border border-white/[0.08] rounded-lg p-0.5">
                 {([
-                  { id: 'type',    label: 'By type'    },
+                  { id: 'date',    label: 'By date'    },
                   { id: 'project', label: 'By project' },
                 ] as const).map(g => (
                   <button
