@@ -2,8 +2,19 @@ import { useEffect } from 'react';
 import { useStore } from '../store';
 import { getPushoverKey, getReminderLockKey } from '../lib/storageKeys';
 
-const FIRE_WINDOW_MS = 5 * 60 * 1000; // 5-minute window to catch reminders if app was briefly closed
-const TAB_LOCK_TTL_MS = 15_000;        // Multi-tab dedup: lock expires after 15s
+export const FIRE_WINDOW_MS = 5 * 60 * 1000; // 5-minute window to catch reminders if app was briefly closed
+export const TAB_LOCK_TTL_MS = 15_000;        // Multi-tab dedup: lock expires after 15s
+
+/** Pure: returns true if the reminder time falls within the [now-FIRE_WINDOW_MS, now] window */
+export function isInFireWindow(reminderAt: string, nowMs: number, windowMs = FIRE_WINDOW_MS): boolean {
+  const t = new Date(reminderAt).getTime();
+  return t <= nowMs && t > nowMs - windowMs;
+}
+
+/** Pure: returns the list of user IDs who should be notified for this task */
+export function getRecipientIds(assigneeIds: string[], currentUserId: string): string[] {
+  return assigneeIds.length > 0 ? assigneeIds : [currentUserId];
+}
 
 async function sendReminder(userKey: string, title: string, message: string, url: string): Promise<boolean> {
   try {

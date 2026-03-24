@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useStore } from '../store';
 import {
   MessageSquare, HelpCircle, Bell, UserPlus, ArrowRight,
-  Zap, Users, Calendar, Mic, Paperclip, CheckCheck, List, LayoutGrid, ArrowUpDown,
+  Zap, Users, Calendar, Mic, Paperclip, CheckCheck, List, LayoutGrid, ArrowUpDown, X,
 } from 'lucide-react';
 import type { Notification } from '../types';
 
@@ -38,39 +38,49 @@ function formatTime(iso: string): string {
   return `${days}d ago`;
 }
 
-function NotifCard({ n, config, onClick, onMarkRead }: {
+function NotifCard({ n, config, onClick, onMarkRead, onDelete }: {
   n: Notification;
   config: typeof TYPE_CONFIG[string] | undefined;
   onClick: () => void;
   onMarkRead: (e: React.MouseEvent) => void;
+  onDelete: (e: React.MouseEvent) => void;
 }) {
   return (
-    <button
-      onClick={onClick}
-      className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-white/[0.04] transition-colors text-left group"
-    >
-      <span
-        onClick={onMarkRead}
-        className={`w-1.5 h-1.5 rounded-full flex-shrink-0 cursor-pointer transition-opacity ${
-          n.read ? 'opacity-0' : 'bg-brand-400 hover:opacity-70'
-        }`}
-      />
-      {config && (
-        <span className={`flex-shrink-0 ${config.colorClass}`}>{config.icon}</span>
-      )}
-      <span className={`flex-1 min-w-0 text-sm truncate ${n.read ? 'text-white/30' : 'text-white/80 group-hover:text-white'}`}>
-        {n.title}
-        {n.body && (
-          <span className="text-white/25 font-normal"> — {n.body}</span>
+    <div className="flex items-center group/row rounded-lg hover:bg-white/[0.04] transition-colors">
+      <button
+        onClick={onClick}
+        className="flex-1 flex items-center gap-2.5 px-3 py-2.5 text-left min-w-0"
+      >
+        <span
+          onClick={onMarkRead}
+          className={`w-1.5 h-1.5 rounded-full flex-shrink-0 cursor-pointer transition-opacity ${
+            n.read ? 'opacity-0' : 'bg-brand-400 hover:opacity-70'
+          }`}
+        />
+        {config && (
+          <span className={`flex-shrink-0 ${config.colorClass}`}>{config.icon}</span>
         )}
-      </span>
-      <span className="flex-shrink-0 text-xs text-white/20">{formatTime(n.createdAt)}</span>
-    </button>
+        <span className={`flex-1 min-w-0 text-sm truncate ${n.read ? 'text-white/30' : 'text-white/80'}`}>
+          {n.title}
+          {n.body && (
+            <span className="text-white/25 font-normal"> — {n.body}</span>
+          )}
+        </span>
+        <span className="flex-shrink-0 text-xs text-white/20 ml-2">{formatTime(n.createdAt)}</span>
+      </button>
+      <button
+        onClick={onDelete}
+        className="flex-shrink-0 opacity-0 group-hover/row:opacity-100 p-1.5 mr-1.5 rounded text-white/20 hover:text-red-400 hover:bg-white/[0.04] transition-all"
+        title="Delete"
+      >
+        <X size={13} />
+      </button>
+    </div>
   );
 }
 
 export default function NotificationsPage({ onNavigate, onOpenTask }: NotificationsPageProps) {
-  const { notifications, tasks, projects, markNotificationRead, markAllNotificationsRead } = useStore();
+  const { notifications, tasks, projects, markNotificationRead, markAllNotificationsRead, deleteNotification } = useStore();
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [viewType, setViewType] = useState<'list' | 'board'>('list');
   const [groupBy, setGroupBy] = useState<'date' | 'project'>('date');
@@ -151,20 +161,42 @@ export default function NotificationsPage({ onNavigate, onOpenTask }: Notificati
   // ── Board view ─────────────────────────────────────────────────────────────
 
   const buildBoardColumns = () => {
-    const byProject: Record<string, { project: typeof projects[0] | null; items: Notification[] }> = {};
+    if (groupBy === 'date') {
+      const now = new Date();
+      const todayStr = now.toISOString().slice(0, 10);
+      const yesterdayStr = new Date(now.getTime() - 86400000).toISOString().slice(0, 10);
+      const weekAgo = new Date(now.getTime() - 7 * 86400000);
+      const getDateGroup = (iso: string) => {
+        const d = iso.slice(0, 10);
+        if (d === todayStr) return 'Today';
+        if (d === yesterdayStr) return 'Yesterday';
+        if (new Date(iso) >= weekAgo) return 'This Week';
+        return 'Earlier';
+      };
+      const DATE_ORDER = ['Today', 'Yesterday', 'This Week', 'Earlier'];
+      const byDate: Record<string, Notification[]> = {};
+      for (const n of filtered) {
+        const group = getDateGroup(n.createdAt);
+        if (!byDate[group]) byDate[group] = [];
+        byDate[group].push(n);
+      }
+      return DATE_ORDER
+        .filter(g => byDate[g]?.length > 0)
+        .map(label => ({ label, color: undefined as string | undefined, project: null as typeof projects[0] | null, items: byDate[label] }));
+    }
+
+    // By project (default)
+    const byProject: Record<string, { label: string; color: string | undefined; project: typeof projects[0] | null; items: Notification[] }> = {};
     for (const n of filtered) {
       const proj = getProject(n);
       const key = proj?.id ?? '__none__';
-      if (!byProject[key]) byProject[key] = { project: proj ?? null, items: [] };
+      if (!byProject[key]) byProject[key] = { label: proj?.name ?? 'No Project', color: proj?.color, project: proj ?? null, items: [] };
       byProject[key].items.push(n);
     }
-    // Order: projects in their defined order, then "No Project"
     const cols = projects
       .filter(p => byProject[p.id])
-      .map(p => ({ ...byProject[p.id], project: p }));
-    if (byProject['__none__']?.items.length) {
-      cols.push({ project: null, items: byProject['__none__'].items });
-    }
+      .map(p => byProject[p.id]);
+    if (byProject['__none__']?.items.length) cols.push(byProject['__none__']);
     return cols;
   };
 
@@ -221,8 +253,8 @@ export default function NotificationsPage({ onNavigate, onOpenTask }: Notificati
             {/* Divider */}
             <span className="w-px h-4 bg-white/[0.08] mx-1" />
 
-            {/* Group by — only in list view */}
-            {viewType === 'list' && ([
+            {/* Group by — available in both list and board */}
+            {([
               { id: 'date',    label: 'By date'    },
               { id: 'project', label: 'By project' },
             ] as const).map(g => (
@@ -282,6 +314,7 @@ export default function NotificationsPage({ onNavigate, onOpenTask }: Notificati
                       config={TYPE_CONFIG[n.type]}
                       onClick={() => handleCardClick(n)}
                       onMarkRead={(e) => { e.stopPropagation(); markNotificationRead(n.id); }}
+                      onDelete={(e) => { e.stopPropagation(); deleteNotification(n.id); }}
                     />
                   ))}
                 </div>
@@ -294,18 +327,18 @@ export default function NotificationsPage({ onNavigate, onOpenTask }: Notificati
           <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
             {boardColumns.map((col, ci) => (
               <div
-                key={col.project?.id ?? '__none__'}
+                key={col.label}
                 className="flex-shrink-0 w-72 flex flex-col bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden"
               >
                 {/* Column header */}
                 <div className="flex items-center gap-2 px-3 py-2.5 border-b border-white/[0.06]">
-                  {col.project ? (
-                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: col.project.color }} />
+                  {col.color ? (
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: col.color }} />
                   ) : (
                     <span className="w-2 h-2 rounded-full bg-white/20 flex-shrink-0" />
                   )}
                   <span className="text-sm font-semibold text-white/70 truncate flex-1">
-                    {col.project?.name ?? 'No Project'}
+                    {col.label}
                   </span>
                   <span className="text-xs text-white/30 flex-shrink-0">{col.items.length}</span>
                 </div>
@@ -315,34 +348,42 @@ export default function NotificationsPage({ onNavigate, onOpenTask }: Notificati
                   {col.items.map(n => {
                     const config = TYPE_CONFIG[n.type];
                     return (
-                      <button
-                        key={n.id}
-                        onClick={() => handleCardClick(n)}
-                        className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
-                          n.read
-                            ? 'border-white/[0.04] bg-white/[0.02] hover:bg-white/[0.05]'
-                            : 'border-brand-500/20 bg-brand-600/5 hover:bg-brand-600/10'
-                        }`}
-                      >
-                        <div className="flex items-start gap-2 mb-1">
-                          {!n.read && (
-                            <span
-                              onClick={(e) => { e.stopPropagation(); markNotificationRead(n.id); }}
-                              className="w-1.5 h-1.5 rounded-full bg-brand-400 flex-shrink-0 mt-1.5 cursor-pointer"
-                            />
+                      <div key={n.id} className="group/card relative">
+                        <button
+                          onClick={() => handleCardClick(n)}
+                          className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
+                            n.read
+                              ? 'border-white/[0.04] bg-white/[0.02] hover:bg-white/[0.05]'
+                              : 'border-brand-500/20 bg-brand-600/5 hover:bg-brand-600/10'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2 mb-1">
+                            {!n.read && (
+                              <span
+                                onClick={(e) => { e.stopPropagation(); markNotificationRead(n.id); }}
+                                className="w-1.5 h-1.5 rounded-full bg-brand-400 flex-shrink-0 mt-1.5 cursor-pointer"
+                              />
+                            )}
+                            {config && (
+                              <span className={`flex-shrink-0 mt-0.5 ${config.colorClass}`}>{config.icon}</span>
+                            )}
+                            <p className={`text-xs leading-snug flex-1 min-w-0 pr-4 ${n.read ? 'text-white/50' : 'text-white/85 font-medium'}`}>
+                              {n.title}
+                            </p>
+                          </div>
+                          {n.body && (
+                            <p className="text-[11px] text-white/35 truncate ml-6 mb-0.5">{n.body}</p>
                           )}
-                          {config && (
-                            <span className={`flex-shrink-0 mt-0.5 ${config.colorClass}`}>{config.icon}</span>
-                          )}
-                          <p className={`text-xs leading-snug flex-1 min-w-0 ${n.read ? 'text-white/50' : 'text-white/85 font-medium'}`}>
-                            {n.title}
-                          </p>
-                        </div>
-                        {n.body && (
-                          <p className="text-[11px] text-white/35 truncate ml-6 mb-0.5">{n.body}</p>
-                        )}
-                        <p className="text-[10px] text-white/20 ml-6">{formatTime(n.createdAt)}</p>
-                      </button>
+                          <p className="text-[10px] text-white/20 ml-6">{formatTime(n.createdAt)}</p>
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); deleteNotification(n.id); }}
+                          className="absolute top-2 right-2 opacity-0 group-hover/card:opacity-100 p-0.5 rounded text-white/20 hover:text-red-400 transition-all"
+                          title="Delete"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
                     );
                   })}
                 </div>

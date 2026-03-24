@@ -1,62 +1,20 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useStore } from '../store';
-import { FileText, LayoutGrid, List, GitBranch, Plus, ArrowUpDown, Cloud, ExternalLink, X, Lock, Unlock } from 'lucide-react';
+import { LayoutGrid, List, Plus, ArrowUpDown, X, Lock } from 'lucide-react';
 import type { Task } from '../types';
 import { isPast } from 'date-fns';
-import { useGooglePicker } from '../hooks/useGooglePicker';
 import TaskRow from '../components/TaskRow';
 import BoardView from '../components/BoardView';
+import DocEditor from '../components/DocEditor';
 import { buildGroups, sortTasks } from '../utils/buildGroups';
 import type { BoardGroupBy, BoardSortBy, BoardSortOrder } from '../utils/buildGroups';
-
-const PRIORITY_DOT: Record<string, string> = {
-  urgent: 'bg-red-400', high: 'bg-orange-400', medium: 'bg-yellow-400', low: 'bg-white/20',
-};
-
-function MindMapView({ tasks, projectName, onOpenTask }: { tasks: Task[]; projectName: string; onOpenTask: (id: string) => void }) {
-  const groups: Record<string, Task[]> = {};
-  tasks.forEach((t) => {
-    const key = t.label || t.priority;
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(t);
-  });
-
-  return (
-    <div className="flex flex-col items-center py-8">
-      <div className="bg-brand-600 text-white px-6 py-3 rounded-2xl font-semibold text-sm mb-8 shadow-lg shadow-brand-600/20">
-        {projectName}
-      </div>
-      <div className="flex flex-wrap justify-center gap-8">
-        {Object.entries(groups).map(([group, groupTasks]) => (
-          <div key={group} className="flex flex-col items-center gap-2 max-w-[200px]">
-            <div className="bg-white/[0.08] border border-white/10 px-4 py-2 rounded-xl text-xs font-semibold text-white/60 uppercase tracking-wider">
-              {group}
-            </div>
-            <div className="w-px h-4 bg-white/10" />
-            <div className="space-y-2 w-full">
-              {groupTasks.map((task) => (
-                <div key={task.id} onClick={() => onOpenTask(task.id)} className="bg-white/[0.04] border border-white/[0.06] hover:border-white/10 rounded-lg px-3 py-2 cursor-pointer transition-colors">
-                  <p className="text-xs text-white/70">{task.title}</p>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <span className={`w-1 h-1 rounded-full ${PRIORITY_DOT[task.priority]}`} />
-                    <span className="text-[10px] text-white/30 capitalize">{task.status}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { projectId: string; onNavigate: (page: string, id?: string) => void; onOpenTask: (id: string) => void }) {
   const { projects, tasks, users, contacts, addTask, updateProject, addUser } = useStore();
   const [inviteEmail, setInviteEmail] = useState('');
   const inviteRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<'tasks' | 'docs' | 'contacts' | 'members'>('tasks');
-  const [viewType, setViewType] = useState<'list' | 'board' | 'mindmap'>('list');
+  const [viewType, setViewType] = useState<'list' | 'board'>('list');
   const [showSort, setShowSort] = useState(false);
   const [groupBy, setGroupBy] = useState<BoardGroupBy>('none');
   const [sortBy, setSortBy] = useState<BoardSortBy>('date');
@@ -97,20 +55,6 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
     setNewTaskTitle('');
     setShowAddTask(false);
   };
-
-  const { open: openDrivePicker, loading: driveLoading } = useGooglePicker((file) => {
-    const doc = {
-      id: Math.random().toString(36).slice(2, 9),
-      name: file.name,
-      type: file.mimeType,
-      url: file.url,
-      source: 'google_drive' as const,
-      driveId: file.id,
-      createdAt: new Date().toISOString(),
-    };
-    const existing = projects.find(p => p.id === projectId)?.docs || [];
-    updateProject(projectId, { docs: [...existing, doc] });
-  });
 
   const project = projects.find((p) => p.id === projectId);
   if (!project) return <div className="flex-1 flex items-center justify-center text-white/30">Project not found</div>;
@@ -314,42 +258,41 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-1 border-b border-white/[0.06] mb-6">
+        <div className="flex items-center border-b border-white/[0.06] mb-6">
           {(['tasks', 'docs', 'contacts', 'members'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${activeTab === tab ? 'border-brand-500 text-white' : 'border-transparent text-white/40 hover:text-white/70'}`}
+              className={`px-3 py-2 text-sm transition-colors relative capitalize ${activeTab === tab ? 'text-white font-medium' : 'text-white/40 hover:text-white/70'}`}
             >
               {tab}
+              {activeTab === tab && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500 rounded-full" />
+              )}
             </button>
           ))}
-        </div>
-
-        {/* Task Tab */}
-        {activeTab === 'tasks' && (
-          <>
-            {/* View switcher + Sort toggle */}
-            <div className="flex items-center gap-1 mb-2">
-              {[
-                { id: 'list', icon: <List size={14} />, label: 'List' },
-                { id: 'board', icon: <LayoutGrid size={14} />, label: 'Board' },
-                { id: 'mindmap', icon: <GitBranch size={14} />, label: 'Mind Map' },
-              ].map((v) => (
+          {/* List/Board + Sort — only when tasks tab is active */}
+          {activeTab === 'tasks' && (
+            <div className="ml-auto flex items-center gap-1">
+              {([
+                { id: 'list' as const,  icon: <List size={14} />,       label: 'List'  },
+                { id: 'board' as const, icon: <LayoutGrid size={14} />, label: 'Board' },
+              ]).map(v => (
                 <button
                   key={v.id}
-                  onClick={() => setViewType(v.id as any)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${viewType === v.id ? 'bg-white/[0.08] text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'}`}
+                  onClick={() => setViewType(v.id)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                    viewType === v.id ? 'bg-white/[0.08] text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
+                  }`}
                 >
                   {v.icon}{v.label}
                 </button>
               ))}
+              <span className="w-px h-4 bg-white/[0.08] mx-1" />
               <button
                 onClick={() => setShowSort(s => !s)}
-                className={`ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
-                  sortActive
-                    ? 'bg-brand-600/20 border-brand-500/40 text-brand-300'
-                    : 'bg-white/[0.04] border-white/[0.08] text-white/50 hover:text-white/70'
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                  sortActive ? 'bg-brand-600/20 text-brand-300' : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
                 }`}
               >
                 <ArrowUpDown size={13} />
@@ -357,6 +300,12 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                 {sortActive && <span className="w-1.5 h-1.5 rounded-full bg-brand-400" />}
               </button>
             </div>
+          )}
+        </div>
+
+        {/* Task Tab */}
+        {activeTab === 'tasks' && (
+          <>
 
             {/* Sort/Group panel */}
             {showSort && (
@@ -460,8 +409,7 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                 )}
               </div>
             )}
-            {viewType === 'board' && <BoardView groups={boardGroups} onOpenTask={onOpenTask} />}
-            {viewType === 'mindmap' && <MindMapView tasks={allProjectTasks.filter(t => t.status !== 'done')} projectName={project.name} onOpenTask={onOpenTask} />}
+            {viewType === 'board' && <BoardView groups={boardGroups} onOpenTask={onOpenTask} addTask={addTask} filterProject={projectId} />}
           </>
         )}
 
@@ -490,54 +438,10 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
         {/* Docs Tab */}
         {activeTab === 'docs' && (
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-xs text-white/30 uppercase tracking-wider">Documents</p>
-              <button
-                onClick={openDrivePicker}
-                disabled={driveLoading}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/[0.05] hover:bg-white/[0.09] text-white/50 hover:text-[#4285F4] text-xs rounded-lg transition-colors disabled:opacity-40"
-              >
-                <Cloud size={12} /> {driveLoading ? 'Opening...' : 'Add from Drive'}
-              </button>
-            </div>
-            {(project.docs || []).length === 0 ? (
-              <div className="py-12 flex flex-col items-center gap-3 border border-dashed border-white/[0.08] rounded-xl">
-                <FileText size={24} className="text-white/15" />
-                <p className="text-white/20 text-sm">No documents yet</p>
-                <button
-                  onClick={openDrivePicker}
-                  disabled={driveLoading}
-                  className="flex items-center gap-1.5 text-xs text-white/30 hover:text-[#4285F4] transition-colors disabled:opacity-40"
-                >
-                  <Cloud size={13} /> {driveLoading ? 'Opening...' : 'Attach from Google Drive'}
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {(project.docs || []).map((doc) => (
-                  <div key={doc.id} className="flex items-center gap-3 px-4 py-3 bg-white/[0.03] border border-white/[0.06] rounded-xl hover:border-white/10 transition-colors group">
-                    <Cloud size={15} className="text-[#4285F4] flex-shrink-0" />
-                    <a
-                      href={doc.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 text-sm text-white/70 hover:text-white truncate transition-colors"
-                    >
-                      {doc.name}
-                    </a>
-                    <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-white/20 hover:text-white/50 transition-colors">
-                      <ExternalLink size={13} />
-                    </a>
-                    <button
-                      onClick={() => updateProject(projectId, { docs: (project.docs || []).filter(d => d.id !== doc.id) })}
-                      className="text-white/10 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                    >
-                      <X size={13} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+            <DocEditor
+              content={project.docContent ?? null}
+              onChange={(json) => updateProject(projectId, { docContent: json })}
+            />
           </div>
         )}
       </div>

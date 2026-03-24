@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useStore } from '../store';
-import { Home, CheckSquare, Users, Bell, Settings, FolderOpen, Search, MessageSquare, ArrowRight } from 'lucide-react';
+import { Home, CheckSquare, Users, Bell, Settings, FolderOpen, Search, MessageSquare, ArrowRight, Sparkles } from 'lucide-react';
 
 interface Command {
   id: string;
@@ -15,9 +15,10 @@ interface Props {
   onClose: () => void;
   onNavigate: (page: string, id?: string) => void;
   onOpenTask: (id: string) => void;
+  onAICapture?: (text: string) => void;
 }
 
-export default function CommandPalette({ onClose, onNavigate, onOpenTask }: Props) {
+export default function CommandPalette({ onClose, onNavigate, onOpenTask, onAICapture }: Props) {
   const { tasks, projects } = useStore();
   const [query, setQuery] = useState('');
   const [activeIdx, setActiveIdx] = useState(0);
@@ -54,15 +55,30 @@ export default function CommandPalette({ onClose, onNavigate, onOpenTask }: Prop
     }),
   ];
 
+  // Show AI capture option when query looks like natural language (4+ words)
+  const isNaturalLanguage = query.trim().split(/\s+/).length >= 4;
+
   const filtered = useMemo(() => {
+    const aiOption: Command | null = (onAICapture && isNaturalLanguage)
+      ? {
+          id: '__ai_capture__',
+          label: `Create with AI: "${query.trim()}"`,
+          sublabel: '✨ Quick capture',
+          icon: <Sparkles size={14} className="text-violet-400" />,
+          action: () => { onAICapture(query.trim()); onClose(); },
+        }
+      : null;
+
     if (!query.trim()) return staticCommands.slice(0, 8);
     const q = query.toLowerCase();
-    return staticCommands.filter((c) =>
+    const matches = staticCommands.filter((c) =>
       c.label.toLowerCase().includes(q) ||
       (c.sublabel?.toLowerCase().includes(q)) ||
       (c.keywords?.includes(q))
-    ).slice(0, 10);
-  }, [query, tasks, projects]);
+    ).slice(0, aiOption ? 9 : 10);
+
+    return aiOption ? [aiOption, ...matches] : matches;
+  }, [query, tasks, projects, isNaturalLanguage, onAICapture]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset active index when results change
   useEffect(() => { setActiveIdx(0); }, [filtered.length, query]);
@@ -108,11 +124,17 @@ export default function CommandPalette({ onClose, onNavigate, onOpenTask }: Prop
                 key={cmd.id}
                 onClick={cmd.action}
                 onMouseEnter={() => setActiveIdx(i)}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${i === activeIdx ? 'bg-white/[0.07]' : 'hover:bg-white/[0.04]'}`}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+                  cmd.id === '__ai_capture__'
+                    ? i === activeIdx ? 'bg-violet-500/[0.12]' : 'hover:bg-violet-500/[0.07]'
+                    : i === activeIdx ? 'bg-white/[0.07]' : 'hover:bg-white/[0.04]'
+                }`}
               >
-                <span className="flex-shrink-0 text-white/40 flex items-center">{cmd.icon}</span>
-                <span className="flex-1 text-sm text-white/80 truncate">{cmd.label}</span>
-                {cmd.sublabel && (
+                <span className="flex-shrink-0 flex items-center">{cmd.icon}</span>
+                <span className={`flex-1 text-sm truncate ${cmd.id === '__ai_capture__' ? 'text-violet-200/80' : 'text-white/80'}`}>
+                  {cmd.label}
+                </span>
+                {cmd.sublabel && cmd.id !== '__ai_capture__' && (
                   <span className="text-xs text-white/25 flex-shrink-0">{cmd.sublabel}</span>
                 )}
                 {i === activeIdx && (

@@ -7,6 +7,7 @@ import VoicePanel from './components/VoicePanel';
 import TaskDetail from './components/TaskDetail';
 import ErrorBoundary from './components/ErrorBoundary';
 import CommandPalette from './components/CommandPalette';
+import QuickCapture from './components/QuickCapture';
 import Home from './pages/Home';
 import ProjectHub from './pages/ProjectHub';
 import TasksPage from './pages/TasksPage';
@@ -384,6 +385,7 @@ function AuthenticatedApp() {
   const [page, setPage] = useState<Page>(() => hashToPage(window.location.hash));
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [cmdKOpen, setCmdKOpen] = useState(false);
+  const [quickCaptureText, setQuickCaptureText] = useState<string | null>(null);
 
   // Mount the SMS reminder checker
   useReminderChecker(currentUser?.id || 'lev');
@@ -473,7 +475,20 @@ function AuthenticatedApp() {
       </main>
       <VoicePanel />
       {openTaskId && <TaskDetail taskId={openTaskId} onClose={() => setOpenTaskId(null)} />}
-      {cmdKOpen && <CommandPalette onClose={() => setCmdKOpen(false)} onNavigate={navigate} onOpenTask={(id) => { setOpenTaskId(id); setCmdKOpen(false); }} />}
+      {cmdKOpen && (
+        <CommandPalette
+          onClose={() => setCmdKOpen(false)}
+          onNavigate={navigate}
+          onOpenTask={(id) => { setOpenTaskId(id); setCmdKOpen(false); }}
+          onAICapture={(text) => { setCmdKOpen(false); setQuickCaptureText(text); }}
+        />
+      )}
+      {quickCaptureText !== null && (
+        <QuickCapture
+          initialText={quickCaptureText}
+          onClose={() => setQuickCaptureText(null)}
+        />
+      )}
     </div>
   );
 }

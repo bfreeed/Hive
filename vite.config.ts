@@ -52,6 +52,90 @@ export default defineConfig(({ mode }) => {
           });
         },
       },
+      {
+        name: 'claude-parse-task',
+        configureServer(server) {
+          server.middlewares.use('/api/parse-task', (req: IncomingMessage, res: ServerResponse) => {
+            if (req.method !== 'POST') {
+              res.statusCode = 405;
+              res.end('Method Not Allowed');
+              return;
+            }
+            const chunks: Buffer[] = [];
+            req.on('data', (c: Buffer) => chunks.push(c));
+            req.on('end', async () => {
+              try {
+                const { text, projects, users, today } = JSON.parse(Buffer.concat(chunks).toString());
+                const apiKey = env.ANTHROPIC_API_KEY;
+                if (!apiKey) {
+                  res.statusCode = 503;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ error: 'ANTHROPIC_API_KEY not configured in .env' }));
+                  return;
+                }
+
+                const projectList = (projects || []).map((p: { id: string; name: string }) => `${p.id}: ${p.name}`).join('\n');
+                const userList = (users || []).map((u: { id: string; name: string }) => `${u.id}: ${u.name}`).join('\n');
+
+                const prompt = `You are a task parser. Parse the following natural language into structured task data.
+Return ONLY valid JSON, no markdown, no explanation.
+
+Today is ${today}.
+
+Available projects (id: name):
+${projectList || '(none)'}
+
+Available team members (id: name):
+${userList || '(none)'}
+
+Input: "${text}"
+
+Return JSON with these fields:
+{
+  "title": "string (required, clean task title)",
+  "dueDate": "YYYY-MM-DD or null",
+  "dueTime": "HH:MM (24h) or null",
+  "reminderAt": "ISO 8601 datetime or null (only if user explicitly mentions a reminder)",
+  "priority": "urgent|high|normal|low or null",
+  "assigneeIds": ["matched user IDs from the list above"],
+  "projectIds": ["matched project IDs from the list above"]
+}`;
+
+                const resp = await fetch('https://api.anthropic.com/v1/messages', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': apiKey,
+                    'anthropic-version': '2023-06-01',
+                  },
+                  body: JSON.stringify({
+                    model: 'claude-haiku-4-5',
+                    max_tokens: 256,
+                    messages: [{ role: 'user', content: prompt }],
+                  }),
+                });
+
+                const apiData = await resp.json() as { content?: Array<{ text?: string }>; error?: { message: string } };
+                if (!resp.ok) {
+                  res.statusCode = 500;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ error: apiData.error?.message || 'Claude API error' }));
+                  return;
+                }
+
+                const raw = apiData.content?.[0]?.text || '{}';
+                const parsed = JSON.parse(raw);
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify(parsed));
+              } catch (err: unknown) {
+                res.statusCode = 500;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+              }
+            });
+          });
+        },
+      },
     ],
   };
 });

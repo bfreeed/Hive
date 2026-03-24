@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import { supabase } from '../lib/supabase';
 import {
   Home, CheckSquare, Users, Bell, Settings, ChevronDown, ChevronRight,
-  Plus, FolderOpen, Mic, Moon, Sun, Menu, MessageSquare, Check, Lock, LogOut, GripVertical
+  Plus, FolderOpen, Mic, Menu, MessageSquare, Check, Lock, LogOut, GripVertical
 } from 'lucide-react';
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors,
@@ -62,6 +62,40 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
+  };
+
+  const [projectOrder, setProjectOrder] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('sidebar-project-order');
+      if (saved) return JSON.parse(saved) as string[];
+    } catch {}
+    return projects.map(p => p.id);
+  });
+
+  // Keep projectOrder in sync when projects are added/removed
+  const orderedProjects = React.useMemo(() => {
+    const known = new Set(projectOrder);
+    const newProjects = projects.filter(p => !known.has(p.id));
+    const order = [...projectOrder.filter(id => projects.some(p => p.id === id)), ...newProjects.map(p => p.id)];
+    return order.map(id => projects.find(p => p.id === id)!).filter(Boolean);
+  }, [projects, projectOrder]);
+
+  const handleProjectDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setProjectOrder(prev => {
+        const oldIndex = prev.indexOf(active.id as string);
+        const newIndex = prev.indexOf(over.id as string);
+        const next = arrayMove(
+          // ensure all current projects are represented
+          projects.map(p => p.id).reduce((acc, id) => acc.includes(id) ? acc : [...acc, id], prev),
+          oldIndex === -1 ? prev.length : oldIndex,
+          newIndex === -1 ? prev.length : newIndex,
+        );
+        localStorage.setItem('sidebar-project-order', JSON.stringify(next));
+        return next;
+      });
+    }
   };
 
   const [navOrder, setNavOrder] = useState<string[]>(() => {
@@ -178,27 +212,25 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
             </div>
           )}
 
-          {(projectsExpanded || !sidebarOpen) && projects.map((project) => {
-            const taskCount = tasks.filter((t) => (t.projectIds ?? []).includes(project.id) && t.status !== 'done').length;
-            return (
-              <button
-                key={project.id}
-                onClick={() => onNavigate('project', project.id)}
-                className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm transition-colors group ${activePage === `project-${project.id}` ? 'bg-white/[0.08] text-white' : 'text-white/60 hover:text-white hover:bg-white/[0.04]'}`}
-              >
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: project.color }} />
-                {sidebarOpen && (
-                  <>
-                    <span className="truncate flex-1 text-left">{project.name}</span>
-                    {project.isPrivate && <Lock size={10} className="text-amber-400/50 flex-shrink-0" />}
-                    {taskCount > 0 && (
-                      <span className="text-xs text-white/30 group-hover:text-white/50">{taskCount}</span>
-                    )}
-                  </>
-                )}
-              </button>
-            );
-          })}
+          {(projectsExpanded || !sidebarOpen) && (
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleProjectDragEnd}>
+              <SortableContext items={orderedProjects.map(p => p.id)} strategy={verticalListSortingStrategy}>
+                {orderedProjects.map((project) => {
+                  const taskCount = tasks.filter((t) => (t.projectIds ?? []).includes(project.id) && t.status !== 'done').length;
+                  return (
+                    <SortableProjectBtn
+                      key={project.id}
+                      project={project}
+                      taskCount={taskCount}
+                      active={activePage === `project-${project.id}`}
+                      expanded={sidebarOpen}
+                      onClick={() => onNavigate('project', project.id)}
+                    />
+                  );
+                })}
+              </SortableContext>
+            </DndContext>
+          )}
 
           {/* New Project inline form */}
           {sidebarOpen && showNewProject && (
@@ -285,13 +317,6 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
         >
           <Mic size={16} className="text-brand-400" />
           {sidebarOpen && <span>Voice AI</span>}
-        </button>
-        <button
-          onClick={toggleDarkMode}
-          className="w-full flex items-center gap-2.5 px-2 py-2 rounded-md text-sm text-white/60 hover:text-white hover:bg-white/[0.04] transition-colors"
-        >
-          {darkMode ? <Sun size={16} /> : <Moon size={16} />}
-          {sidebarOpen && <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>}
         </button>
         <button
           onClick={() => onNavigate('settings')}
@@ -387,6 +412,43 @@ function SortableNavBtn({ icon, label, id, active, expanded, onClick, badge }: {
         {expanded && badge ? (
           <span className="bg-brand-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium">{badge}</span>
         ) : null}
+      </button>
+    </div>
+  );
+}
+
+function SortableProjectBtn({ project, taskCount, active, expanded, onClick }: {
+  project: { id: string; name: string; color: string; isPrivate?: boolean };
+  taskCount: number; active: boolean; expanded: boolean; onClick: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: project.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center group/proj">
+      {expanded && (
+        <span
+          {...attributes}
+          {...listeners}
+          className="flex-shrink-0 w-4 flex items-center justify-center text-white/0 group-hover/proj:text-white/20 hover:!text-white/40 cursor-grab active:cursor-grabbing transition-colors mr-0.5"
+        >
+          <GripVertical size={12} />
+        </span>
+      )}
+      <button
+        onClick={onClick}
+        className={`flex-1 flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm transition-colors group ${active ? 'bg-white/[0.08] text-white' : 'text-white/60 hover:text-white hover:bg-white/[0.04]'} ${!expanded ? 'w-full' : ''}`}
+      >
+        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: project.color }} />
+        {expanded && (
+          <>
+            <span className="truncate flex-1 text-left">{project.name}</span>
+            {project.isPrivate && <Lock size={10} className="text-amber-400/50 flex-shrink-0" />}
+            {taskCount > 0 && (
+              <span className="text-xs text-white/30 group-hover:text-white/50">{taskCount}</span>
+            )}
+          </>
+        )}
       </button>
     </div>
   );
