@@ -17,7 +17,6 @@ import {
   SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy, arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { isToday, isPast } from 'date-fns';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -140,7 +139,6 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
     activeTab === 'project' ? 'project' :
     'status';
   const filterToday = activeTab === 'today';
-
   // Tab definitions
   const tabs = [
     { id: 'status' as ActiveTab,    label: 'By Status'   },
@@ -164,12 +162,11 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
     if (!baseFilter(t)) return false;
     if (activeTab === 'completed') return t.status === 'done';
     if (filterToday) {
-      if (t.status === 'done') return false;
-      if (!t.dueDate) return false;
+      if (t.status === 'done' || !t.dueDate) return false;
       const d = new Date(t.dueDate);
-      return isToday(d) || (isPast(d) && t.status !== 'done');
+      const today = new Date(); today.setHours(0,0,0,0);
+      return d <= today || d.toDateString() === today.toDateString();
     }
-    // All other tabs: show active tasks
     return t.status !== 'done';
   });
 
