@@ -1,5 +1,25 @@
 # Hive — Deferred Work
 
+## P2 — Quick Reminder Shortcuts
+**What:** Add "In 1hr", "Tomorrow 9am", "Monday 9am", "Custom" pill buttons to the Reminder row in TaskDetail. Clicking a pill sets reminderAt immediately — zero typing for 90% of reminders.
+**Why:** The current date+time inputs work but require manual entry. Most reminders are relative to now (same UX pattern as Slack reminder picker).
+**Effort:** S (human: ~45min / CC: ~5min)
+**Priority:** P2
+**Depends on:** Nothing.
+
+---
+
+## P2 — ServiceWorker Background Push Notifications
+**What:** Register a ServiceWorker + Web Push so task reminders fire even when the browser tab is closed or the Mac is asleep.
+**Why:** Current reminder system requires the tab to be open. A 3pm reminder only works if Hive is the active tab.
+**Pros:** Fully reliable reminders. Works exactly like Google Calendar notifications.
+**Cons:** Requires VAPID key pair, server-side push endpoint, browser permission prompt. Moderate complexity.
+**Effort:** L (human: ~1 day / CC: ~30min)
+**Priority:** P2
+**Depends on:** PUSHOVER_API_TOKEN in .env (already done). Could replace Pushover entirely or sit alongside it.
+
+---
+
 ## P2 — Task Labels
 **What:** Wire the existing `label?: string` field. Add label input in TaskDetail, show as chip on task rows, add label filter to TasksPage.
 **Why:** Fast visual categorization without creating new projects.

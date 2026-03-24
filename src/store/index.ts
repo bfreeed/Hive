@@ -319,6 +319,7 @@ interface AppStore {
   updateContact: (id: string, u: Partial<Contact>) => void;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
+  deleteNotification: (id: string) => void;
   addNotification: (n: Omit<Notification, 'id' | 'createdAt' | 'read'>) => void;
   addChannel: (channel: Omit<Channel, 'id'>) => void;
   updateChannel: (id: string, u: Partial<Channel>) => void;
@@ -609,7 +610,11 @@ export const useStore = create<AppStore>()((set, get) => ({
   updateTask: (id, u) => set((s) => {
     const prev = s.tasks.find(t => t.id === id);
     const ts = new Date().toISOString();
-    const tasks = s.tasks.map((t) => t.id === id ? { ...t, ...u, updatedAt: ts } : t);
+    // Auto-clear reminder when task is marked done (prevents ghost notifications)
+    const finalUpdate = (u.status === 'done' && prev?.status !== 'done' && prev?.reminderAt)
+      ? { ...u, reminderAt: undefined, reminderSent: undefined }
+      : u;
+    const tasks = s.tasks.map((t) => t.id === id ? { ...t, ...finalUpdate, updatedAt: ts } : t);
     if (!prev) return { tasks };
 
     const mkn = (type: string, title: string, body: string) => ({
@@ -749,6 +754,12 @@ export const useStore = create<AppStore>()((set, get) => ({
     set((s) => ({ notifications: s.notifications.map((n) => ({ ...n, read: true })) }));
     supabase.from('notifications').update({ read: true }).eq('read', false)
       .then(({ error }) => { if (error) console.error('markAllNotificationsRead error:', error); });
+  },
+
+  deleteNotification: (id) => {
+    set((s) => ({ notifications: s.notifications.filter((n) => n.id !== id) }));
+    supabase.from('notifications').delete().eq('id', id)
+      .then(({ error }) => { if (error) console.error('deleteNotification error:', error); });
   },
 
   addNotification: (n) => {
