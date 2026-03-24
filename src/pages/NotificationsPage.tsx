@@ -47,21 +47,21 @@ function NotifCard({ n, config, onClick, onMarkRead }: {
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/[0.04] transition-colors text-left group"
+      className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-white/[0.04] transition-colors text-left group"
     >
       <span
         onClick={onMarkRead}
         className={`w-1.5 h-1.5 rounded-full flex-shrink-0 cursor-pointer transition-opacity ${
-          n.read ? 'bg-transparent' : 'bg-brand-400 hover:opacity-70'
+          n.read ? 'opacity-0' : 'bg-brand-400 hover:opacity-70'
         }`}
       />
       {config && (
         <span className={`flex-shrink-0 ${config.colorClass}`}>{config.icon}</span>
       )}
-      <span className={`flex-1 min-w-0 text-sm truncate ${n.read ? 'text-white/40' : 'text-white/80 group-hover:text-white'}`}>
+      <span className={`flex-1 min-w-0 text-sm truncate ${n.read ? 'text-white/30' : 'text-white/80 group-hover:text-white'}`}>
         {n.title}
         {n.body && (
-          <span className="text-white/30 font-normal"> — {n.body}</span>
+          <span className="text-white/25 font-normal"> — {n.body}</span>
         )}
       </span>
       <span className="flex-shrink-0 text-xs text-white/20">{formatTime(n.createdAt)}</span>
@@ -199,57 +199,54 @@ export default function NotificationsPage({ onNavigate, onOpenTask }: Notificati
           </div>
 
           {/* Controls row */}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1 flex-wrap">
             {/* View toggle — List / Board */}
-            <div className="flex items-center bg-white/[0.04] border border-white/[0.08] rounded-lg p-0.5">
-              {([
-                { id: 'list',  icon: <List size={13} />,       label: 'List'  },
-                { id: 'board', icon: <LayoutGrid size={13} />, label: 'Board' },
-              ] as const).map(v => (
-                <button
-                  key={v.id}
-                  onClick={() => setViewType(v.id)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-colors ${
-                    viewType === v.id
-                      ? 'bg-white/[0.10] text-white'
-                      : 'text-white/40 hover:text-white/70'
-                  }`}
-                >
-                  {v.icon}
-                  {v.label}
-                </button>
-              ))}
-            </div>
+            {([
+              { id: 'list',  icon: <List size={14} />,       label: 'List'  },
+              { id: 'board', icon: <LayoutGrid size={14} />, label: 'Board' },
+            ] as const).map(v => (
+              <button
+                key={v.id}
+                onClick={() => setViewType(v.id)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                  viewType === v.id
+                    ? 'bg-white/[0.08] text-white'
+                    : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
+                }`}
+              >
+                {v.icon}{v.label}
+              </button>
+            ))}
+
+            {/* Divider */}
+            <span className="w-px h-4 bg-white/[0.08] mx-1" />
 
             {/* Group by — only in list view */}
-            {viewType === 'list' && (
-              <div className="flex items-center bg-white/[0.04] border border-white/[0.08] rounded-lg p-0.5">
-                {([
-                  { id: 'date',    label: 'By date'    },
-                  { id: 'project', label: 'By project' },
-                ] as const).map(g => (
-                  <button
-                    key={g.id}
-                    onClick={() => setGroupBy(g.id)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-colors ${
-                      groupBy === g.id
-                        ? 'bg-white/[0.10] text-white'
-                        : 'text-white/40 hover:text-white/70'
-                    }`}
-                  >
-                    {g.label}
-                  </button>
-                ))}
-              </div>
-            )}
+            {viewType === 'list' && ([
+              { id: 'date',    label: 'By date'    },
+              { id: 'project', label: 'By project' },
+            ] as const).map(g => (
+              <button
+                key={g.id}
+                onClick={() => setGroupBy(g.id)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                  groupBy === g.id
+                    ? 'bg-white/[0.08] text-white'
+                    : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
+                }`}
+              >
+                {g.label}
+              </button>
+            ))}
 
             {/* Unread filter */}
+            <span className="w-px h-4 bg-white/[0.08] mx-1" />
             <button
               onClick={() => setShowUnreadOnly(v => !v)}
-              className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
                 showUnreadOnly
-                  ? 'border-brand-500/40 bg-brand-600/10 text-brand-400'
-                  : 'border-white/[0.08] text-white/40 hover:text-white/70'
+                  ? 'bg-brand-600/20 text-brand-400'
+                  : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
               }`}
             >
               {showUnreadOnly ? 'Unread only' : 'All'}
@@ -265,16 +262,16 @@ export default function NotificationsPage({ onNavigate, onOpenTask }: Notificati
 
         ) : viewType === 'list' ? (
           /* ── List ── */
-          <div className="space-y-6">
+          <div className="space-y-5">
             {listGroups.map(group => (
               <div key={group.label}>
-                <div className="flex items-center gap-2 mb-2 px-1">
+                <div className="flex items-center gap-2 mb-1 px-3">
                   {group.color && (
                     <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: group.color }} />
                   )}
-                  <h2 className="text-xs font-semibold text-white/30 uppercase tracking-wider">
+                  <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">
                     {group.label}
-                  </h2>
+                  </span>
                   <span className="text-xs text-white/20">{group.items.length}</span>
                 </div>
                 <div>
