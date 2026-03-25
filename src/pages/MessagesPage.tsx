@@ -487,6 +487,7 @@ export default function MessagesPage() {
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordingStartRef = useRef<number>(0);
@@ -690,9 +691,19 @@ export default function MessagesPage() {
 
   // ── Voice recording ─────────────────────────────────────────────────────────
 
+  // Stop the mic stream immediately — called from stopRecording and on unmount
+  const releaseStream = () => {
+    mediaStreamRef.current?.getTracks().forEach(t => t.stop());
+    mediaStreamRef.current = null;
+  };
+
+  // Release the mic if the component unmounts while recording is active
+  useEffect(() => () => { releaseStream(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream; // store so we can stop it at any time
       // Prefer webm/opus; fall back to whatever the browser supports (Safari uses mp4)
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
@@ -705,7 +716,6 @@ export default function MessagesPage() {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
       mediaRecorder.onstop = async () => {
-        stream.getTracks().forEach(t => t.stop());
         const duration = (Date.now() - recordingStartRef.current) / 1000;
         if (duration < 0.5) return; // too short, discard
         const blob = new Blob(chunksRef.current, { type: mimeType || 'audio/webm' });
@@ -728,6 +738,7 @@ export default function MessagesPage() {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
+    releaseStream(); // stop mic tracks immediately — clears the browser tab indicator
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
       recordingTimerRef.current = null;
