@@ -15,7 +15,8 @@ export async function uploadToStorage(
   path: string,
   file: Blob | File,
 ): Promise<string> {
-  const contentType = file instanceof File ? file.type : 'application/octet-stream';
+  // Blob.type is always populated (e.g. 'audio/webm;codecs=opus'); File extends Blob so this covers both
+  const contentType = file.type || 'application/octet-stream';
   const { data, error } = await supabase.storage
     .from(bucketName)
     .upload(path, file, { contentType, upsert: false });

@@ -1504,7 +1504,7 @@ export default function MessagesPage() {
             <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-xl">
               <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
               <span className="text-xs text-red-400">Recording… {fmtDuration(recordingDuration)}</span>
-              <span className="text-[10px] text-white/30 ml-auto">Release to send</span>
+              <span className="text-[10px] text-white/30 ml-auto">Click 🎙 to stop</span>
             </div>
           )}
 
@@ -1555,16 +1555,12 @@ export default function MessagesPage() {
               style={{ minHeight: '22px', maxHeight: '120px' }}
             />
 
-            {/* Mic button — hold to record */}
+            {/* Mic button — tap to start/stop recording */}
             <button
               type="button"
-              onMouseDown={startRecording}
-              onMouseUp={stopRecording}
-              onMouseLeave={() => { if (isRecording) stopRecording(); }}
-              onTouchStart={e => { e.preventDefault(); startRecording(); }}
-              onTouchEnd={e => { e.preventDefault(); stopRecording(); }}
+              onClick={() => isRecording ? stopRecording() : startRecording()}
               disabled={isUploading}
-              title="Hold to record voice note"
+              title={isRecording ? 'Click to stop and send voice note' : 'Click to record voice note'}
               className={`flex-shrink-0 mb-0.5 p-1.5 rounded-lg transition-all ${
                 isRecording
                   ? 'bg-red-500 text-white scale-110 shadow-lg shadow-red-500/30'
