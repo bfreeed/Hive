@@ -1,5 +1,15 @@
 # Hive — Deferred Work
 
+## 🚨 P1 — Production API Proxy (BLOCKS DEPLOYMENT)
+**What:** Replace the Vite dev middleware (`/api/parse-task`) with a real server-side function that works in production. Options: Supabase Edge Function, Vercel serverless function, or a small Express server. The API key moves from `.env` (dev only) to the hosting platform's secret manager.
+**Why:** The current Claude API call runs through a Vite middleware that only exists when `npm run dev` is running. The moment you deploy (Vercel, Netlify, Fly.io, anywhere), `/api/parse-task` returns 404 and the entire NLP quick capture feature breaks silently.
+**What breaks if skipped:** `Cmd+K` → "✨ Create with AI" → 404 in production.
+**Effort:** S (human: ~1hr / CC: ~10min) — Supabase Edge Function is the natural fit since you're already on Supabase.
+**Priority:** P1 — must complete before any deployment
+**Depends on:** Decision on hosting platform. Supabase Edge Functions recommended (already in the stack).
+
+---
+
 ## P2 — Quick Reminder Shortcuts
 **What:** Add "In 1hr", "Tomorrow 9am", "Monday 9am", "Custom" pill buttons to the Reminder row in TaskDetail. Clicking a pill sets reminderAt immediately — zero typing for 90% of reminders.
 **Why:** The current date+time inputs work but require manual entry. Most reminders are relative to now (same UX pattern as Slack reminder picker).

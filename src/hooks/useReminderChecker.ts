@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import { getPushoverKey, getReminderLockKey } from '../lib/storageKeys';
 
 export const FIRE_WINDOW_MS = 5 * 60 * 1000; // 5-minute window to catch reminders if app was briefly closed
-export const TAB_LOCK_TTL_MS = 15_000;        // Multi-tab dedup: lock expires after 15s
+export const TAB_LOCK_TTL_MS = FIRE_WINDOW_MS; // Multi-tab dedup: lock held for the full fire window
 
 /** Pure: returns true if the reminder time falls within the [now-FIRE_WINDOW_MS, now] window */
 export function isInFireWindow(reminderAt: string, nowMs: number, windowMs = FIRE_WINDOW_MS): boolean {
@@ -69,7 +69,8 @@ export function useReminderChecker(currentUserId: string) {
         }
 
         if (anySent) updateTask(task.id, { reminderSent: true });
-        localStorage.removeItem(lockKey);
+        // Do NOT remove the lock — keep it for the full FIRE_WINDOW_MS so other
+        // tabs cannot re-fire the same reminder within the same fire window.
       }
     };
 

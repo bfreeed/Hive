@@ -78,7 +78,7 @@ describe('constants', () => {
     expect(FIRE_WINDOW_MS).toBe(5 * 60 * 1000);
   });
 
-  it('TAB_LOCK_TTL_MS is 15 seconds', () => {
-    expect(TAB_LOCK_TTL_MS).toBe(15_000);
+  it('TAB_LOCK_TTL_MS equals FIRE_WINDOW_MS — lock held for the full fire window to prevent duplicate sends', () => {
+    expect(TAB_LOCK_TTL_MS).toBe(FIRE_WINDOW_MS);
   });
 });

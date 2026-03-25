@@ -1,22 +1,53 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, X, Calendar, Clock, User, FolderOpen, AlertCircle, Loader2 } from 'lucide-react';
+import { Sparkles, X, AlertCircle, Loader2 } from 'lucide-react';
 import { useStore } from '../store';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 
 interface ParsedTask {
   title: string;
-  dueDate?: string | null;
-  dueTime?: string | null;
-  reminderAt?: string | null;
-  priority?: string | null;
-  assigneeIds?: string[];
-  projectIds?: string[];
+  dueDate: string;
+  dueTime: string;
+  reminderAt: string;
+  priority: string;
+  assigneeIds: string[];
+  projectIds: string[];
 }
 
 interface Props {
   initialText: string;
   onClose: () => void;
 }
+
+/** Pure: converts the confirmed ParsedTask form state into an addTask payload */
+export function buildTaskPayload(parsed: ParsedTask) {
+  return {
+    title:            parsed.title,
+    description:      undefined as undefined,
+    projectIds:       parsed.projectIds,
+    status:           'todo' as const,
+    priority:         (parsed.priority || 'normal') as 'urgent' | 'high' | 'normal' | 'low',
+    assigneeIds:      parsed.assigneeIds,
+    dueDate:          parsed.dueDate || undefined,
+    dueTime:          parsed.dueTime || undefined,
+    reminderAt:       parsed.reminderAt ? new Date(parsed.reminderAt).toISOString() : undefined,
+    reminderSent:     false,
+    isPrivate:        false,
+    flags:            [] as string[],
+    linkedContactIds: [] as string[],
+    linkedDocIds:     [] as string[],
+  };
+}
+
+const PRIORITIES = [
+  { value: 'normal', label: 'Normal' },
+  { value: 'high',   label: 'High' },
+  { value: 'urgent', label: 'Urgent' },
+  { value: 'low',    label: 'Low' },
+];
+
+const selectCls = 'w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-2.5 py-1.5 text-xs text-white/70 focus:outline-none focus:border-violet-500/40 appearance-none cursor-pointer';
+const inputCls  = 'w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-2.5 py-1.5 text-xs text-white/70 focus:outline-none focus:border-violet-500/40';
+const labelCls  = 'block text-[10px] text-white/30 mb-1 uppercase tracking-wide';
 
 export default function QuickCapture({ initialText, onClose }: Props) {
   const { projects, users, addTask } = useStore();
@@ -27,13 +58,17 @@ export default function QuickCapture({ initialText, onClose }: Props) {
   const [created, setCreated] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-parse on open if there's initial text
   useEffect(() => {
-    if (initialText.trim().length > 0) {
-      parse(initialText);
-    }
+    if (initialText.trim().length > 0) parse(initialText);
     inputRef.current?.focus();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Escape closes from anywhere — even when focused inside a dropdown or date field
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
 
   async function parse(text: string) {
     if (!text.trim()) return;
@@ -53,74 +88,46 @@ export default function QuickCapture({ initialText, onClose }: Props) {
         }),
       });
       const data = await resp.json();
-      if (!resp.ok) {
-        setError(data.error || 'Parse failed');
-        return;
-      }
+      if (!resp.ok) { setError(data.error || 'Parse failed'); return; }
       setParsed({
-        title: data.title || text,
-        dueDate: data.dueDate || null,
-        dueTime: data.dueTime || null,
-        reminderAt: data.reminderAt || null,
-        priority: data.priority || null,
+        title:       data.title || text,
+        dueDate:     data.dueDate || '',
+        dueTime:     data.dueTime || '',
+        reminderAt:  data.reminderAt ? data.reminderAt.slice(0, 16) : '',
+        priority:    data.priority || 'normal',
         assigneeIds: Array.isArray(data.assigneeIds) ? data.assigneeIds : [],
-        projectIds: Array.isArray(data.projectIds) ? data.projectIds : [],
+        projectIds:  Array.isArray(data.projectIds)  ? data.projectIds  : [],
       });
-    } catch (e) {
+    } catch {
       setError('Could not reach /api/parse-task. Is ANTHROPIC_API_KEY set in .env?');
     } finally {
       setLoading(false);
     }
   }
 
+  function set<K extends keyof ParsedTask>(key: K, value: ParsedTask[K]) {
+    setParsed((p) => p ? { ...p, [key]: value } : p);
+  }
+
   function handleConfirm() {
     if (!parsed) return;
-    addTask({
-      title: parsed.title,
-      description: undefined,
-      projectIds: parsed.projectIds || [],
-      status: 'todo',
-      priority: (parsed.priority as any) || 'normal',
-      assigneeIds: parsed.assigneeIds || [],
-      dueDate: parsed.dueDate || undefined,
-      dueTime: parsed.dueTime || undefined,
-      reminderAt: parsed.reminderAt || undefined,
-      reminderSent: false,
-      isPrivate: false,
-      flags: [],
-      linkedContactIds: [],
-      linkedDocIds: [],
-    });
+    addTask(buildTaskPayload(parsed));
     setCreated(true);
-    setTimeout(() => {
-      onClose();
-    }, 600);
+    setTimeout(onClose, 600);
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Escape') { onClose(); return; }
-    if (e.key === 'Enter' && !loading && input.trim()) {
+    if (e.key === 'Enter' && !loading && input.trim() && !parsed) {
       e.preventDefault();
-      if (parsed) {
-        handleConfirm();
-      } else {
-        parse(input);
-      }
+      parse(input);
     }
   }
-
-  const assigneeNames = (parsed?.assigneeIds || [])
-    .map((id) => users.find((u) => u.id === id)?.name)
-    .filter(Boolean);
-
-  const projectNames = (parsed?.projectIds || [])
-    .map((id) => projects.find((p) => p.id === id)?.name)
-    .filter(Boolean);
 
   return (
     <>
       <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed top-[18%] left-1/2 -translate-x-1/2 z-50 w-[580px] bg-[#18181b] border border-white/[0.10] rounded-2xl shadow-2xl overflow-hidden">
+      <div className="fixed top-[14%] left-1/2 -translate-x-1/2 z-50 w-[560px] bg-[#18181b] border border-white/[0.10] rounded-2xl shadow-2xl overflow-hidden">
 
         {/* Input row */}
         <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/[0.06]">
@@ -130,7 +137,7 @@ export default function QuickCapture({ initialText, onClose }: Props) {
             value={input}
             onChange={(e) => { setInput(e.target.value); setParsed(null); setError(null); }}
             onKeyDown={handleKeyDown}
-            placeholder="follow up with Mike about roof next Tuesday 3pm…"
+            placeholder="call Sarah Thursday at 4pm, remind me at 3:30…"
             className="flex-1 bg-transparent text-sm text-white placeholder-white/20 focus:outline-none"
           />
           {loading && <Loader2 size={14} className="text-white/30 animate-spin flex-shrink-0" />}
@@ -139,7 +146,7 @@ export default function QuickCapture({ initialText, onClose }: Props) {
           </button>
         </div>
 
-        {/* Error state */}
+        {/* Error */}
         {error && (
           <div className="flex items-start gap-2.5 px-4 py-3 border-b border-white/[0.06]">
             <AlertCircle size={13} className="text-red-400 flex-shrink-0 mt-0.5" />
@@ -147,70 +154,109 @@ export default function QuickCapture({ initialText, onClose }: Props) {
           </div>
         )}
 
-        {/* Parsed confirmation */}
+        {/* Editable fields */}
         {parsed && !loading && (
-          <div className="px-4 py-3.5 space-y-3">
-            {/* Title — editable */}
-            <input
-              value={parsed.title}
-              onChange={(e) => setParsed({ ...parsed, title: e.target.value })}
-              className="w-full bg-transparent text-sm font-medium text-white/90 focus:outline-none border-b border-white/[0.08] pb-1 focus:border-violet-500/40 transition-colors"
-            />
+          <div className="px-4 pt-4 pb-3 space-y-3">
 
-            {/* Parsed metadata chips */}
-            <div className="flex flex-wrap gap-2">
-              {parsed.dueDate && (
-                <span className="flex items-center gap-1 text-[11px] text-white/50 bg-white/[0.05] px-2 py-1 rounded-md">
-                  <Calendar size={10} className="text-white/30" />
-                  {format(parseISO(parsed.dueDate), 'MMM d')}
-                  {parsed.dueTime && ` · ${parsed.dueTime}`}
-                </span>
-              )}
-              {parsed.reminderAt && (
-                <span className="flex items-center gap-1 text-[11px] text-violet-400/70 bg-violet-500/[0.08] px-2 py-1 rounded-md">
-                  <Clock size={10} />
-                  Reminder {format(parseISO(parsed.reminderAt), 'MMM d, h:mm a')}
-                </span>
-              )}
-              {assigneeNames.map((name) => (
-                <span key={name} className="flex items-center gap-1 text-[11px] text-white/50 bg-white/[0.05] px-2 py-1 rounded-md">
-                  <User size={10} className="text-white/30" />
-                  {name}
-                </span>
-              ))}
-              {projectNames.map((name) => (
-                <span key={name} className="flex items-center gap-1 text-[11px] text-white/50 bg-white/[0.05] px-2 py-1 rounded-md">
-                  <FolderOpen size={10} className="text-white/30" />
-                  {name}
-                </span>
-              ))}
-              {parsed.priority && parsed.priority !== 'normal' && (
-                <span className={`text-[11px] px-2 py-1 rounded-md ${
-                  parsed.priority === 'urgent' ? 'text-red-400/80 bg-red-500/[0.08]' :
-                  parsed.priority === 'high' ? 'text-orange-400/80 bg-orange-500/[0.08]' :
-                  'text-white/40 bg-white/[0.05]'
-                }`}>
-                  {parsed.priority}
-                </span>
-              )}
+            {/* Title */}
+            <div>
+              <label className={labelCls}>Title</label>
+              <input
+                value={parsed.title}
+                onChange={(e) => set('title', e.target.value)}
+                className={inputCls + ' text-sm font-medium text-white/90'}
+              />
+            </div>
+
+            {/* Row: date · time · priority */}
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className={labelCls}>Due date</label>
+                <input
+                  type="date"
+                  value={parsed.dueDate}
+                  onChange={(e) => set('dueDate', e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Due time</label>
+                <input
+                  type="time"
+                  value={parsed.dueTime}
+                  onChange={(e) => set('dueTime', e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Priority</label>
+                <select
+                  value={parsed.priority}
+                  onChange={(e) => set('priority', e.target.value)}
+                  className={selectCls}
+                >
+                  {PRIORITIES.map((p) => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Row: assignee · project */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className={labelCls}>Assignee</label>
+                <select
+                  value={parsed.assigneeIds[0] || ''}
+                  onChange={(e) => set('assigneeIds', e.target.value ? [e.target.value] : [])}
+                  className={selectCls}
+                >
+                  <option value="">— none —</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Project</label>
+                <select
+                  value={parsed.projectIds[0] || ''}
+                  onChange={(e) => set('projectIds', e.target.value ? [e.target.value] : [])}
+                  className={selectCls}
+                >
+                  <option value="">— none —</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Reminder */}
+            <div>
+              <label className={labelCls}>Reminder (optional)</label>
+              <input
+                type="datetime-local"
+                value={parsed.reminderAt}
+                onChange={(e) => set('reminderAt', e.target.value)}
+                className={inputCls}
+              />
             </div>
           </div>
         )}
 
         {/* Footer */}
         <div className="px-4 py-2.5 border-t border-white/[0.06] flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <span className="text-[10px] text-white/20 flex items-center gap-1">
-              <kbd className="bg-white/[0.06] px-1 rounded font-mono">↵</kbd>
-              {parsed ? 'create task' : 'parse'}
-            </span>
-            <span className="text-[10px] text-white/20 flex items-center gap-1">
-              <kbd className="bg-white/[0.06] px-1 rounded font-mono">esc</kbd>
-              cancel
-            </span>
-          </div>
+          <div />
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-xs text-white/30 hover:text-white/60 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
             {!parsed && !loading && input.trim() && (
               <button
                 onClick={() => parse(input)}
@@ -223,7 +269,7 @@ export default function QuickCapture({ initialText, onClose }: Props) {
               <button
                 onClick={handleConfirm}
                 disabled={created}
-                className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${
                   created
                     ? 'text-emerald-400 bg-emerald-500/[0.12]'
                     : 'text-white bg-violet-600/80 hover:bg-violet-600 active:scale-95'

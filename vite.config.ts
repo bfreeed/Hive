@@ -90,15 +90,21 @@ ${userList || '(none)'}
 
 Input: "${text}"
 
+Rules:
+- assigneeIds: ONLY populate if the user explicitly delegates ("assign to X", "for X", "X should do this", "X's task"). Do NOT assign just because a person's name appears in the task (e.g. "call Sarah" means call Sarah, not assign to Sarah).
+- projectIds: populate if the user mentions a project name or clear context match.
+- reminderAt: only if the user explicitly says "remind me".
+- priority: only if the user says urgent/high/important/asap/low.
+
 Return JSON with these fields:
 {
   "title": "string (required, clean task title)",
   "dueDate": "YYYY-MM-DD or null",
   "dueTime": "HH:MM (24h) or null",
-  "reminderAt": "ISO 8601 datetime or null (only if user explicitly mentions a reminder)",
+  "reminderAt": "ISO 8601 datetime or null",
   "priority": "urgent|high|normal|low or null",
-  "assigneeIds": ["matched user IDs from the list above"],
-  "projectIds": ["matched project IDs from the list above"]
+  "assigneeIds": ["matched user IDs — only if explicitly assigned"],
+  "projectIds": ["matched project IDs"]
 }`;
 
                 const resp = await fetch('https://api.anthropic.com/v1/messages', {
@@ -123,7 +129,8 @@ Return JSON with these fields:
                   return;
                 }
 
-                const raw = apiData.content?.[0]?.text || '{}';
+                const raw = (apiData.content?.[0]?.text || '{}')
+                  .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
                 const parsed = JSON.parse(raw);
                 res.setHeader('Content-Type', 'application/json');
                 res.end(JSON.stringify(parsed));
