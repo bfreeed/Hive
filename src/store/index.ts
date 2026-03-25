@@ -174,6 +174,7 @@ function dbToProject(row: any): Project {
     memberIds: row.member_ids ?? [],
     isPrivate: row.is_private ?? false,
     createdAt: row.created_at,
+    parentId: row.parent_id ?? undefined,
   };
 }
 
@@ -188,6 +189,7 @@ function projectToDb(p: Project) {
     member_ids: p.memberIds,
     is_private: p.isPrivate,
     created_at: p.createdAt,
+    parent_id: p.parentId ?? null,
   };
 }
 

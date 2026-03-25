@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useStore } from '../store';
-import { LayoutGrid, List, Plus, ArrowUpDown, X, Lock } from 'lucide-react';
+import { LayoutGrid, List, Plus, ArrowUpDown, X, Lock, ChevronRight, FolderOpen } from 'lucide-react';
 import type { Task } from '../types';
 import { isPast } from 'date-fns';
 import TaskRow from '../components/TaskRow';
@@ -9,8 +9,10 @@ import DocEditor from '../components/DocEditor';
 import { buildGroups, sortTasks } from '../utils/buildGroups';
 import type { BoardGroupBy, BoardSortBy, BoardSortOrder } from '../utils/buildGroups';
 
+const PROJECT_COLORS = ['#6366f1','#10b981','#f59e0b','#ef4444','#3b82f6','#8b5cf6','#ec4899','#14b8a6'];
+
 export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { projectId: string; onNavigate: (page: string, id?: string) => void; onOpenTask: (id: string) => void }) {
-  const { projects, tasks, users, contacts, addTask, updateProject, addUser } = useStore();
+  const { projects, tasks, users, contacts, addTask, updateProject, addUser, addProject } = useStore();
   const [inviteEmail, setInviteEmail] = useState('');
   const inviteRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<'tasks' | 'docs' | 'contacts' | 'members'>('tasks');
@@ -24,6 +26,31 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
   const addTaskRef = useRef<HTMLInputElement>(null);
   const [showSharePopover, setShowSharePopover] = useState(false);
   const shareRef = useRef<HTMLDivElement>(null);
+
+  // Sub-project creation
+  const [showAddSub, setShowAddSub] = useState(false);
+  const [newSubName, setNewSubName] = useState('');
+  const [newSubColor, setNewSubColor] = useState(PROJECT_COLORS[0]);
+  const newSubRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (showAddSub) newSubRef.current?.focus();
+  }, [showAddSub]);
+
+  const handleAddSubProject = () => {
+    if (!newSubName.trim()) { setShowAddSub(false); return; }
+    addProject({
+      name: newSubName.trim(),
+      color: newSubColor,
+      status: 'active',
+      memberIds: project?.memberIds ?? ['lev'],
+      isPrivate: project?.isPrivate ?? false,
+      parentId: projectId,
+    });
+    setNewSubName('');
+    setNewSubColor(PROJECT_COLORS[0]);
+    setShowAddSub(false);
+  };
 
   useEffect(() => {
     if (showAddTask) addTaskRef.current?.focus();
@@ -58,6 +85,9 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
 
   const project = projects.find((p) => p.id === projectId);
   if (!project) return <div className="flex-1 flex items-center justify-center text-white/30">Project not found</div>;
+
+  const parentProject = project.parentId ? projects.find(p => p.id === project.parentId) : null;
+  const subProjects = projects.filter(p => p.parentId === projectId);
 
   const allProjectTasks = tasks.filter((t) => t.projectIds?.includes(projectId));
   const projectTasks = allProjectTasks.filter((t) => t.status !== 'done');
@@ -94,6 +124,21 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
   return (
     <div className="flex-1 overflow-y-auto scrollbar-hide">
       <div className="max-w-5xl mx-auto px-8 py-8">
+        {/* Breadcrumb — only shown for sub-projects */}
+        {parentProject && (
+          <div className="flex items-center gap-1.5 mb-4 text-xs text-white/30">
+            <button
+              onClick={() => onNavigate('project', parentProject.id)}
+              className="flex items-center gap-1.5 hover:text-white/60 transition-colors"
+            >
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: parentProject.color }} />
+              {parentProject.name}
+            </button>
+            <ChevronRight size={11} />
+            <span className="text-white/50">{project.name}</span>
+          </div>
+        )}
+
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-start justify-between">
@@ -256,6 +301,98 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
             </div>
           </div>
         </div>
+
+        {/* Sub-projects — shown for any project that has or can have sub-projects */}
+        {(subProjects.length > 0 || !project.parentId) && (
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-semibold text-white/30 uppercase tracking-wider">
+                Sub-projects {subProjects.length > 0 && <span className="font-normal text-white/20">({subProjects.length})</span>}
+              </h2>
+              {!showAddSub && (
+                <button
+                  onClick={() => setShowAddSub(true)}
+                  className="flex items-center gap-1 text-xs text-white/25 hover:text-white/60 transition-colors"
+                >
+                  <Plus size={11} /> Add
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              {subProjects.map(sub => {
+                const subActive = tasks.filter(t => (t.projectIds ?? []).includes(sub.id) && t.status !== 'done').length;
+                const subDone = tasks.filter(t => (t.projectIds ?? []).includes(sub.id) && t.status === 'done').length;
+                const subTotal = subActive + subDone;
+                const subProgress = subTotal > 0 ? Math.round((subDone / subTotal) * 100) : 0;
+                return (
+                  <button
+                    key={sub.id}
+                    onClick={() => onNavigate('project', sub.id)}
+                    className="flex flex-col gap-2 w-44 p-3 bg-white/[0.03] border border-white/[0.07] rounded-xl hover:border-white/[0.15] hover:bg-white/[0.05] transition-all text-left group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: sub.color }} />
+                      <span className="text-sm font-medium text-white/80 truncate flex-1 group-hover:text-white">{sub.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-white/30">
+                      <FolderOpen size={10} />
+                      <span>{subActive} active</span>
+                      {subDone > 0 && <span>· {subDone} done</span>}
+                    </div>
+                    {subTotal > 0 && (
+                      <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full bg-brand-500/60" style={{ width: `${subProgress}%` }} />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+
+              {/* Inline new sub-project form */}
+              {showAddSub && (
+                <div className="w-44 p-3 bg-white/[0.04] border border-white/[0.10] rounded-xl space-y-2">
+                  <input
+                    ref={newSubRef}
+                    value={newSubName}
+                    onChange={e => setNewSubName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleAddSubProject();
+                      if (e.key === 'Escape') { setShowAddSub(false); setNewSubName(''); }
+                    }}
+                    placeholder="Sub-project name"
+                    className="w-full bg-transparent text-sm text-white/80 placeholder-white/25 focus:outline-none"
+                  />
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {PROJECT_COLORS.map(c => (
+                      <button key={c} onClick={() => setNewSubColor(c)}
+                        className="w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center hover:scale-110 transition-transform"
+                        style={{ backgroundColor: c }}
+                      >
+                        {newSubColor === c && <span className="block w-1.5 h-1.5 rounded-full bg-white/80" />}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button onClick={handleAddSubProject} className="flex-1 py-1 bg-brand-600 hover:bg-brand-500 text-white text-xs rounded-lg transition-colors">Create</button>
+                    <button onClick={() => { setShowAddSub(false); setNewSubName(''); }} className="flex-1 py-1 text-white/30 hover:text-white/60 text-xs transition-colors">Cancel</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Empty state */}
+              {subProjects.length === 0 && !showAddSub && (
+                <button
+                  onClick={() => setShowAddSub(true)}
+                  className="flex flex-col items-center justify-center gap-1.5 w-44 h-20 border border-dashed border-white/[0.08] rounded-xl text-white/20 hover:text-white/40 hover:border-white/[0.15] transition-all"
+                >
+                  <Plus size={14} />
+                  <span className="text-xs">New sub-project</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex items-center border-b border-white/[0.06] mb-6">

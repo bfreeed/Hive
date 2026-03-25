@@ -80,6 +80,62 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
     return order.map(id => projects.find(p => p.id === id)!).filter(Boolean);
   }, [projects, projectOrder]);
 
+  // Top-level projects only (for drag-drop ordering)
+  const topLevelProjects = React.useMemo(
+    () => orderedProjects.filter(p => !p.parentId),
+    [orderedProjects],
+  );
+
+  // Map parentId → sub-projects
+  const subProjectMap = React.useMemo(() => {
+    const map: Record<string, typeof projects> = {};
+    projects.filter(p => p.parentId).forEach(p => {
+      if (!map[p.parentId!]) map[p.parentId!] = [];
+      map[p.parentId!].push(p);
+    });
+    return map;
+  }, [projects]);
+
+  // Which parent projects have their sub-list expanded
+  const [expandedSubs, setExpandedSubs] = useState<Record<string, boolean>>({});
+
+  // Auto-expand parent when a sub-project is the active page
+  useEffect(() => {
+    projects.forEach(p => {
+      if (p.parentId && activePage === `project-${p.id}`) {
+        setExpandedSubs(prev => ({ ...prev, [p.parentId!]: true }));
+      }
+    });
+  }, [activePage, projects]);
+
+  // Inline new sub-project form state
+  const [newSubParentId, setNewSubParentId] = useState<string | null>(null);
+  const [newSubName, setNewSubName] = useState('');
+  const [newSubColor, setNewSubColor] = useState(PROJECT_COLORS[0]);
+  const newSubRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (newSubParentId) newSubRef.current?.focus();
+  }, [newSubParentId]);
+
+  const handleAddSubProject = () => {
+    if (!newSubName.trim() || !newSubParentId) { setNewSubParentId(null); setNewSubName(''); return; }
+    const parent = projects.find(p => p.id === newSubParentId);
+    addProject({
+      name: newSubName.trim(),
+      color: newSubColor,
+      status: 'active',
+      memberIds: parent?.memberIds ?? ['lev'],
+      isPrivate: parent?.isPrivate ?? false,
+      parentId: newSubParentId,
+    });
+    setNewSubName('');
+    setNewSubColor(PROJECT_COLORS[0]);
+    setNewSubParentId(null);
+    // Keep parent expanded
+    setExpandedSubs(prev => ({ ...prev, [newSubParentId]: true }));
+  };
+
   const handleProjectDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
@@ -214,18 +270,116 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
 
           {(projectsExpanded || !sidebarOpen) && (
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleProjectDragEnd}>
-              <SortableContext items={orderedProjects.map(p => p.id)} strategy={verticalListSortingStrategy}>
-                {orderedProjects.map((project) => {
+              <SortableContext items={topLevelProjects.map(p => p.id)} strategy={verticalListSortingStrategy}>
+                {topLevelProjects.map((project) => {
                   const taskCount = tasks.filter((t) => (t.projectIds ?? []).includes(project.id) && t.status !== 'done').length;
+                  const subs = subProjectMap[project.id] ?? [];
+                  const subsExpanded = expandedSubs[project.id] ?? false;
                   return (
-                    <SortableProjectBtn
-                      key={project.id}
-                      project={project}
-                      taskCount={taskCount}
-                      active={activePage === `project-${project.id}`}
-                      expanded={sidebarOpen}
-                      onClick={() => onNavigate('project', project.id)}
-                    />
+                    <React.Fragment key={project.id}>
+                      <SortableProjectBtn
+                        project={project}
+                        taskCount={taskCount}
+                        active={activePage === `project-${project.id}`}
+                        expanded={sidebarOpen}
+                        onClick={() => onNavigate('project', project.id)}
+                        hasSubProjects={subs.length > 0}
+                        subProjectsExpanded={subsExpanded}
+                        onToggleSubProjects={() => setExpandedSubs(prev => ({ ...prev, [project.id]: !subsExpanded }))}
+                      />
+
+                      {/* Sub-projects */}
+                      {sidebarOpen && (subsExpanded || subs.some(s => activePage === `project-${s.id}`)) && subs.length > 0 && (
+                        <div className="ml-5 border-l border-white/[0.06] pl-2 space-y-0.5 mb-0.5">
+                          {subs.map(sub => {
+                            const subCount = tasks.filter(t => (t.projectIds ?? []).includes(sub.id) && t.status !== 'done').length;
+                            const subActive = activePage === `project-${sub.id}`;
+                            return (
+                              <button
+                                key={sub.id}
+                                onClick={() => onNavigate('project', sub.id)}
+                                className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-xs transition-colors ${subActive ? 'bg-white/[0.08] text-white' : 'text-white/50 hover:text-white hover:bg-white/[0.04]'}`}
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: sub.color }} />
+                                <span className="truncate flex-1 text-left">{sub.name}</span>
+                                {subCount > 0 && <span className="text-[10px] text-white/30">{subCount}</span>}
+                              </button>
+                            );
+                          })}
+
+                          {/* Inline new sub-project form for this parent */}
+                          {newSubParentId === project.id ? (
+                            <div className="mt-1 p-2 bg-white/[0.04] rounded-lg border border-white/[0.08] space-y-1.5">
+                              <input
+                                ref={newSubRef}
+                                value={newSubName}
+                                onChange={e => setNewSubName(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') handleAddSubProject();
+                                  if (e.key === 'Escape') { setNewSubParentId(null); setNewSubName(''); }
+                                }}
+                                placeholder="Sub-project name"
+                                className="w-full bg-transparent text-xs text-white/80 placeholder-white/25 focus:outline-none"
+                              />
+                              <div className="flex items-center gap-1">
+                                {PROJECT_COLORS.map(c => (
+                                  <button key={c} onClick={() => setNewSubColor(c)}
+                                    className="w-3.5 h-3.5 rounded-full flex-shrink-0 flex items-center justify-center hover:scale-110 transition-transform"
+                                    style={{ backgroundColor: c }}
+                                  >
+                                    {newSubColor === c && <Check size={7} className="text-white" strokeWidth={3} />}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="flex gap-1">
+                                <button onClick={handleAddSubProject} className="flex-1 py-0.5 bg-brand-600 hover:bg-brand-500 text-white text-[10px] rounded transition-colors">Add</button>
+                                <button onClick={() => { setNewSubParentId(null); setNewSubName(''); }} className="flex-1 py-0.5 text-white/30 hover:text-white/60 text-[10px] transition-colors">Cancel</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => { setExpandedSubs(prev => ({ ...prev, [project.id]: true })); setNewSubParentId(project.id); }}
+                              className="w-full flex items-center gap-1.5 px-2 py-0.5 text-[10px] text-white/20 hover:text-white/50 transition-colors rounded"
+                            >
+                              <Plus size={9} /> New sub-project
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Show "add sub-project" even when no subs exist yet (sidebar expanded) */}
+                      {sidebarOpen && subs.length === 0 && newSubParentId === project.id && (
+                        <div className="ml-5 border-l border-white/[0.06] pl-2 mb-0.5">
+                          <div className="mt-1 p-2 bg-white/[0.04] rounded-lg border border-white/[0.08] space-y-1.5">
+                            <input
+                              ref={newSubRef}
+                              value={newSubName}
+                              onChange={e => setNewSubName(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') handleAddSubProject();
+                                if (e.key === 'Escape') { setNewSubParentId(null); setNewSubName(''); }
+                              }}
+                              placeholder="Sub-project name"
+                              className="w-full bg-transparent text-xs text-white/80 placeholder-white/25 focus:outline-none"
+                            />
+                            <div className="flex items-center gap-1">
+                              {PROJECT_COLORS.map(c => (
+                                <button key={c} onClick={() => setNewSubColor(c)}
+                                  className="w-3.5 h-3.5 rounded-full flex-shrink-0 flex items-center justify-center hover:scale-110 transition-transform"
+                                  style={{ backgroundColor: c }}
+                                >
+                                  {newSubColor === c && <Check size={7} className="text-white" strokeWidth={3} />}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="flex gap-1">
+                              <button onClick={handleAddSubProject} className="flex-1 py-0.5 bg-brand-600 hover:bg-brand-500 text-white text-[10px] rounded transition-colors">Add</button>
+                              <button onClick={() => { setNewSubParentId(null); setNewSubName(''); }} className="flex-1 py-0.5 text-white/30 hover:text-white/60 text-[10px] transition-colors">Cancel</button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </SortableContext>
@@ -417,9 +571,10 @@ function SortableNavBtn({ icon, label, id, active, expanded, onClick, badge }: {
   );
 }
 
-function SortableProjectBtn({ project, taskCount, active, expanded, onClick }: {
+function SortableProjectBtn({ project, taskCount, active, expanded, onClick, hasSubProjects, subProjectsExpanded, onToggleSubProjects }: {
   project: { id: string; name: string; color: string; isPrivate?: boolean };
   taskCount: number; active: boolean; expanded: boolean; onClick: () => void;
+  hasSubProjects?: boolean; subProjectsExpanded?: boolean; onToggleSubProjects?: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: project.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
@@ -450,6 +605,16 @@ function SortableProjectBtn({ project, taskCount, active, expanded, onClick }: {
           </>
         )}
       </button>
+      {/* Sub-project toggle chevron */}
+      {expanded && hasSubProjects && (
+        <button
+          onClick={e => { e.stopPropagation(); onToggleSubProjects?.(); }}
+          className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-white/20 hover:text-white/50 transition-colors rounded mr-0.5"
+          title={subProjectsExpanded ? 'Collapse sub-projects' : 'Expand sub-projects'}
+        >
+          {subProjectsExpanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+        </button>
+      )}
     </div>
   );
 }

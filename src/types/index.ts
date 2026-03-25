@@ -105,6 +105,7 @@ export interface Project {
   createdAt: string;
   docs?: Attachment[];
   docContent?: any;
+  parentId?: string; // sub-project support: ID of the parent project
 }
 
 export interface Contact {
