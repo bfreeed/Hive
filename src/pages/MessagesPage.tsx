@@ -1477,25 +1477,39 @@ export default function MessagesPage() {
 
         {/* Input area */}
         <div className="flex-shrink-0 px-4 pb-4">
-          {/* Pending attachment pills */}
+          {/* Pending attachments — audio gets a preview player, others get pills */}
           {pendingAttachments.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              {pendingAttachments.map((att, i) => (
-                <div key={i} className="flex items-center gap-1.5 px-2.5 py-1 bg-white/[0.06] border border-white/[0.08] rounded-full text-xs text-white/60">
-                  {att.type === 'audio'
-                    ? <Mic size={10} className="text-brand-400 flex-shrink-0" />
-                    : att.type.startsWith('image/')
-                    ? <ImageIcon size={10} className="text-emerald-400 flex-shrink-0" />
-                    : <Link size={10} className="flex-shrink-0" />}
-                  <span className="truncate max-w-[120px]">{att.name}</span>
-                  <button
-                    onClick={() => setPendingAttachments(prev => prev.filter((_, j) => j !== i))}
-                    className="text-white/30 hover:text-white/60 ml-0.5"
-                  >
-                    <X size={10} />
-                  </button>
-                </div>
-              ))}
+            <div className="flex flex-wrap gap-2 mb-2">
+              {pendingAttachments.map((att, i) => {
+                if (att.type === 'audio') {
+                  return (
+                    <div key={i} className="flex items-center gap-2">
+                      <AudioPlayer url={att.url} duration={att.duration} />
+                      <button
+                        onClick={() => setPendingAttachments(prev => prev.filter((_, j) => j !== i))}
+                        className="text-white/30 hover:text-red-400 transition-colors flex-shrink-0"
+                        title="Remove"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  );
+                }
+                return (
+                  <div key={i} className="flex items-center gap-1.5 px-2.5 py-1 bg-white/[0.06] border border-white/[0.08] rounded-full text-xs text-white/60">
+                    {att.type.startsWith('image/')
+                      ? <ImageIcon size={10} className="text-emerald-400 flex-shrink-0" />
+                      : <Link size={10} className="flex-shrink-0" />}
+                    <span className="truncate max-w-[120px]">{att.name}</span>
+                    <button
+                      onClick={() => setPendingAttachments(prev => prev.filter((_, j) => j !== i))}
+                      className="text-white/30 hover:text-white/60 ml-0.5"
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
 
