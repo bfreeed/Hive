@@ -267,37 +267,9 @@ function MessageBubble({ msg, prevMsg, userNames, users, replyCount, isPinned, o
           </div>
         )}
 
-        {editing ? (
-          <textarea
-            value={editValue}
-            onChange={e => onEditChange(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onEditSave(); }
-              if (e.key === 'Escape') onEditCancel();
-            }}
-            autoFocus
-            className="w-full bg-white/[0.06] border border-brand-500/40 rounded-lg px-3 py-2 text-sm text-white/80 focus:outline-none resize-none"
-            rows={2}
-          />
-        ) : (
-          <p className="text-sm text-white/80 leading-relaxed break-words">
-            {renderBody(msg.body, userNames)}
-            {isContinuation && msg.editedAt && <span className="text-[10px] text-white/20 ml-1">(edited)</span>}
-          </p>
-        )}
-
-        {/* Link preview — first URL in body, if not already in attachments */}
-        {(() => {
-          const url = extractFirstUrl(msg.body);
-          if (!url) return null;
-          const alreadyAttached = msg.attachments?.some(a => a.url === url);
-          if (alreadyAttached) return null;
-          return <LinkPreviewCard url={url} />;
-        })()}
-
-        {/* Attachments */}
+        {/* Attachments first — so text caption sits tight below */}
         {msg.attachments && msg.attachments.length > 0 && (
-          <div className="mt-1 flex flex-col gap-2">
+          <div className="mb-1 flex flex-col gap-2">
             {msg.attachments.map((att, i) => {
               if (att.type === 'audio') {
                 return <AudioPlayer key={i} url={att.url} duration={att.duration} />;
@@ -324,6 +296,34 @@ function MessageBubble({ msg, prevMsg, userNames, users, replyCount, isPinned, o
             })}
           </div>
         )}
+
+        {editing ? (
+          <textarea
+            value={editValue}
+            onChange={e => onEditChange(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onEditSave(); }
+              if (e.key === 'Escape') onEditCancel();
+            }}
+            autoFocus
+            className="w-full bg-white/[0.06] border border-brand-500/40 rounded-lg px-3 py-2 text-sm text-white/80 focus:outline-none resize-none"
+            rows={2}
+          />
+        ) : msg.body ? (
+          <p className="text-sm text-white/80 leading-relaxed break-words">
+            {renderBody(msg.body, userNames)}
+            {isContinuation && msg.editedAt && <span className="text-[10px] text-white/20 ml-1">(edited)</span>}
+          </p>
+        ) : null}
+
+        {/* Link preview — first URL in body, if not already in attachments */}
+        {(() => {
+          const url = extractFirstUrl(msg.body);
+          if (!url) return null;
+          const alreadyAttached = msg.attachments?.some(a => a.url === url);
+          if (alreadyAttached) return null;
+          return <LinkPreviewCard url={url} />;
+        })()}
 
         {/* Reactions */}
         {totalReactions.length > 0 && (
