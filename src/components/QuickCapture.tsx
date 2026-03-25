@@ -25,21 +25,21 @@ export function buildTaskPayload(parsed: ParsedTask) {
     description:      undefined as undefined,
     projectIds:       parsed.projectIds,
     status:           'todo' as const,
-    priority:         (parsed.priority || 'normal') as 'urgent' | 'high' | 'normal' | 'low',
+    priority:         (parsed.priority || 'medium') as import('../types').Priority,
     assigneeIds:      parsed.assigneeIds,
     dueDate:          parsed.dueDate || undefined,
     dueTime:          parsed.dueTime || undefined,
     reminderAt:       parsed.reminderAt ? new Date(parsed.reminderAt).toISOString() : undefined,
     reminderSent:     false,
     isPrivate:        false,
-    flags:            [] as string[],
+    flags:            [] as import('../types').TaskFlag[],
     linkedContactIds: [] as string[],
     linkedDocIds:     [] as string[],
   };
 }
 
 const PRIORITIES = [
-  { value: 'normal', label: 'Normal' },
+  { value: 'medium', label: 'Normal' },
   { value: 'high',   label: 'High' },
   { value: 'urgent', label: 'Urgent' },
   { value: 'low',    label: 'Low' },
@@ -94,7 +94,7 @@ export default function QuickCapture({ initialText, onClose }: Props) {
         dueDate:     data.dueDate || '',
         dueTime:     data.dueTime || '',
         reminderAt:  data.reminderAt ? data.reminderAt.slice(0, 16) : '',
-        priority:    data.priority || 'normal',
+        priority:    data.priority || 'medium',
         assigneeIds: Array.isArray(data.assigneeIds) ? data.assigneeIds : [],
         projectIds:  Array.isArray(data.projectIds)  ? data.projectIds  : [],
       });

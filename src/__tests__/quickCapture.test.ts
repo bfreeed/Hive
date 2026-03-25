@@ -47,9 +47,9 @@ describe('buildTaskPayload', () => {
     expect(payload.dueTime).toBeUndefined();
   });
 
-  it('defaults priority to normal when empty', () => {
+  it('defaults priority to medium when empty', () => {
     const payload = buildTaskPayload({ ...base, priority: '' });
-    expect(payload.priority).toBe('normal');
+    expect(payload.priority).toBe('medium');
   });
 
   it('initialises arrays as empty when no assignees or projects', () => {

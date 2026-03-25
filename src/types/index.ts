@@ -160,7 +160,7 @@ export interface Message {
   body: string;
   createdAt: string;
   reactions: Record<string, string[]>;
-  attachments?: { name: string; url: string; type: string }[];
+  attachments?: { name: string; url: string; type: string; duration?: number }[];
   editedAt?: string;
   parentId?: string;
 }

@@ -173,6 +173,9 @@ export default function BoardView({ groups, onOpenTask, addTask, filterProject }
       isPrivate: false,
       linkedContactIds: [],
       linkedDocIds: [],
+      comments: [] as import('../types').Comment[],
+      audioNotes: [] as import('../types').AudioNote[],
+      attachments: [] as import('../types').Attachment[],
     });
   };
 

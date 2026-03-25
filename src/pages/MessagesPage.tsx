@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useStore } from '../store';
 import { supabase } from '../lib/supabase';
-import { Hash, Plus, Search, Smile, Paperclip, Send, X, Pencil, Trash2, MessageSquare, Link, MoreHorizontal, Pin, Copy, ChevronDown, BellOff, Bell, RotateCcw, Archive, Bookmark, ExternalLink, Globe, UserPlus } from 'lucide-react';
+import { Hash, Plus, Search, Smile, Paperclip, Send, X, Pencil, Trash2, MessageSquare, Link, MoreHorizontal, Pin, Copy, ChevronDown, BellOff, Bell, RotateCcw, Archive, Bookmark, ExternalLink, Globe, UserPlus, Mic, MicOff, Play, Pause, FileText, ImageIcon, Loader2 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 import type { Message, User } from '../types';
+import { uploadToStorage } from '../lib/supabase';
 
 const EMOJIS = ['👍', '❤️', '😂', '🎉', '✅', '🔥'];
 
@@ -72,6 +73,79 @@ function formatTime(iso: string) {
   if (isToday(d)) return format(d, 'h:mm a');
   if (isYesterday(d)) return `Yesterday ${format(d, 'h:mm a')}`;
   return format(d, 'MMM d, h:mm a');
+}
+
+function fmtDuration(secs: number): string {
+  const m = Math.floor(secs / 60);
+  const s = Math.round(secs % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+async function compressImage(file: File): Promise<Blob> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 1200;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
+        else { width = Math.round(width * MAX / height); height = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(b => resolve(b || file), 'image/jpeg', 0.82);
+    };
+    img.onerror = () => resolve(file);
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+function AudioPlayer({ url, duration }: { url: string; duration?: number }) {
+  const [playing, setPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  const toggle = () => {
+    if (!audioRef.current) return;
+    if (playing) { audioRef.current.pause(); setPlaying(false); }
+    else { audioRef.current.play(); setPlaying(true); }
+  };
+
+  const remaining = duration ? Math.max(0, duration - currentTime) : 0;
+  const progress = duration && duration > 0 ? (currentTime / duration) * 100 : 0;
+
+  return (
+    <div className="mt-1.5 flex items-center gap-2.5 px-3 py-2.5 bg-white/[0.05] border border-white/[0.08] rounded-xl max-w-[260px]">
+      <button
+        onClick={toggle}
+        className="w-8 h-8 rounded-full bg-brand-600 hover:bg-brand-500 flex items-center justify-center flex-shrink-0 transition-colors"
+      >
+        {playing
+          ? <Pause size={13} className="text-white" />
+          : <Play size={13} className="text-white ml-0.5" />}
+      </button>
+      <div className="flex-1 min-w-0">
+        <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+          <div
+            className="h-1 bg-brand-500 rounded-full transition-all"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+      <span className="text-[10px] text-white/40 flex-shrink-0 tabular-nums w-8 text-right">
+        {fmtDuration(playing ? remaining : (duration ?? 0))}
+      </span>
+      <audio
+        ref={audioRef}
+        src={url}
+        onCanPlay={() => setLoaded(true)}
+        onTimeUpdate={() => setCurrentTime(audioRef.current?.currentTime || 0)}
+        onEnded={() => { setPlaying(false); setCurrentTime(0); }}
+      />
+    </div>
+  );
 }
 
 function formatDivider(iso: string) {
@@ -223,14 +297,31 @@ function MessageBubble({ msg, prevMsg, userNames, users, replyCount, isPinned, o
 
         {/* Attachments */}
         {msg.attachments && msg.attachments.length > 0 && (
-          <div className="mt-2 flex flex-col gap-1.5">
-            {msg.attachments.map((att, i) => (
-              <a key={i} href={att.url} target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/[0.04] border border-white/[0.06] rounded-lg hover:bg-white/[0.08] transition-colors max-w-xs group/att">
-                <Link size={12} className="text-white/40 flex-shrink-0" />
-                <span className="text-xs text-white/60 truncate group-hover/att:text-white/80">{att.name || att.url}</span>
-              </a>
-            ))}
+          <div className="mt-1 flex flex-col gap-2">
+            {msg.attachments.map((att, i) => {
+              if (att.type === 'audio') {
+                return <AudioPlayer key={i} url={att.url} duration={att.duration} />;
+              }
+              if (att.type.startsWith('image/') || att.type === 'image') {
+                return (
+                  <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" className="block mt-1">
+                    <img
+                      src={att.url}
+                      alt={att.name}
+                      className="max-w-[320px] max-h-[240px] rounded-xl object-cover border border-white/[0.08] hover:opacity-90 transition-opacity"
+                      loading="lazy"
+                    />
+                  </a>
+                );
+              }
+              return (
+                <a key={i} href={att.url} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/[0.04] border border-white/[0.06] rounded-lg hover:bg-white/[0.08] transition-colors max-w-xs group/att">
+                  {att.type === 'link' ? <Link size={12} className="text-white/40 flex-shrink-0" /> : <FileText size={12} className="text-white/40 flex-shrink-0" />}
+                  <span className="text-xs text-white/60 truncate group-hover/att:text-white/80">{att.name || att.url}</span>
+                </a>
+              );
+            })}
           </div>
         )}
 
@@ -390,6 +481,16 @@ export default function MessagesPage() {
   });
   const [showSaved, setShowSaved] = useState(false);
   const prevChannelIdRef = useRef<string | null>(null);
+
+  // Voice recording
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recordingStartRef = useRef<number>(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -585,6 +686,102 @@ export default function MessagesPage() {
     setPendingUrl('');
     setPendingUrlName('');
     setShowAttachForm(false);
+  };
+
+  // ── Voice recording ─────────────────────────────────────────────────────────
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Prefer webm/opus; fall back to whatever the browser supports (Safari uses mp4)
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/mp4')
+        ? 'audio/mp4'
+        : '';
+      const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      chunksRef.current = [];
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const duration = (Date.now() - recordingStartRef.current) / 1000;
+        if (duration < 0.5) return; // too short, discard
+        const blob = new Blob(chunksRef.current, { type: mimeType || 'audio/webm' });
+        await uploadAudioBlob(blob, duration);
+      };
+      mediaRecorderRef.current = mediaRecorder;
+      recordingStartRef.current = Date.now();
+      mediaRecorder.start(100); // collect data every 100ms
+      setIsRecording(true);
+      setRecordingDuration(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration(d => d + 1);
+      }, 1000);
+    } catch {
+      alert('Microphone access denied. Please allow microphone access in your browser settings.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    setIsRecording(false);
+    setRecordingDuration(0);
+  };
+
+  const uploadAudioBlob = async (blob: Blob, duration: number) => {
+    setIsUploading(true);
+    try {
+      const ext = blob.type.includes('mp4') ? 'm4a' : 'webm';
+      const path = `audio/${Date.now()}-${currentUser.id}.${ext}`;
+      const url = await uploadToStorage('hive-attachments', path, blob);
+      setPendingAttachments(prev => [...prev, {
+        name: `Voice note (${fmtDuration(duration)})`,
+        url,
+        type: 'audio',
+        duration,
+      }]);
+    } catch (err: any) {
+      console.error('Audio upload failed:', err);
+      alert(`Upload failed: ${err?.message || 'Unknown error'}. Make sure the "hive-attachments" Supabase Storage bucket exists and is set to public.`);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // ── File / photo upload ──────────────────────────────────────────────────────
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setIsUploading(true);
+    try {
+      for (const file of files) {
+        let uploadBlob: Blob = file;
+        let type = file.type;
+        if (file.type.startsWith('image/')) {
+          uploadBlob = await compressImage(file);
+          type = 'image/jpeg';
+        }
+        const ext = file.name.split('.').pop() || 'bin';
+        const path = `files/${Date.now()}-${currentUser.id}.${ext}`;
+        const url = await uploadToStorage('hive-attachments', path, uploadBlob);
+        setPendingAttachments(prev => [...prev, { name: file.name, url, type }]);
+      }
+    } catch (err: any) {
+      console.error('Upload failed:', err);
+      alert(`Upload failed: ${err?.message || 'Unknown error'}. Make sure the "hive-attachments" Supabase Storage bucket exists and is set to public.`);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const broadcastTyping = useCallback(() => {
@@ -1285,7 +1482,11 @@ export default function MessagesPage() {
             <div className="flex flex-wrap gap-1.5 mb-2">
               {pendingAttachments.map((att, i) => (
                 <div key={i} className="flex items-center gap-1.5 px-2.5 py-1 bg-white/[0.06] border border-white/[0.08] rounded-full text-xs text-white/60">
-                  <Link size={10} className="flex-shrink-0" />
+                  {att.type === 'audio'
+                    ? <Mic size={10} className="text-brand-400 flex-shrink-0" />
+                    : att.type.startsWith('image/')
+                    ? <ImageIcon size={10} className="text-emerald-400 flex-shrink-0" />
+                    : <Link size={10} className="flex-shrink-0" />}
                   <span className="truncate max-w-[120px]">{att.name}</span>
                   <button
                     onClick={() => setPendingAttachments(prev => prev.filter((_, j) => j !== i))}
@@ -1298,47 +1499,39 @@ export default function MessagesPage() {
             </div>
           )}
 
-          {/* Attach URL form */}
-          {showAttachForm && (
-            <div className="mb-2 p-2.5 bg-white/[0.04] border border-white/[0.08] rounded-xl flex items-center gap-2">
-              <input
-                value={pendingUrl}
-                onChange={e => setPendingUrl(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') handleAddAttachment();
-                  if (e.key === 'Escape') setShowAttachForm(false);
-                }}
-                placeholder="Paste URL"
-                autoFocus
-                className="flex-1 bg-transparent text-xs text-white/80 placeholder-white/25 focus:outline-none"
-              />
-              <input
-                value={pendingUrlName}
-                onChange={e => setPendingUrlName(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleAddAttachment(); }}
-                placeholder="Label (optional)"
-                className="w-32 bg-transparent text-xs text-white/50 placeholder-white/20 focus:outline-none"
-              />
-              <button
-                onClick={handleAddAttachment}
-                disabled={!pendingUrl.trim()}
-                className="px-2.5 py-1 text-xs bg-brand-600 hover:bg-brand-500 disabled:opacity-30 text-white rounded-lg transition-colors"
-              >
-                Add
-              </button>
-              <button onClick={() => setShowAttachForm(false)} className="text-white/30 hover:text-white/60 transition-colors">
-                <X size={12} />
-              </button>
+          {/* Recording indicator */}
+          {isRecording && (
+            <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-xl">
+              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
+              <span className="text-xs text-red-400">Recording… {fmtDuration(recordingDuration)}</span>
+              <span className="text-[10px] text-white/30 ml-auto">Release to send</span>
             </div>
           )}
 
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
+            className="hidden"
+            onChange={handleFileSelect}
+          />
+
           <div className="flex items-end gap-2 bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2.5 focus-within:border-white/20 transition-colors">
+            {/* File / photo picker */}
             <button
-              onClick={() => setShowAttachForm(v => !v)}
-              className={`flex-shrink-0 mb-0.5 transition-colors ${showAttachForm ? 'text-brand-400' : 'text-white/30 hover:text-white/60'}`}
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading || isRecording}
+              title="Attach photo or file"
+              className="flex-shrink-0 mb-0.5 text-white/30 hover:text-white/60 disabled:opacity-30 transition-colors"
             >
-              <Paperclip size={16} />
+              {isUploading
+                ? <Loader2 size={16} className="animate-spin text-brand-400" />
+                : <Paperclip size={16} />}
             </button>
+
             <textarea
               ref={inputRef}
               value={input}
@@ -1361,9 +1554,30 @@ export default function MessagesPage() {
               className="flex-1 bg-transparent text-sm text-white/80 placeholder-white/20 focus:outline-none resize-none leading-relaxed"
               style={{ minHeight: '22px', maxHeight: '120px' }}
             />
+
+            {/* Mic button — hold to record */}
             <button
+              type="button"
+              onMouseDown={startRecording}
+              onMouseUp={stopRecording}
+              onMouseLeave={() => { if (isRecording) stopRecording(); }}
+              onTouchStart={e => { e.preventDefault(); startRecording(); }}
+              onTouchEnd={e => { e.preventDefault(); stopRecording(); }}
+              disabled={isUploading}
+              title="Hold to record voice note"
+              className={`flex-shrink-0 mb-0.5 p-1.5 rounded-lg transition-all ${
+                isRecording
+                  ? 'bg-red-500 text-white scale-110 shadow-lg shadow-red-500/30'
+                  : 'text-white/30 hover:text-white/60 disabled:opacity-30'
+              }`}
+            >
+              {isRecording ? <MicOff size={15} /> : <Mic size={15} />}
+            </button>
+
+            <button
+              type="button"
               onClick={handleSend}
-              disabled={!input.trim() && pendingAttachments.length === 0}
+              disabled={(!input.trim() && pendingAttachments.length === 0) || isUploading}
               className="flex-shrink-0 mb-0.5 p-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <Send size={14} className="text-white" />
