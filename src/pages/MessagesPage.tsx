@@ -454,6 +454,8 @@ export default function MessagesPage() {
   const [threadInput, setThreadInput] = useState('');
   const [channelMenuId, setChannelMenuId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [renamingChannelId, setRenamingChannelId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
   const [showNewChannel, setShowNewChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
   const [showNewDm, setShowNewDm] = useState(false);
@@ -1115,13 +1117,40 @@ export default function MessagesPage() {
                           <MoreHorizontal size={13} />
                         </button>
                         {channelMenuId === c.id && (
-                          <div className="absolute right-0 top-full mt-0.5 z-50 bg-[#1c1c1f] border border-white/[0.1] rounded-lg shadow-xl overflow-hidden w-44">
+                          <div className="absolute right-0 top-full mt-0.5 z-50 bg-[#1c1c1f] border border-white/[0.1] rounded-lg shadow-xl overflow-hidden w-48">
                             {confirmDeleteId === c.id ? (
                               <div className="p-2">
                                 <p className="text-xs text-white/60 mb-2">Delete conversation with <span className="text-white font-medium">{getDmName(c)}</span>?</p>
                                 <div className="flex gap-1">
                                   <button onClick={() => { deleteChannel(c.id); setChannelMenuId(null); setConfirmDeleteId(null); }} className="flex-1 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs rounded transition-colors">Delete</button>
                                   <button onClick={() => setConfirmDeleteId(null)} className="flex-1 py-1 bg-white/[0.04] hover:bg-white/[0.08] text-white/50 text-xs rounded transition-colors">Cancel</button>
+                                </div>
+                              </div>
+                            ) : renamingChannelId === c.id ? (
+                              <div className="p-2">
+                                <p className="text-xs text-white/60 mb-1.5">Rename conversation</p>
+                                <input
+                                  autoFocus
+                                  value={renameValue}
+                                  onChange={e => setRenameValue(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter' && renameValue.trim()) {
+                                      updateChannel(c.id, { name: renameValue.trim() });
+                                      setChannelMenuId(null); setRenamingChannelId(null);
+                                    } else if (e.key === 'Escape') {
+                                      setRenamingChannelId(null);
+                                    }
+                                  }}
+                                  className="w-full bg-white/[0.06] border border-white/[0.1] rounded px-2 py-1 text-xs text-white placeholder-white/30 outline-none focus:border-brand-400 mb-1.5"
+                                  placeholder="Conversation name…"
+                                />
+                                <div className="flex gap-1">
+                                  <button
+                                    onClick={() => { if (renameValue.trim()) { updateChannel(c.id, { name: renameValue.trim() }); setChannelMenuId(null); setRenamingChannelId(null); } }}
+                                    disabled={!renameValue.trim()}
+                                    className="flex-1 py-1 bg-brand-500/20 hover:bg-brand-500/30 text-brand-400 text-xs rounded transition-colors disabled:opacity-40"
+                                  >Save</button>
+                                  <button onClick={() => setRenamingChannelId(null)} className="flex-1 py-1 bg-white/[0.04] hover:bg-white/[0.08] text-white/50 text-xs rounded transition-colors">Cancel</button>
                                 </div>
                               </div>
                             ) : (
@@ -1132,6 +1161,12 @@ export default function MessagesPage() {
                                 >
                                   {c.muted ? <Bell size={12} /> : <BellOff size={12} />}
                                   {c.muted ? 'Unmute' : 'Mute conversation'}
+                                </button>
+                                <button
+                                  onClick={() => { setRenamingChannelId(c.id); setRenameValue(c.name ?? ''); }}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/60 hover:bg-white/[0.06] transition-colors"
+                                >
+                                  <Pencil size={12} /> Rename conversation
                                 </button>
                                 <button
                                   onClick={() => setConfirmDeleteId(c.id)}
