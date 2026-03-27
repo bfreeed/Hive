@@ -146,33 +146,32 @@ export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: st
 
   return (
     <div className="flex-1 overflow-y-auto scrollbar-hide">
-      <div className="max-w-3xl mx-auto px-8 py-10">
+      <div className="max-w-3xl mx-auto px-5 py-6">
         {/* Header */}
-        <div className="mb-8">
-          <p className="text-white/30 text-sm mb-1">{today}</p>
-          <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-semibold text-white tracking-tight">{greeting}, Lev.</h1>
-            <div className="flex items-center gap-2">
+        <div className="mb-6">
+          <p className="text-white/30 text-xs font-medium tracking-wide uppercase mb-3">{today}</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-white/50 text-sm">
+              {activeTasks.length} active tasks · {new Set(activeTasks.flatMap((t) => t.projectIds ?? [])).size} projects
+            </p>
+            <div className="flex items-center gap-2 flex-shrink-0">
               <button
                 onClick={() => setShowCapture(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white/[0.06] text-white/50 hover:bg-white/[0.10] hover:text-white/80 transition-all"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-brand-500 text-white hover:bg-brand-600 active:scale-95 transition-all shadow-lg shadow-brand-500/25"
               >
-                <Plus size={13} /> New Task
+                <Plus size={15} /> New Task
               </button>
               <button
                 onClick={triggerBriefing}
                 disabled={isSpeaking}
                 title="Read morning briefing aloud"
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${isSpeaking ? 'bg-amber-500/30 text-amber-300 ring-1 ring-amber-400/40 animate-pulse' : 'bg-amber-500/10 text-amber-400/70 hover:bg-amber-500/20 hover:text-amber-400'}`}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all active:scale-95 ${isSpeaking ? 'bg-amber-500/25 text-amber-300 ring-1 ring-amber-400/40 animate-pulse' : 'bg-amber-500/12 text-amber-400 hover:bg-amber-500/22 hover:text-amber-300'}`}
               >
-                <Sun size={13} />
+                <Sun size={15} />
                 {isSpeaking ? 'Speaking…' : 'Briefing'}
               </button>
             </div>
           </div>
-          <p className="text-white/40 mt-1 text-sm">
-            {activeTasks.length} active tasks across {new Set(activeTasks.flatMap((t) => t.projectIds ?? [])).size} projects
-          </p>
         </div>
 
         {/* Quick capture */}
