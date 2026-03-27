@@ -1541,7 +1541,7 @@ export default function MessagesPage() {
         )}
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto scrollbar-hide py-4 relative">
+        <div className="flex-1 overflow-y-auto scrollbar-hide py-4 pb-28 md:pb-4 relative">
           {/* Jump to unread button */}
           {hasNewMessages && firstUnreadId && (
             <button
@@ -1604,8 +1604,8 @@ export default function MessagesPage() {
           )}
         </div>
 
-        {/* Input area — sticky so it always sits just above the bottom nav in any orientation */}
-        <div className="sticky bottom-16 md:relative md:bottom-auto px-4 pt-3 pb-3 bg-[#0f0f10]">
+        {/* Input area — fixed on mobile so it always hugs the bottom nav bar exactly */}
+        <div className="fixed bottom-nav-bar left-0 right-0 md:relative md:bottom-auto px-4 pt-3 pb-3 bg-[#0f0f10] md:bg-transparent z-10">
           {/* Pending attachments — audio gets a preview player, others get pills */}
           {pendingAttachments.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2">
