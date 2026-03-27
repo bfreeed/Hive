@@ -446,9 +446,9 @@ function MobileBottomNav({ activePage, onNavigate }: { activePage: string; onNav
               >
                 {tab.icon}
                 <span className="text-[10px] font-medium">{tab.label}</span>
-                {/* Unread badge */}
-                {tab.badge && tab.badge > 0 && (
-                  <span className="absolute top-1.5 right-[calc(50%-14px)] min-w-[16px] h-4 px-1 bg-brand-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
+                {/* Unread badge — !! prevents React rendering stray 0 */}
+                {!!tab.badge && (
+                  <span className="absolute top-1.5 right-[calc(50%-14px)] min-w-[16px] h-4 px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none shadow-lg shadow-red-500/40">
                     {tab.badge > 99 ? '99+' : tab.badge}
                   </span>
                 )}
