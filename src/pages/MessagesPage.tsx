@@ -1307,7 +1307,7 @@ export default function MessagesPage() {
       )}
 
       {/* Main message area — full-screen on mobile in chat view, always visible on desktop */}
-      {!showSaved && <div className={`${mobileView === 'list' ? 'hidden md:flex' : 'flex'} flex-1 flex-col overflow-hidden min-w-0`}>
+      {!showSaved && <div className={`${mobileView === 'list' ? 'hidden md:flex' : 'flex'} flex-1 flex-col min-w-0`}>
         {/* Header — pt-safe pushes content below Dynamic Island / status bar on mobile */}
         <div className="flex items-center gap-3 px-5 h-14 pt-safe md:pt-0 border-b border-white/[0.06] flex-shrink-0">
           {/* Back to channel list — mobile only */}
@@ -1534,8 +1534,8 @@ export default function MessagesPage() {
           )}
         </div>
 
-        {/* Input area — pb-8 on mobile sits just above the bottom nav */}
-        <div className="flex-shrink-0 px-4 pt-3 pb-8 md:pb-4">
+        {/* Input area — sticky so it always sits just above the bottom nav in any orientation */}
+        <div className="sticky bottom-16 md:relative md:bottom-auto px-4 pt-3 pb-3 bg-[#0f0f10]">
           {/* Pending attachments — audio gets a preview player, others get pills */}
           {pendingAttachments.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2">
