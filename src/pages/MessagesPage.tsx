@@ -913,8 +913,8 @@ export default function MessagesPage() {
 
       {/* Channel sidebar — full-screen on mobile in list view, always visible on desktop */}
       <div className={`${mobileView === 'chat' ? 'hidden md:flex' : 'flex'} w-full md:w-56 flex-shrink-0 flex-col bg-[#111113] border-r border-white/[0.06]`}>
-        {/* Search */}
-        <div className="p-3 border-b border-white/[0.06]">
+        {/* Search — extra top padding on mobile to clear the Dynamic Island / status bar */}
+        <div className="p-3 pt-safe md:pt-3 border-b border-white/[0.06]">
           <div className="relative">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/30" />
             <input
@@ -1308,8 +1308,8 @@ export default function MessagesPage() {
 
       {/* Main message area — full-screen on mobile in chat view, always visible on desktop */}
       {!showSaved && <div className={`${mobileView === 'list' ? 'hidden md:flex' : 'flex'} flex-1 flex-col overflow-hidden min-w-0`}>
-        {/* Header */}
-        <div className="flex items-center gap-3 px-5 h-14 border-b border-white/[0.06] flex-shrink-0">
+        {/* Header — pt-safe pushes content below Dynamic Island / status bar on mobile */}
+        <div className="flex items-center gap-3 px-5 h-14 pt-safe md:pt-0 border-b border-white/[0.06] flex-shrink-0">
           {/* Back to channel list — mobile only */}
           <button
             onClick={() => setMobileView('list')}
