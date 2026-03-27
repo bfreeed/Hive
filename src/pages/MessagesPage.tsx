@@ -1308,14 +1308,14 @@ export default function MessagesPage() {
 
       {/* Main message area — full-screen on mobile in chat view, always visible on desktop */}
       {!showSaved && <div className={`${mobileView === 'list' ? 'hidden md:flex' : 'flex'} flex-1 flex-col min-w-0`}>
-        {/* Header — pt-safe pushes content below Dynamic Island / status bar on mobile */}
-        <div className="flex items-center gap-3 px-5 h-14 pt-safe md:pt-0 border-b border-white/[0.06] flex-shrink-0">
-          {/* Back to channel list — mobile only */}
+        {/* Header — pt-safe pushes content below Dynamic Island; min-h instead of h so it expands */}
+        <div className="flex items-center gap-3 px-3 min-h-[56px] pt-safe md:pt-0 pb-2 md:pb-0 border-b border-white/[0.06] flex-shrink-0">
+          {/* Back to channel list — mobile only. Large tap target (44×44 min per Apple HIG) */}
           <button
             onClick={() => setMobileView('list')}
-            className="md:hidden -ml-2 p-1.5 text-white/40 hover:text-white/70 transition-colors flex-shrink-0"
+            className="md:hidden -ml-1 p-3 text-white/60 hover:text-white active:text-white transition-colors flex-shrink-0"
           >
-            <ChevronLeft size={22} />
+            <ChevronLeft size={26} />
           </button>
           {channel?.type === 'channel' ? (
             <Hash size={16} className="text-white/40 flex-shrink-0" />
