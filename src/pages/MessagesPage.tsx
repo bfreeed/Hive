@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useStore } from '../store';
 import { supabase } from '../lib/supabase';
-import { Hash, Plus, Search, Smile, Paperclip, Send, X, Pencil, Trash2, MessageSquare, Link, MoreHorizontal, Pin, Copy, ChevronDown, BellOff, Bell, RotateCcw, Archive, Bookmark, ExternalLink, Globe, UserPlus, Mic, MicOff, Play, Pause, FileText, ImageIcon, Loader2 } from 'lucide-react';
+import { Hash, Plus, Search, Smile, Paperclip, Send, X, Pencil, Trash2, MessageSquare, Link, MoreHorizontal, Pin, Copy, ChevronDown, BellOff, Bell, RotateCcw, Archive, Bookmark, ExternalLink, Globe, UserPlus, Mic, MicOff, Play, Pause, FileText, ImageIcon, Loader2, ChevronLeft } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 import type { Message, User } from '../types';
 import { uploadToStorage } from '../lib/supabase';
@@ -484,6 +484,12 @@ export default function MessagesPage() {
   const [showSaved, setShowSaved] = useState(false);
   const prevChannelIdRef = useRef<string | null>(null);
 
+  // Mobile: 'list' shows the channel sidebar full-screen; 'chat' shows the message area full-screen
+  const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
+
+  // Wrapper so every channel-select also switches to chat view on mobile
+  const selectChannel = (id: string) => { setActiveChannel(id); setMobileView('chat'); };
+
   // Voice recording
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
@@ -834,7 +840,7 @@ export default function MessagesPage() {
   const handleAddDm = () => {
     if (!newDmUserId) return;
     const existing = channels.find(c => c.type === 'dm' && c.memberIds.includes(newDmUserId));
-    if (existing) { setActiveChannel(existing.id); setShowNewDm(false); return; }
+    if (existing) { selectChannel(existing.id); setShowNewDm(false); return; }
     addChannel({ name: '', type: 'dm', memberIds: [currentUser.id, newDmUserId] });
     setNewDmUserId('');
     setShowNewDm(false);
@@ -905,8 +911,8 @@ export default function MessagesPage() {
   return (
     <div className="flex-1 flex overflow-hidden relative">
 
-      {/* Channel sidebar */}
-      <div className="w-56 flex-shrink-0 flex flex-col bg-[#111113] border-r border-white/[0.06]">
+      {/* Channel sidebar — full-screen on mobile in list view, always visible on desktop */}
+      <div className={`${mobileView === 'chat' ? 'hidden md:flex' : 'flex'} w-full md:w-56 flex-shrink-0 flex-col bg-[#111113] border-r border-white/[0.06]`}>
         {/* Search */}
         <div className="p-3 border-b border-white/[0.06]">
           <div className="relative">
@@ -955,7 +961,7 @@ export default function MessagesPage() {
                 searchResults.map(({ msg, ch }) => (
                   <button
                     key={msg.id}
-                    onClick={() => { setActiveChannel(ch!.id); setSearch(''); }}
+                    onClick={() => { selectChannel(ch!.id); setSearch(''); }}
                     className="w-full text-left px-3 py-2 hover:bg-white/[0.04] transition-colors"
                   >
                     <div className="flex items-center gap-1.5 mb-0.5">
@@ -1007,7 +1013,7 @@ export default function MessagesPage() {
                   return (
                     <div key={c.id} className="group relative mx-1 flex items-center">
                       <button
-                        onClick={() => { setActiveChannel(c.id); setChannelMenuId(null); setShowSaved(false); }}
+                        onClick={() => { selectChannel(c.id); setChannelMenuId(null); setShowSaved(false); }}
                         className={`flex-1 flex items-center gap-2 px-3 py-1.5 text-sm transition-colors rounded-md ${
                           !showSaved && isActive ? 'bg-white/[0.08] text-white' : unread ? 'text-white font-medium hover:bg-white/[0.04]' : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'
                         }`}
@@ -1089,7 +1095,7 @@ export default function MessagesPage() {
                   return (
                     <div key={c.id} className="group relative mx-1 flex items-center">
                       <button
-                        onClick={() => { setActiveChannel(c.id); setChannelMenuId(null); setShowSaved(false); }}
+                        onClick={() => { selectChannel(c.id); setChannelMenuId(null); setShowSaved(false); }}
                         className={`flex-1 flex items-center gap-2 px-3 py-1.5 text-sm transition-colors rounded-md ${
                           !showSaved && isActive ? 'bg-white/[0.08] text-white' : unread ? 'text-white font-medium hover:bg-white/[0.04]' : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'
                         }`}
@@ -1272,7 +1278,7 @@ export default function MessagesPage() {
                           <span className="text-xs font-semibold text-white/80">{author?.name}</span>
                           {ch && (
                             <button
-                              onClick={() => { setActiveChannel(msg.channelId); setShowSaved(false); }}
+                              onClick={() => { selectChannel(msg.channelId); setShowSaved(false); }}
                               className="flex items-center gap-0.5 text-[10px] text-brand-400/70 hover:text-brand-400 transition-colors"
                             >
                               {ch.type === 'channel' ? <Hash size={9} /> : null}
@@ -1300,10 +1306,17 @@ export default function MessagesPage() {
         </div>
       )}
 
-      {/* Main message area */}
-      {!showSaved && <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+      {/* Main message area — full-screen on mobile in chat view, always visible on desktop */}
+      {!showSaved && <div className={`${mobileView === 'list' ? 'hidden md:flex' : 'flex'} flex-1 flex-col overflow-hidden min-w-0`}>
         {/* Header */}
         <div className="flex items-center gap-3 px-5 h-14 border-b border-white/[0.06] flex-shrink-0">
+          {/* Back to channel list — mobile only */}
+          <button
+            onClick={() => setMobileView('list')}
+            className="md:hidden -ml-2 p-1.5 text-white/40 hover:text-white/70 transition-colors flex-shrink-0"
+          >
+            <ChevronLeft size={22} />
+          </button>
           {channel?.type === 'channel' ? (
             <Hash size={16} className="text-white/40 flex-shrink-0" />
           ) : (
@@ -1791,7 +1804,7 @@ export default function MessagesPage() {
                       <button
                         onClick={() => {
                           updateChannel(c.id, { memberIds: [...c.memberIds, currentUser.id] });
-                          setActiveChannel(c.id);
+                          selectChannel(c.id);
                           setShowChannelBrowser(false);
                           setShowSaved(false);
                         }}
