@@ -1534,8 +1534,8 @@ export default function MessagesPage() {
           )}
         </div>
 
-        {/* Input area */}
-        <div className="flex-shrink-0 px-4 pb-4">
+        {/* Input area — pb-nav clears bottom nav + home indicator on mobile; md:pb-4 resets on desktop */}
+        <div className="flex-shrink-0 px-4 pt-2 pb-nav md:pb-4">
           {/* Pending attachments — audio gets a preview player, others get pills */}
           {pendingAttachments.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2">

@@ -552,8 +552,9 @@ function AuthenticatedApp() {
       <div className="hidden md:flex h-full">
         <Sidebar activePage={activePage} onNavigate={navigate} />
       </div>
-      {/* Main content — add bottom padding on mobile so content clears the nav bar */}
-      <main className="flex-1 flex flex-col overflow-hidden pb-16 md:pb-0">
+      {/* Main content — pb-16 clears the fixed bottom nav on mobile.
+          Messages manages its own internal layout so it gets pb-0 to avoid double-spacing. */}
+      <main className={`flex-1 flex flex-col overflow-hidden md:pb-0 ${activePage === 'messages' ? 'pb-0' : 'pb-16'}`}>
         <ErrorBoundary>
           {renderPage()}
         </ErrorBoundary>
