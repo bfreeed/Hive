@@ -1534,8 +1534,8 @@ export default function MessagesPage() {
           )}
         </div>
 
-        {/* Input area — pb-20 clears the fixed bottom nav (64px) + a little breathing room on mobile */}
-        <div className="flex-shrink-0 px-4 pt-3 pb-20 md:pb-4">
+        {/* Input area — pb-8 on mobile sits just above the bottom nav */}
+        <div className="flex-shrink-0 px-4 pt-3 pb-8 md:pb-4">
           {/* Pending attachments — audio gets a preview player, others get pills */}
           {pendingAttachments.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2">
