@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from './store';
 import { useAuth } from './hooks/useAuth';
+import { Home as HomeIcon, CheckSquare, MessageSquare, Users, MoreHorizontal } from 'lucide-react';
 import LoginPage from './pages/LoginPage';
 import Sidebar from './components/Sidebar';
 import VoicePanel from './components/VoicePanel';
@@ -380,6 +381,86 @@ function pageToHash(p: Page): string {
   return `#${p.id}`;
 }
 
+function MobileBottomNav({ activePage, onNavigate }: { activePage: string; onNavigate: (page: string, id?: string) => void }) {
+  const { channels, messages, currentUser } = useStore();
+
+  const unreadMessages = channels
+    .filter(c => c.memberIds?.includes(currentUser?.id ?? '') && !c.muted && !c.deletedAt)
+    .reduce((total, ch) => {
+      const count = messages.filter(m =>
+        m.channelId === ch.id && m.authorId !== currentUser?.id &&
+        (ch.lastReadAt ? m.createdAt > ch.lastReadAt : true)
+      ).length;
+      return total + count;
+    }, 0);
+
+  const tabs = [
+    { id: 'home',     label: 'Home',     icon: <HomeIcon size={22} /> },
+    { id: 'tasks',    label: 'Tasks',    icon: <CheckSquare size={22} /> },
+    { id: 'messages', label: 'Messages', icon: <MessageSquare size={22} />, badge: unreadMessages },
+    { id: 'contacts', label: 'Contacts', icon: <Users size={22} /> },
+    { id: 'more',     label: 'More',     icon: <MoreHorizontal size={22} /> },
+  ];
+
+  const [showMore, setShowMore] = useState(false);
+
+  return (
+    <>
+      {/* More menu overlay */}
+      {showMore && (
+        <div className="fixed inset-0 z-40" onClick={() => setShowMore(false)}>
+          <div
+            className="absolute bottom-16 right-0 left-0 mx-4 bg-[#1c1c1f] border border-white/[0.1] rounded-2xl shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {[
+              { id: 'notifications', label: 'Notifications' },
+              { id: 'settings',      label: 'Settings' },
+            ].map(item => (
+              <button
+                key={item.id}
+                onClick={() => { onNavigate(item.id); setShowMore(false); }}
+                className="w-full px-5 py-3.5 text-left text-sm text-white/70 hover:bg-white/[0.06] border-b border-white/[0.06] last:border-0 transition-colors"
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Bottom tab bar */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-[#0f0f10]/95 backdrop-blur-xl border-t border-white/[0.08] pb-safe">
+        <div className="flex items-center">
+          {tabs.map(tab => {
+            const isActive = tab.id === 'more'
+              ? ['notifications', 'settings'].includes(activePage)
+              : activePage === tab.id || activePage.startsWith(tab.id + '-');
+            return (
+              <button
+                key={tab.id}
+                onClick={() => tab.id === 'more' ? setShowMore(v => !v) : onNavigate(tab.id)}
+                className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 transition-colors relative ${
+                  isActive ? 'text-brand-400' : 'text-white/30 hover:text-white/50'
+                }`}
+              >
+                {tab.icon}
+                <span className="text-[10px] font-medium">{tab.label}</span>
+                {/* Unread badge */}
+                {tab.badge && tab.badge > 0 && (
+                  <span className="absolute top-1.5 right-[calc(50%-14px)] min-w-[16px] h-4 px-1 bg-brand-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
+                    {tab.badge > 99 ? '99+' : tab.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+    </>
+  );
+}
+
 function AuthenticatedApp() {
   const { sidebarOpen, currentUser, darkMode, toggleDarkMode } = useStore();
   const [page, setPage] = useState<Page>(() => hashToPage(window.location.hash));
@@ -467,12 +548,18 @@ function AuthenticatedApp() {
 
   return (
     <div className="flex h-full bg-[#0f0f10]">
-      <Sidebar activePage={activePage} onNavigate={navigate} />
-      <main className="flex-1 flex flex-col overflow-hidden">
+      {/* Sidebar — desktop only */}
+      <div className="hidden md:flex h-full">
+        <Sidebar activePage={activePage} onNavigate={navigate} />
+      </div>
+      {/* Main content — add bottom padding on mobile so content clears the nav bar */}
+      <main className="flex-1 flex flex-col overflow-hidden pb-16 md:pb-0">
         <ErrorBoundary>
           {renderPage()}
         </ErrorBoundary>
       </main>
+      {/* Mobile bottom nav */}
+      <MobileBottomNav activePage={activePage} onNavigate={navigate} />
       <VoicePanel />
       {openTaskId && <TaskDetail taskId={openTaskId} onClose={() => setOpenTaskId(null)} />}
       {cmdKOpen && (
