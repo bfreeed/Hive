@@ -482,6 +482,7 @@ export default function MessagesPage() {
     catch { return new Set<string>(); }
   });
   const [showSaved, setShowSaved] = useState(false);
+  const [savedChannelFilter, setSavedChannelFilter] = useState<string | null>(null);
   const prevChannelIdRef = useRef<string | null>(null);
 
   // Mobile: 'list' shows the channel sidebar full-screen; 'chat' shows the message area full-screen
@@ -939,7 +940,7 @@ export default function MessagesPage() {
           {!search.trim() && (
             <div className="px-1 mb-1">
               <button
-                onClick={() => setShowSaved(v => !v)}
+                onClick={() => { setShowSaved(v => !v); setSavedChannelFilter(null); }}
                 className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${showSaved ? 'bg-white/[0.08] text-white' : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'}`}
               >
                 <Bookmark size={14} className={showSaved ? 'text-amber-400' : 'text-white/30'} />
@@ -1249,11 +1250,57 @@ export default function MessagesPage() {
       {/* Saved Items panel */}
       {showSaved && (
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-          <div className="flex items-center gap-3 px-5 h-14 border-b border-white/[0.06] flex-shrink-0">
+          {/* Header */}
+          <div className="flex items-center gap-3 px-5 min-h-[56px] pt-safe md:pt-0 pb-2 md:pb-0 border-b border-white/[0.06] flex-shrink-0">
+            {/* Back button on mobile */}
+            <button
+              onClick={() => setShowSaved(false)}
+              className="md:hidden -ml-1 p-3 text-white/60 hover:text-white transition-colors flex-shrink-0"
+            >
+              <ChevronLeft size={26} />
+            </button>
             <Bookmark size={16} className="text-amber-400 flex-shrink-0" />
-            <h2 className="text-sm font-semibold text-white">Saved Items</h2>
-            <span className="text-xs text-white/30">{savedIds.size}</span>
+            <h2 className="text-sm font-semibold text-white flex-1">
+              {savedChannelFilter
+                ? (() => { const ch = channels.find(c => c.id === savedChannelFilter); return ch ? (ch.type === 'channel' ? `#${ch.name}` : getDmName(ch)) : 'Saved'; })()
+                : 'Saved Items'}
+            </h2>
+            {savedChannelFilter && (
+              <button
+                onClick={() => setSavedChannelFilter(null)}
+                className="text-[10px] text-white/30 hover:text-white/60 transition-colors px-2 py-0.5 rounded-full border border-white/[0.08] hover:border-white/20"
+              >
+                Show all
+              </button>
+            )}
           </div>
+
+          {/* Channel filter pills — only shown when viewing all */}
+          {!savedChannelFilter && savedIds.size > 0 && (() => {
+            const channelsWithSaves = channels.filter(ch =>
+              messages.some(m => m.channelId === ch.id && savedIds.has(m.id))
+            );
+            if (channelsWithSaves.length < 2) return null;
+            return (
+              <div className="flex gap-1.5 px-4 py-2 border-b border-white/[0.04] overflow-x-auto scrollbar-hide flex-shrink-0">
+                {channelsWithSaves.map(ch => {
+                  const count = messages.filter(m => m.channelId === ch.id && savedIds.has(m.id)).length;
+                  return (
+                    <button
+                      key={ch.id}
+                      onClick={() => setSavedChannelFilter(ch.id)}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/[0.05] border border-white/[0.08] text-xs text-white/50 hover:text-white/80 hover:bg-white/[0.08] transition-colors whitespace-nowrap flex-shrink-0"
+                    >
+                      {ch.type === 'channel' ? <Hash size={9} /> : null}
+                      {ch.type === 'channel' ? ch.name : getDmName(ch)}
+                      <span className="text-white/30 ml-0.5">{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
           <div className="flex-1 overflow-y-auto scrollbar-hide py-4">
             {savedIds.size === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center px-8">
@@ -1261,47 +1308,52 @@ export default function MessagesPage() {
                   <Bookmark size={24} className="text-white/20" />
                 </div>
                 <p className="text-white/60 font-medium">No saved items yet</p>
-                <p className="text-white/30 text-sm mt-1">Hover a message and click the bookmark icon to save it.</p>
+                <p className="text-white/30 text-sm mt-1">Tap a message and click the bookmark icon to save it.</p>
               </div>
-            ) : (
-              messages
-                .filter(m => savedIds.has(m.id))
-                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                .map(msg => {
-                  const ch = channels.find(c => c.id === msg.channelId);
-                  const author = users.find(u => u.id === msg.authorId);
-                  return (
-                    <div key={msg.id} className="group flex items-start gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors">
-                      <Avatar userId={msg.authorId} size={8} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-2 mb-0.5 flex-wrap">
-                          <span className="text-xs font-semibold text-white/80">{author?.name}</span>
-                          {ch && (
-                            <button
-                              onClick={() => { selectChannel(msg.channelId); setShowSaved(false); }}
-                              className="flex items-center gap-0.5 text-[10px] text-brand-400/70 hover:text-brand-400 transition-colors"
-                            >
-                              {ch.type === 'channel' ? <Hash size={9} /> : null}
-                              {ch.type === 'channel' ? ch.name : getDmName(ch)}
-                            </button>
-                          )}
-                          <span className="text-[10px] text-white/25">{formatTime(msg.createdAt)}</span>
-                        </div>
-                        <p className="text-sm text-white/60 leading-relaxed break-words line-clamp-3">
-                          {renderBody(msg.body, userNames)}
-                        </p>
+            ) : (() => {
+              const filtered = messages
+                .filter(m => savedIds.has(m.id) && (!savedChannelFilter || m.channelId === savedChannelFilter))
+                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+              if (filtered.length === 0) return (
+                <div className="flex flex-col items-center justify-center h-full text-center px-8">
+                  <p className="text-white/40 text-sm">No saved items in this channel yet.</p>
+                </div>
+              );
+              return filtered.map(msg => {
+                const ch = channels.find(c => c.id === msg.channelId);
+                const author = users.find(u => u.id === msg.authorId);
+                return (
+                  <div key={msg.id} className="group flex items-start gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors">
+                    <Avatar userId={msg.authorId} size={8} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-2 mb-0.5 flex-wrap">
+                        <span className="text-xs font-semibold text-white/80">{author?.name}</span>
+                        {ch && !savedChannelFilter && (
+                          <button
+                            onClick={() => { selectChannel(msg.channelId); setShowSaved(false); }}
+                            className="flex items-center gap-0.5 text-[10px] text-brand-400/70 hover:text-brand-400 transition-colors"
+                          >
+                            {ch.type === 'channel' ? <Hash size={9} /> : null}
+                            {ch.type === 'channel' ? ch.name : getDmName(ch)}
+                          </button>
+                        )}
+                        <span className="text-[10px] text-white/25">{formatTime(msg.createdAt)}</span>
                       </div>
-                      <button
-                        onClick={() => toggleSave(msg.id)}
-                        title="Remove bookmark"
-                        className="opacity-0 group-hover:opacity-100 p-1 text-amber-400 hover:text-white/40 transition-all flex-shrink-0 mt-0.5"
-                      >
-                        <X size={12} />
-                      </button>
+                      <p className="text-sm text-white/60 leading-relaxed break-words line-clamp-3">
+                        {renderBody(msg.body, userNames)}
+                      </p>
                     </div>
-                  );
-                })
-            )}
+                    <button
+                      onClick={() => toggleSave(msg.id)}
+                      title="Remove bookmark"
+                      className="opacity-0 group-hover:opacity-100 p-1 text-amber-400 hover:text-white/40 transition-all flex-shrink-0 mt-0.5"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                );
+              });
+            })()}
           </div>
         </div>
       )}
@@ -1355,6 +1407,24 @@ export default function MessagesPage() {
             )}
           </div>
           <div className="ml-auto flex items-center gap-2 relative">
+            {/* Per-channel saved items button */}
+            {(() => {
+              const channelSavedCount = messages.filter(m => m.channelId === activeChannelId && savedIds.has(m.id)).length;
+              return (
+                <button
+                  onClick={() => { setShowSaved(true); setSavedChannelFilter(activeChannelId); }}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors ${
+                    showSaved && savedChannelFilter === activeChannelId
+                      ? 'bg-amber-500/20 text-amber-400'
+                      : 'text-white/30 hover:text-white/60 hover:bg-white/[0.04]'
+                  }`}
+                  title="Saved in this channel"
+                >
+                  <Bookmark size={12} />
+                  {channelSavedCount > 0 && <span>{channelSavedCount}</span>}
+                </button>
+              );
+            })()}
             {pinnedMessages.length > 0 && (
               <button
                 onClick={() => setShowPinned(v => !v)}
