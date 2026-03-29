@@ -4,7 +4,7 @@ import { X, Trash2, Paperclip, FileText, Lock, Cloud, Calendar, Check, RefreshCw
 import type { Task, TaskStatus, Priority } from '../types';
 import { format } from 'date-fns';
 import { useGooglePicker } from '../hooks/useGooglePicker';
-import { syncTaskToCalendar, deleteCalendarEvent, hasCalendarToken } from '../hooks/useGoogleCalendar';
+import { syncTaskToCalendar, deleteCalendarEvent, hasCalendarToken, listCalendars, type CalendarEntry } from '../hooks/useGoogleCalendar';
 
 const STATUS_OPTIONS: { value: TaskStatus; label: string; active: string }[] = [
   { value: 'todo',    label: 'To Do',     active: 'bg-white/10 text-white/70 ring-1 ring-white/20' },
@@ -47,6 +47,9 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
   const [calSyncing, setCalSyncing] = useState(false);
   const [calSynced, setCalSynced] = useState(false);
   const [needsAuth, setNeedsAuth] = useState(false);
+  const [showCalPicker, setShowCalPicker] = useState(false);
+  const [calList, setCalList] = useState<CalendarEntry[]>([]);
+  const [calListLoading, setCalListLoading] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [showPriorityPicker, setShowPriorityPicker] = useState(false);
   const [showProjectPicker, setShowProjectPicker] = useState(false);
@@ -88,6 +91,20 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
     }
   }, [task, taskId, updateTask]);
 
+  const openCalPicker = useCallback(async () => {
+    setShowCalPicker(true);
+    if (calList.length > 0) return; // already loaded
+    setCalListLoading(true);
+    try {
+      const entries = await listCalendars(false);
+      setCalList(entries);
+    } catch {
+      // token needed — will show empty, user can still dismiss
+    } finally {
+      setCalListLoading(false);
+    }
+  }, [calList.length]);
+
   // Auto-sync when dueDate changes (if calendarSync is on and token is cached)
   useEffect(() => {
     if (!task) return;
@@ -99,7 +116,7 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
 
     if (!curr && task.calendarEventId) {
       // Due date removed — delete calendar event
-      deleteCalendarEvent(task.calendarEventId).then(() => {
+      deleteCalendarEvent(task.calendarEventId, task.calendarId).then(() => {
         updateTask(taskId, { calendarEventId: undefined });
       });
       return;
@@ -300,17 +317,82 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                     {task.calendarSync ? 'Cal On' : 'Cal'}
                   </button>
                   {task.calendarSync && (
-                    calSyncing ? (
-                      <span className="text-xs text-white/30 flex items-center gap-1"><RefreshCw size={10} className="animate-spin" /> Syncing…</span>
-                    ) : calSynced ? (
-                      <span className="text-xs text-emerald-400 flex items-center gap-1"><Check size={10} /> Synced</span>
-                    ) : needsAuth ? (
-                      <button onClick={() => doSync(true)} className="text-xs text-[#4285F4] hover:underline flex items-center gap-1">
-                        <Calendar size={10} /> Authorize
-                      </button>
-                    ) : task.calendarEventId ? (
-                      <span className="text-xs text-white/20 flex items-center gap-1"><Check size={10} /> On calendar</span>
-                    ) : null
+                    <>
+                      {/* Calendar picker */}
+                      <div className="relative">
+                        <button
+                          onClick={openCalPicker}
+                          className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-white/40 hover:text-white/70 bg-white/[0.04] hover:bg-white/[0.07] transition-colors max-w-[120px]"
+                          title="Choose calendar"
+                        >
+                          {calList.find(c => c.id === task.calendarId) ? (
+                            <>
+                              <span
+                                className="w-2 h-2 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: calList.find(c => c.id === task.calendarId)?.backgroundColor || '#4285F4' }}
+                              />
+                              <span className="truncate">{calList.find(c => c.id === task.calendarId)?.summary}</span>
+                            </>
+                          ) : (
+                            <span className="truncate">{task.calendarId && task.calendarId !== 'primary' ? task.calendarId : 'Primary'}</span>
+                          )}
+                          <ChevronDown size={9} className="flex-shrink-0 opacity-50" />
+                        </button>
+                        {showCalPicker && (
+                          <div className="absolute top-full left-0 mt-1 w-52 bg-[#1c1c1f] border border-white/[0.08] rounded-xl shadow-xl z-30 py-1 max-h-56 overflow-y-auto">
+                            <div className="flex items-center justify-between px-3 pt-1 pb-1.5 border-b border-white/[0.06]">
+                              <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Choose calendar</span>
+                              <button onClick={() => setShowCalPicker(false)} className="text-white/30 hover:text-white/60"><X size={12} /></button>
+                            </div>
+                            {calListLoading && (
+                              <div className="flex items-center justify-center py-4">
+                                <RefreshCw size={13} className="animate-spin text-white/30" />
+                              </div>
+                            )}
+                            {!calListLoading && calList.length === 0 && (
+                              <p className="text-xs text-white/30 px-3 py-3">No calendars found. Make sure you're signed in.</p>
+                            )}
+                            {calList.map(cal => (
+                              <button
+                                key={cal.id}
+                                onClick={() => {
+                                  update('calendarId', cal.id);
+                                  setShowCalPicker(false);
+                                  // Re-sync to the new calendar if already synced
+                                  if (task.calendarEventId) {
+                                    deleteCalendarEvent(task.calendarEventId, task.calendarId)
+                                      .then(() => updateTask(taskId, { calendarEventId: undefined, calendarId: cal.id }))
+                                      .then(() => doSync(false));
+                                  }
+                                }}
+                                className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/[0.06] ${task.calendarId === cal.id || (!task.calendarId && cal.primary) ? 'text-white/90' : 'text-white/55'}`}
+                              >
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                  style={{ backgroundColor: cal.backgroundColor || '#4285F4' }}
+                                />
+                                <span className="truncate flex-1 text-left">{cal.summary}</span>
+                                {(task.calendarId === cal.id || (!task.calendarId && cal.primary)) && (
+                                  <Check size={11} className="text-[#4285F4] flex-shrink-0" />
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {/* Sync status */}
+                      {calSyncing ? (
+                        <span className="text-xs text-white/30 flex items-center gap-1"><RefreshCw size={10} className="animate-spin" /> Syncing…</span>
+                      ) : calSynced ? (
+                        <span className="text-xs text-emerald-400 flex items-center gap-1"><Check size={10} /> Synced</span>
+                      ) : needsAuth ? (
+                        <button onClick={() => doSync(true)} className="text-xs text-[#4285F4] hover:underline flex items-center gap-1">
+                          <Calendar size={10} /> Authorize
+                        </button>
+                      ) : task.calendarEventId ? (
+                        <span className="text-xs text-white/20 flex items-center gap-1"><Check size={10} /> On calendar</span>
+                      ) : null}
+                    </>
                   )}
                 </div>
               </PropRow>

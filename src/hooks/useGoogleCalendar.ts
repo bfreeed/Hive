@@ -28,7 +28,8 @@ async function getToken(clientId: string, forcePrompt = false): Promise<string> 
   return new Promise((res, rej) => {
     window.google.accounts.oauth2.initTokenClient({
       client_id: clientId,
-      scope: 'https://www.googleapis.com/auth/calendar.events',
+      // calendar.readonly lets us list calendars; calendar.events lets us create/update events
+      scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly',
       callback: (r: any) => {
         if (r.error) { rej(r.error); return; }
         calToken = r.access_token;
@@ -41,11 +42,33 @@ async function getToken(clientId: string, forcePrompt = false): Promise<string> 
   });
 }
 
+export interface CalendarEntry {
+  id: string;
+  summary: string;
+  backgroundColor?: string;
+  primary?: boolean;
+  accessRole?: string;
+}
+
+export async function listCalendars(forcePrompt = false): Promise<CalendarEntry[]> {
+  const clientId = localStorage.getItem('google_client_id')?.trim();
+  if (!clientId) return [];
+  const token = await getToken(clientId, forcePrompt);
+  const res = await fetch(
+    'https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=writer',
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data.items ?? []) as CalendarEntry[];
+}
+
 export async function syncTaskToCalendar(task: Task, forcePrompt = false): Promise<string | null> {
   const clientId = localStorage.getItem('google_client_id')?.trim();
   if (!clientId || !task.dueDate) return null;
 
   const token = await getToken(clientId, forcePrompt);
+  const calId = task.calendarId || 'primary';
   const showAs = task.calendarShowAs || 'busy';
   const dateStr = task.dueDate.slice(0, 10);
 
@@ -69,8 +92,8 @@ export async function syncTaskToCalendar(task: Task, forcePrompt = false): Promi
 
   const method = task.calendarEventId ? 'PUT' : 'POST';
   const url = task.calendarEventId
-    ? `https://www.googleapis.com/calendar/v3/calendars/primary/events/${task.calendarEventId}`
-    : 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
+    ? `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events/${task.calendarEventId}`
+    : `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events`;
 
   const res = await fetch(url, {
     method,
@@ -81,12 +104,13 @@ export async function syncTaskToCalendar(task: Task, forcePrompt = false): Promi
   return data.id || null;
 }
 
-export async function deleteCalendarEvent(eventId: string): Promise<void> {
+export async function deleteCalendarEvent(eventId: string, calendarId?: string): Promise<void> {
   const clientId = localStorage.getItem('google_client_id')?.trim();
   if (!clientId || !eventId) return;
   const token = await getToken(clientId);
+  const calId = calendarId || 'primary';
   await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events/${eventId}`,
     { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }
   );
 }

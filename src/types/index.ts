@@ -47,6 +47,7 @@ export interface Task {
   calendarEventId?: string;
   calendarShowAs?: 'free' | 'busy';
   calendarSync?: boolean;
+  calendarId?: string; // which Google Calendar to sync to (defaults to 'primary')
   snoozeDate?: string;
   waitDate?: string;
   label?: string;
