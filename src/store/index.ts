@@ -346,6 +346,7 @@ function dbToUserSettings(row: any): UserSettings {
     otterApiKey: row.otter_api_key ?? undefined,
     otterLastSyncedAt: row.otter_last_synced_at ?? undefined,
     googleClientId: row.google_client_id ?? undefined,
+    anthropicApiKey: row.anthropic_api_key ?? undefined,
     homeSections: row.home_sections ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -1155,6 +1156,7 @@ export const useStore = create<AppStore>()((set, get) => ({
     if ('otterApiKey' in s) row.otter_api_key = s.otterApiKey ?? null;
     if ('otterLastSyncedAt' in s) row.otter_last_synced_at = s.otterLastSyncedAt ?? null;
     if ('googleClientId' in s) row.google_client_id = s.googleClientId ?? null;
+    if ('anthropicApiKey' in s) row.anthropic_api_key = s.anthropicApiKey ?? null;
     if ('homeSections' in s) row.home_sections = s.homeSections ?? null;
     const { error } = await supabase.from('user_settings').upsert(row, { onConflict: 'user_id' });
     if (error) { console.error('saveUserSettings error:', error); return; }

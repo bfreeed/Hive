@@ -23,12 +23,13 @@ import MobileProjectsPage from './pages/MobileProjectsPage';
 import { useReminderChecker } from './hooks/useReminderChecker';
 import { useHealthSweep } from './hooks/useHealthSweep';
 import { useGranolaSync } from './hooks/useGranolaSync';
-import { getPushoverKey, GOOGLE_CLIENT_ID_KEY, GOOGLE_API_KEY_KEY } from './lib/storageKeys';
+import { getPushoverKey, GOOGLE_CLIENT_ID_KEY, GOOGLE_API_KEY_KEY, ANTHROPIC_API_KEY_KEY } from './lib/storageKeys';
 
 function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: any; darkMode: boolean; toggleDarkMode: () => void }) {
   const { addUserFlag, updateUserFlag, removeUserFlag, userSettings, saveUserSettings } = useStore();
   const clientIdRef = useRef<HTMLInputElement>(null);
   const apiKeyRef = useRef<HTMLInputElement>(null);
+  const anthropicKeyRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
   const granolaKeyRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -111,9 +112,11 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
   const saveCredentials = async () => {
     const clientId = clientIdRef.current?.value.trim() ?? '';
     const apiKey = apiKeyRef.current?.value.trim() ?? '';
+    const anthropicKey = anthropicKeyRef.current?.value.trim() ?? '';
     if (clientIdRef.current) localStorage.setItem(GOOGLE_CLIENT_ID_KEY, clientId);
     if (apiKeyRef.current) localStorage.setItem(GOOGLE_API_KEY_KEY, apiKey);
-    await saveUserSettings({ googleClientId: clientId || undefined });
+    if (anthropicKeyRef.current) localStorage.setItem(ANTHROPIC_API_KEY_KEY, anthropicKey);
+    await saveUserSettings({ googleClientId: clientId || undefined, anthropicApiKey: anthropicKey || undefined });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -328,6 +331,33 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${saved ? 'bg-emerald-500/20 text-emerald-400' : 'bg-brand-600 hover:bg-brand-500 text-white'}`}
             >
               {saved ? '✓ Saved' : 'Save Credentials'}
+            </button>
+          </div>
+        </div>
+
+        {/* Claude / Anthropic */}
+        <div className="mb-8">
+          <h2 className="text-xs font-semibold text-white/30 uppercase tracking-wider mb-3">Claude AI</h2>
+          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 space-y-4">
+            <p className="text-xs text-white/40 leading-relaxed">
+              Powers the Claude bar on your Home page. Each user brings their own key — Hive never sees your data or pays for your queries.
+              Get a key at <span className="text-brand-400">console.anthropic.com</span>.
+            </p>
+            <div>
+              <label className="text-xs text-white/40 block mb-1.5">Anthropic API Key</label>
+              <input
+                ref={anthropicKeyRef}
+                type="password"
+                defaultValue={localStorage.getItem(ANTHROPIC_API_KEY_KEY) || userSettings?.anthropicApiKey || ''}
+                placeholder="sk-ant-..."
+                className="w-full px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white/60 placeholder-white/20 focus:outline-none focus:border-brand-500/40 font-mono"
+              />
+            </div>
+            <button
+              onClick={saveCredentials}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${saved ? 'bg-emerald-500/20 text-emerald-400' : 'bg-brand-600 hover:bg-brand-500 text-white'}`}
+            >
+              {saved ? '✓ Saved' : 'Save'}
             </button>
           </div>
         </div>

@@ -11,5 +11,6 @@ export const getBriefingKey = (userId: string, date: string) => `briefing_sent_$
 
 export const GOOGLE_CLIENT_ID_KEY = 'google_client_id';
 export const GOOGLE_API_KEY_KEY = 'google_api_key';
+export const ANTHROPIC_API_KEY_KEY = 'anthropic_api_key';
 export const SIDEBAR_NAV_ORDER_KEY = 'sidebar-nav-order';
 export const SIDEBAR_PROJECT_ORDER_KEY = 'sidebar-project-order';

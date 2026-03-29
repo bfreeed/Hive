@@ -196,6 +196,8 @@ export interface UserSettings {
   otterLastSyncedAt?: string;
   // Google Drive OAuth client ID
   googleClientId?: string;
+  // Anthropic / Claude
+  anthropicApiKey?: string;
   // Home layout
   homeSections?: HomeSection[];
   createdAt?: string;

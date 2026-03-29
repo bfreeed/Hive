@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '../store';
-import { AlertTriangle, Clock, MessageSquare, CheckCircle, ArrowRight, Plus, X, Sun, Inbox, Calendar, Sparkles, ChevronRight } from 'lucide-react';
+import { AlertTriangle, Clock, MessageSquare, CheckCircle, ArrowRight, Plus, X, Sun, Inbox, Calendar, Sparkles, ChevronRight, Send, Loader2 } from 'lucide-react';
 import { isPast, addDays, isWithinInterval, startOfDay } from 'date-fns';
 import TaskRow from '../components/TaskRow';
 import { DEFAULT_HOME_SECTIONS, type HomeSection } from '../types';
+import { ANTHROPIC_API_KEY_KEY } from '../lib/storageKeys';
 
 function Section({ title, icon, count, color = 'text-white/50', children }: {
   title: string; icon: React.ReactNode; count: number;
@@ -23,12 +24,19 @@ function Section({ title, icon, count, color = 'text-white/50', children }: {
 }
 
 export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: string, id?: string) => void; onOpenTask: (id: string) => void }) {
-  const { tasks, projects, meetings, addTask, userSettings, saveUserSettings } = useStore();
+  const { tasks, projects, meetings, messages, channels, addTask, userSettings, saveUserSettings } = useStore();
   const [showCapture, setShowCapture] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [captureTitle, setCaptureTitle] = useState('');
   const [captureProject, setCaptureProject] = useState('');
   const captureRef = useRef<HTMLInputElement>(null);
+
+  // Claude bar
+  const [claudeInput, setClaudeInput] = useState('');
+  const [claudeAnswer, setClaudeAnswer] = useState('');
+  const [claudeLoading, setClaudeLoading] = useState(false);
+  const [claudeError, setClaudeError] = useState('');
+  const claudeInputRef = useRef<HTMLInputElement>(null);
 
   // Cancel speech if user navigates away
   useEffect(() => () => { window.speechSynthesis?.cancel(); }, []);
@@ -65,6 +73,94 @@ export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: st
       window.speechSynthesis.speak(utterance);
     }
   }, [tasks]);
+
+  const askClaude = useCallback(async () => {
+    const question = claudeInput.trim();
+    if (!question) return;
+    const apiKey = userSettings?.anthropicApiKey || localStorage.getItem(ANTHROPIC_API_KEY_KEY);
+    if (!apiKey) {
+      setClaudeError('Add your Anthropic API key in Settings → Claude AI to use this.');
+      return;
+    }
+    setClaudeLoading(true);
+    setClaudeAnswer('');
+    setClaudeError('');
+
+    // Build context from the user's data
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const activeTasks = tasks.filter(t => t.status !== 'done');
+    const taskSummary = activeTasks.map(t =>
+      `- ${t.title} [${t.priority ?? 'no priority'}, ${t.status}${t.dueDate ? `, due ${t.dueDate}` : ''}${t.projectIds?.length ? `, project: ${projects.find(p => p.id === t.projectIds[0])?.name ?? t.projectIds[0]}` : ''}]`
+    ).join('\n');
+    const recentMessages = messages
+      .slice(-30)
+      .map(m => {
+        const ch = channels.find(c => c.id === m.channelId);
+        return `[${ch?.name ?? 'DM'}] ${m.body || '(audio/attachment)'}`;
+      }).join('\n');
+
+    const systemPrompt = `You are a smart assistant embedded in Hive, a personal productivity app. Today is ${todayStr}.
+Answer questions about the user's tasks, projects, and messages concisely. Be direct and specific.
+Never make up tasks or information that isn't in the data.
+
+ACTIVE TASKS (${activeTasks.length}):
+${taskSummary || 'None'}
+
+RECENT MESSAGES (last 30):
+${recentMessages || 'None'}
+
+PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
+
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-opus-4-5',
+          max_tokens: 1024,
+          stream: true,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: question }],
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error?.message ?? `API error ${res.status}`);
+      }
+
+      // Stream the response
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let answer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value);
+        for (const line of chunk.split('\n')) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') break;
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+              answer += parsed.delta.text;
+              setClaudeAnswer(answer);
+            }
+          } catch { /* skip malformed lines */ }
+        }
+      }
+    } catch (e: any) {
+      setClaudeError(e.message ?? 'Something went wrong.');
+    } finally {
+      setClaudeLoading(false);
+    }
+  }, [claudeInput, userSettings, tasks, projects, messages, channels]);
 
   // N key shortcut
   useEffect(() => {
@@ -251,6 +347,40 @@ export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: st
               </button>
             </div>
           </div>
+        </div>
+
+        {/* Claude bar */}
+        <div className="mb-5">
+          <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-colors ${claudeLoading ? 'border-brand-500/40 bg-brand-500/[0.04]' : 'border-white/[0.08] bg-white/[0.03] hover:border-white/[0.14]'}`}>
+            <Sparkles size={14} className={`flex-shrink-0 ${claudeLoading ? 'text-brand-400 animate-pulse' : 'text-white/25'}`} />
+            <input
+              ref={claudeInputRef}
+              value={claudeInput}
+              onChange={e => { setClaudeInput(e.target.value); setClaudeAnswer(''); setClaudeError(''); }}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); askClaude(); } }}
+              placeholder="Ask Claude anything about your tasks, projects, or messages…"
+              className="flex-1 bg-transparent text-sm text-white placeholder-white/20 focus:outline-none"
+            />
+            {claudeInput && !claudeLoading && (
+              <button
+                onClick={askClaude}
+                className="p-1 rounded-lg text-brand-400 hover:text-brand-300 transition-colors flex-shrink-0"
+              >
+                <Send size={13} />
+              </button>
+            )}
+            {claudeLoading && <Loader2 size={13} className="text-brand-400 animate-spin flex-shrink-0" />}
+            {(claudeAnswer || claudeError) && !claudeLoading && (
+              <button onClick={() => { setClaudeAnswer(''); setClaudeError(''); setClaudeInput(''); }} className="p-1 text-white/20 hover:text-white/50 flex-shrink-0">
+                <X size={13} />
+              </button>
+            )}
+          </div>
+          {(claudeAnswer || claudeError) && (
+            <div className={`mt-2 px-4 py-3 rounded-xl text-sm leading-relaxed border ${claudeError ? 'border-red-500/20 bg-red-500/[0.04] text-red-400' : 'border-white/[0.06] bg-white/[0.03] text-white/75'}`}>
+              {claudeError || claudeAnswer}
+            </div>
+          )}
         </div>
 
         {/* Quick capture */}
