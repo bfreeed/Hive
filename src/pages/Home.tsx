@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '../store';
 import { AlertTriangle, Clock, MessageSquare, CheckCircle, ArrowRight, Plus, X, Sun, Inbox, Calendar, Sparkles, ChevronRight, Send, Loader2 } from 'lucide-react';
 import { isPast, addDays, isWithinInterval, startOfDay } from 'date-fns';
+import ReactMarkdown from 'react-markdown';
 import TaskRow from '../components/TaskRow';
 import { DEFAULT_HOME_SECTIONS, type HomeSection } from '../types';
 import { ANTHROPIC_API_KEY_KEY } from '../lib/storageKeys';
@@ -377,8 +378,31 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
             )}
           </div>
           {(claudeAnswer || claudeError) && (
-            <div className={`mt-2 px-4 py-3 rounded-xl text-sm leading-relaxed border ${claudeError ? 'border-red-500/20 bg-red-500/[0.04] text-red-400' : 'border-white/[0.06] bg-white/[0.03] text-white/75'}`}>
-              {claudeError || claudeAnswer}
+            <div className={`mt-2 px-4 py-4 rounded-xl border ${claudeError ? 'border-red-500/20 bg-red-500/[0.04] text-red-400 text-sm' : 'border-white/[0.06] bg-white/[0.03]'}`}>
+              {claudeError ? claudeError : (
+                <ReactMarkdown
+                  components={{
+                    p: ({ children }) => <p className="text-sm text-white/75 leading-relaxed mb-3 last:mb-0">{children}</p>,
+                    strong: ({ children }) => <strong className="text-white/90 font-semibold">{children}</strong>,
+                    em: ({ children }) => <em className="text-white/70 italic">{children}</em>,
+                    ul: ({ children }) => <ul className="mb-3 last:mb-0 space-y-1">{children}</ul>,
+                    ol: ({ children }) => <ol className="mb-3 last:mb-0 space-y-1 list-decimal list-inside">{children}</ol>,
+                    li: ({ children }) => (
+                      <li className="text-sm text-white/70 leading-relaxed flex gap-2">
+                        <span className="text-brand-400 flex-shrink-0 mt-0.5">•</span>
+                        <span>{children}</span>
+                      </li>
+                    ),
+                    h1: ({ children }) => <h1 className="text-base font-semibold text-white/90 mb-2">{children}</h1>,
+                    h2: ({ children }) => <h2 className="text-sm font-semibold text-white/80 mb-2 mt-3 first:mt-0">{children}</h2>,
+                    h3: ({ children }) => <h3 className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-1.5 mt-3 first:mt-0">{children}</h3>,
+                    code: ({ children }) => <code className="px-1.5 py-0.5 rounded bg-white/[0.07] text-xs text-brand-300 font-mono">{children}</code>,
+                    hr: () => <hr className="border-white/[0.08] my-3" />,
+                  }}
+                >
+                  {claudeAnswer}
+                </ReactMarkdown>
+              )}
             </div>
           )}
         </div>
