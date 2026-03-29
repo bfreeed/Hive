@@ -586,8 +586,8 @@ export default function MessagesPage() {
   // Mobile: 'list' shows the channel sidebar full-screen; 'chat' shows the message area full-screen
   const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
 
-  // Wrapper so every channel-select also switches to chat view on mobile
-  const selectChannel = (id: string) => { setActiveChannel(id); setMobileView('chat'); };
+  // Wrapper so every channel-select also switches to chat view on mobile and clears any overlay panels
+  const selectChannel = (id: string) => { setActiveChannel(id); setMobileView('chat'); setPriorityFilter(null); setShowSaved(false); };
 
   // Voice recording
   const [isRecording, setIsRecording] = useState(false);
@@ -1397,6 +1397,9 @@ export default function MessagesPage() {
               <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
               <h2 className="text-sm font-semibold text-white flex-1">{cfg.label} Priority</h2>
               <span className="text-xs text-white/30">{filtered.length}</span>
+              <button onClick={() => setPriorityFilter(null)} className="hidden md:flex p-1.5 rounded-md text-white/30 hover:text-white/70 hover:bg-white/[0.06] transition-colors">
+                <X size={15} />
+              </button>
             </div>
             <div className="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4">
               {channelsWithMsgs.length === 0 && (
