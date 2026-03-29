@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import { supabase } from '../lib/supabase';
 import {
   Home, CheckSquare, Users, Bell, Settings, ChevronDown, ChevronRight,
-  Plus, FolderOpen, Mic, Menu, MessageSquare, Check, Lock, LogOut, GripVertical
+  Plus, FolderOpen, Mic, Menu, MessageSquare, Check, Lock, LogOut, GripVertical, Calendar, Layout
 } from 'lucide-react';
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors,
@@ -16,11 +16,13 @@ import { CSS } from '@dnd-kit/utilities';
 
 const PROJECT_COLORS = ['#6366f1','#10b981','#f59e0b','#ef4444','#3b82f6','#8b5cf6','#ec4899','#14b8a6'];
 
-const DEFAULT_NAV_ORDER = ['home', 'tasks', 'contacts', 'messages', 'notifications'];
+const DEFAULT_NAV_ORDER = ['home', 'tasks', 'contacts', 'messages', 'meetings', 'notifications'];
 const NAV_ITEMS_MAP: Record<string, { label: string; icon: React.ReactNode; getBadge?: (store: any) => number | undefined }> = {
   home:          { label: 'Home',          icon: <Home size={16} /> },
   tasks:         { label: 'My Tasks',      icon: <CheckSquare size={16} />, getBadge: (s) => s.tasks.filter((t: any) => t.flags?.some((f: any) => f.flagId === 'flag-questions')).length || undefined },
+  workspace:     { label: 'Workspace',     icon: <Layout size={16} /> },
   contacts:      { label: 'Contacts',      icon: <Users size={16} /> },
+  meetings:      { label: 'Meetings',      icon: <Calendar size={16} />, getBadge: (s) => s.meetings.filter((m: any) => m.reviewed === false && m.provider && m.provider !== 'manual').length || undefined },
   messages:      { label: 'Messages',      icon: <MessageSquare size={16} />, getBadge: (s) => {
     const unread = s.channels
       .filter((c: any) => c.memberIds.includes(s.currentUser.id) && !c.muted)
@@ -160,7 +162,11 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
       if (saved) {
         const parsed = JSON.parse(saved) as string[];
         // Validate all items are still valid
-        if (parsed.length === DEFAULT_NAV_ORDER.length && parsed.every(id => NAV_ITEMS_MAP[id])) return parsed;
+        if (parsed.every(id => NAV_ITEMS_MAP[id])) {
+          // Merge: add any new items from DEFAULT_NAV_ORDER that aren't in saved order
+          const merged = [...parsed, ...DEFAULT_NAV_ORDER.filter(id => !parsed.includes(id))];
+          return merged;
+        }
       }
     } catch {}
     return DEFAULT_NAV_ORDER;

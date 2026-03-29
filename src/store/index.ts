@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
-import type { Task, Project, Contact, User, UserFlag, Notification, Channel, Message, Section } from '../types';
+import type { Task, Project, Contact, User, UserFlag, Notification, Channel, Message, Section, Meeting, UserSettings, HivePage } from '../types';
 
 // ---------------------------------------------------------------------------
 // Fallback seed data (shown while Supabase loads or if it fails)
@@ -175,6 +175,8 @@ function dbToProject(row: any): Project {
     isPrivate: row.is_private ?? false,
     createdAt: row.created_at,
     parentId: row.parent_id ?? undefined,
+    googleDriveFolderId: row.google_drive_folder_id ?? undefined,
+    googleDriveFolderName: row.google_drive_folder_name ?? undefined,
   };
 }
 
@@ -190,6 +192,8 @@ function projectToDb(p: Project) {
     is_private: p.isPrivate,
     created_at: p.createdAt,
     parent_id: p.parentId ?? null,
+    google_drive_folder_id: p.googleDriveFolderId ?? null,
+    google_drive_folder_name: p.googleDriveFolderName ?? null,
   };
 }
 
@@ -249,6 +253,8 @@ function dbToMessage(row: any): Message {
     attachments: row.attachments ?? undefined,
     editedAt: row.edited_at ?? undefined,
     parentId: row.parent_id ?? undefined,
+    priority: row.priority ?? undefined,
+    receiverPriority: row.receiver_priority ?? undefined,
   };
 }
 
@@ -276,10 +282,95 @@ function dbToUser(row: any): User {
   };
 }
 
+function dbToMeeting(row: any): Meeting {
+  return {
+    id: row.id,
+    contactId: row.contact_id ?? '',
+    title: row.title,
+    date: row.date ?? row.created_at,
+    notes: row.notes ?? '',
+    source: row.source ?? undefined,
+    externalId: row.external_id ?? undefined,
+    provider: row.provider ?? undefined,
+    transcript: row.transcript ?? undefined,
+    summary: row.summary ?? undefined,
+    participantNames: row.participant_names ?? [],
+    participantEmails: row.participant_emails ?? [],
+    linkedContactIds: row.linked_contact_ids ?? [],
+    linkedProjectIds: row.linked_project_ids ?? [],
+    suggestedProjectIds: row.suggested_project_ids ?? [],
+    actionItems: row.action_items ?? [],
+    hasProjectLinks: row.has_project_links ?? false,
+    reviewed: row.reviewed ?? false,
+    userId: row.user_id ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function meetingToDb(m: Meeting) {
+  return {
+    id: m.id,
+    contact_id: m.contactId || null,
+    title: m.title,
+    date: m.date,
+    notes: m.notes,
+    source: m.source ?? null,
+    external_id: m.externalId ?? null,
+    provider: m.provider ?? null,
+    transcript: m.transcript ?? null,
+    summary: m.summary ?? null,
+    participant_names: m.participantNames ?? [],
+    participant_emails: m.participantEmails ?? [],
+    linked_contact_ids: m.linkedContactIds ?? [],
+    linked_project_ids: m.linkedProjectIds ?? [],
+    suggested_project_ids: m.suggestedProjectIds ?? [],
+    action_items: m.actionItems ?? [],
+    has_project_links: m.hasProjectLinks ?? false,
+    reviewed: m.reviewed ?? false,
+    user_id: m.userId ?? null,
+    created_at: m.createdAt,
+    updated_at: m.updatedAt,
+  };
+}
+
+function dbToUserSettings(row: any): UserSettings {
+  return {
+    userId: row.user_id,
+    granolaApiKey: row.granola_api_key ?? undefined,
+    granolaLastSyncedAt: row.granola_last_synced_at ?? undefined,
+    firefliesApiKey: row.fireflies_api_key ?? undefined,
+    firefliesLastSyncedAt: row.fireflies_last_synced_at ?? undefined,
+    otterApiKey: row.otter_api_key ?? undefined,
+    otterLastSyncedAt: row.otter_last_synced_at ?? undefined,
+    googleClientId: row.google_client_id ?? undefined,
+    homeSections: row.home_sections ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // uid helper
 // ---------------------------------------------------------------------------
 const uid = () => Math.random().toString(36).slice(2, 9);
+
+function dbToPage(row: any): HivePage {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    title: row.title ?? 'Untitled',
+    icon: row.icon ?? undefined,
+    content: row.content ?? {},
+    parentId: row.parent_id ?? undefined,
+    projectId: row.project_id ?? undefined,
+    templateId: row.template_id ?? undefined,
+    isTemplate: row.is_template ?? false,
+    sortOrder: row.sort_order ?? 0,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Store interface (unchanged from original)
@@ -328,8 +419,10 @@ interface AppStore {
   deleteChannel: (id: string) => void;
   restoreChannel: (id: string) => void;
   permanentlyDeleteChannel: (id: string) => void;
-  sendMessage: (channelId: string, body: string, attachments?: { name: string; url: string; type: string }[]) => void;
+  sendMessage: (channelId: string, body: string, attachments?: { name: string; url: string; type: string }[], priority?: import('../types').MessagePriority) => void;
   updateMessage: (id: string, body: string) => void;
+  setMessagePriority: (id: string, priority: import('../types').MessagePriority | null, isReceiver?: boolean) => void;
+  moveMessage: (id: string, targetChannelId: string) => void;
   deleteMessage: (id: string) => void;
   replyToMessage: (parentId: string, channelId: string, body: string) => void;
   addReaction: (messageId: string, emoji: string) => void;
@@ -344,6 +437,23 @@ interface AppStore {
   addSection: (s: Omit<Section, 'id'>) => void;
   updateSection: (id: string, u: Partial<Section>) => void;
   deleteSection: (id: string) => void;
+
+  // Meeting notes
+  meetings: Meeting[];
+  addMeeting: (m: Omit<Meeting, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Meeting>;
+  updateMeeting: (id: string, u: Partial<Meeting>) => Promise<void>;
+  upsertMeeting: (m: Omit<Meeting, 'id' | 'createdAt' | 'updatedAt'> & { externalId: string; provider: string }) => Promise<Meeting>;
+
+  // User settings (API keys, sync timestamps)
+  userSettings: UserSettings | null;
+  loadUserSettings: () => Promise<void>;
+  saveUserSettings: (s: Partial<UserSettings>) => Promise<void>;
+
+  // Workspace pages
+  pages: HivePage[];
+  addPage: (p: Partial<HivePage>) => Promise<HivePage>;
+  updatePage: (id: string, u: Partial<HivePage>) => Promise<void>;
+  deletePage: (id: string) => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -360,6 +470,9 @@ export const useStore = create<AppStore>()((set, get) => ({
   channels: CHANNELS,
   messages: MESSAGES,
   sections: SECTIONS,
+  meetings: [],
+  pages: [],
+  userSettings: null,
   activeChannelId: 'general',
   activeProjectId: null,
   sidebarOpen: true,
@@ -387,6 +500,9 @@ export const useStore = create<AppStore>()((set, get) => ({
         notificationsRes,
         profilesRes,
         prefsRes,
+        meetingsRes,
+        settingsRes,
+        pagesRes,
       ] = await Promise.all([
         supabase.from('tasks').select('*').order('created_at', { ascending: true }),
         supabase.from('projects').select('*').order('created_at', { ascending: true }),
@@ -396,6 +512,9 @@ export const useStore = create<AppStore>()((set, get) => ({
         supabase.from('notifications').select('*').order('created_at', { ascending: false }),
         supabase.from('profiles').select('*'),
         authUser ? supabase.from('user_preferences').select('*').eq('user_id', authUser.id).maybeSingle() : Promise.resolve({ data: null, error: null }),
+        supabase.from('meetings').select('*').order('date', { ascending: false }),
+        authUser ? supabase.from('user_settings').select('*').eq('user_id', authUser.id).maybeSingle() : Promise.resolve({ data: null, error: null }),
+        supabase.from('pages').select('*').order('updated_at', { ascending: false }),
       ]);
 
       const updates: Partial<AppStore> = { isLoading: false };
@@ -440,6 +559,21 @@ export const useStore = create<AppStore>()((set, get) => ({
       // Load manual order from user_preferences
       if (prefsRes.data?.manual_order) {
         updates.manualOrder = prefsRes.data.manual_order;
+      }
+
+      // Meetings
+      if (meetingsRes.data) {
+        updates.meetings = meetingsRes.data.map(dbToMeeting);
+      }
+
+      // User settings
+      if (settingsRes.data) {
+        updates.userSettings = dbToUserSettings(settingsRes.data);
+      }
+
+      // Pages
+      if (pagesRes.data) {
+        updates.pages = pagesRes.data.map(dbToPage);
       }
 
       set(updates);
@@ -777,7 +911,7 @@ export const useStore = create<AppStore>()((set, get) => ({
   // -------------------------------------------------------------------------
   // Messages
   // -------------------------------------------------------------------------
-  sendMessage: (channelId, body, attachments) => {
+  sendMessage: (channelId, body, attachments, priority) => {
     const s = get();
     const newMsg: Message = {
       id: uid(),
@@ -787,6 +921,7 @@ export const useStore = create<AppStore>()((set, get) => ({
       createdAt: new Date().toISOString(),
       reactions: {},
       ...(attachments && attachments.length > 0 ? { attachments } : {}),
+      ...(priority ? { priority } : {}),
     };
     set((st) => ({ messages: [...st.messages, newMsg] }));
     supabase.from('messages').insert({
@@ -798,6 +933,7 @@ export const useStore = create<AppStore>()((set, get) => ({
       attachments: newMsg.attachments ?? null,
       parent_id: newMsg.parentId ?? null,
       created_at: newMsg.createdAt,
+      priority: newMsg.priority ?? null,
     }).then(({ error }) => { if (error) console.error('sendMessage error:', error); });
   },
 
@@ -808,6 +944,24 @@ export const useStore = create<AppStore>()((set, get) => ({
     }));
     supabase.from('messages').update({ body, edited_at: editedAt }).eq('id', id)
       .then(({ error }) => { if (error) console.error('updateMessage error:', error); });
+  },
+
+  setMessagePriority: (id, priority, isReceiver = false) => {
+    const field = isReceiver ? 'receiverPriority' : 'priority';
+    const dbField = isReceiver ? 'receiver_priority' : 'priority';
+    set((s) => ({
+      messages: s.messages.map(m => m.id === id ? { ...m, [field]: priority ?? undefined } : m),
+    }));
+    supabase.from('messages').update({ [dbField]: priority ?? null }).eq('id', id)
+      .then(({ error }) => { if (error) console.error('setMessagePriority error:', error); });
+  },
+
+  moveMessage: (id, targetChannelId) => {
+    set((s) => ({
+      messages: s.messages.map(m => m.id === id ? { ...m, channelId: targetChannelId } : m),
+    }));
+    supabase.from('messages').update({ channel_id: targetChannelId }).eq('id', id)
+      .then(({ error }) => { if (error) console.error('moveMessage error:', error); });
   },
 
   deleteMessage: (id) => {
@@ -928,6 +1082,130 @@ export const useStore = create<AppStore>()((set, get) => ({
     });
   },
 
+  // -------------------------------------------------------------------------
+  // Meetings
+  // -------------------------------------------------------------------------
+  addMeeting: async (m) => {
+    const newMeeting: Meeting = {
+      ...m,
+      id: uid(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    set((s) => ({ meetings: [newMeeting, ...s.meetings] }));
+    const { error } = await supabase.from('meetings').insert(meetingToDb(newMeeting));
+    if (error) console.error('addMeeting error:', error);
+    return newMeeting;
+  },
+
+  updateMeeting: async (id, u) => {
+    const updatedAt = new Date().toISOString();
+    set((s) => ({
+      meetings: s.meetings.map(m => m.id === id ? { ...m, ...u, updatedAt } : m),
+    }));
+    const dbFields: Record<string, any> = { updated_at: updatedAt };
+    if ('notes' in u) dbFields.notes = u.notes ?? null;
+    if ('linkedContactIds' in u) dbFields.linked_contact_ids = u.linkedContactIds ?? [];
+    if ('linkedProjectIds' in u) dbFields.linked_project_ids = u.linkedProjectIds ?? [];
+    if ('suggestedProjectIds' in u) dbFields.suggested_project_ids = u.suggestedProjectIds ?? [];
+    if ('actionItems' in u) dbFields.action_items = u.actionItems ?? [];
+    if ('reviewed' in u) dbFields.reviewed = u.reviewed ?? false;
+    if ('hasProjectLinks' in u) dbFields.has_project_links = u.hasProjectLinks ?? false;
+    if ('transcript' in u) dbFields.transcript = u.transcript ?? null;
+    if ('summary' in u) dbFields.summary = u.summary ?? null;
+    const { error } = await supabase.from('meetings').update(dbFields).eq('id', id);
+    if (error) console.error('updateMeeting error:', error);
+  },
+
+  upsertMeeting: async (m) => {
+    // Dedup by (provider, externalId) — return existing if already synced
+    const existing = get().meetings.find(
+      x => x.provider === m.provider && x.externalId === m.externalId
+    );
+    if (existing) return existing;
+    return get().addMeeting(m);
+  },
+
+  // -------------------------------------------------------------------------
+  // User Settings
+  // -------------------------------------------------------------------------
+  loadUserSettings: async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data, error } = await supabase
+      .from('user_settings')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (error) { console.error('loadUserSettings error:', error); return; }
+    if (data) set({ userSettings: dbToUserSettings(data) });
+  },
+
+  saveUserSettings: async (s) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const now = new Date().toISOString();
+    const row: Record<string, any> = { user_id: user.id, updated_at: now };
+    if ('granolaApiKey' in s) row.granola_api_key = s.granolaApiKey ?? null;
+    if ('granolaLastSyncedAt' in s) row.granola_last_synced_at = s.granolaLastSyncedAt ?? null;
+    if ('firefliesApiKey' in s) row.fireflies_api_key = s.firefliesApiKey ?? null;
+    if ('firefliesLastSyncedAt' in s) row.fireflies_last_synced_at = s.firefliesLastSyncedAt ?? null;
+    if ('otterApiKey' in s) row.otter_api_key = s.otterApiKey ?? null;
+    if ('otterLastSyncedAt' in s) row.otter_last_synced_at = s.otterLastSyncedAt ?? null;
+    if ('googleClientId' in s) row.google_client_id = s.googleClientId ?? null;
+    if ('homeSections' in s) row.home_sections = s.homeSections ?? null;
+    const { error } = await supabase.from('user_settings').upsert(row, { onConflict: 'user_id' });
+    if (error) { console.error('saveUserSettings error:', error); return; }
+    set((st) => ({ userSettings: { ...(st.userSettings ?? { userId: user.id }), ...s } }));
+  },
+
+  // ── Workspace pages ──────────────────────────────────────────────────────
+  addPage: async (p) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+    const now = new Date().toISOString();
+    const row = {
+      user_id: user.id,
+      title: p.title ?? 'Untitled',
+      icon: p.icon ?? null,
+      content: p.content ?? {},
+      parent_id: p.parentId ?? null,
+      project_id: p.projectId ?? null,
+      template_id: p.templateId ?? null,
+      is_template: p.isTemplate ?? false,
+      sort_order: p.sortOrder ?? 0,
+      created_at: now,
+      updated_at: now,
+    };
+    const { data, error } = await supabase.from('pages').insert(row).select().single();
+    if (error) throw error;
+    const newPage = dbToPage(data);
+    set((s) => ({ pages: [newPage, ...s.pages] }));
+    return newPage;
+  },
+
+  updatePage: async (id, u) => {
+    const now = new Date().toISOString();
+    const row: Record<string, any> = { updated_at: now };
+    if ('title' in u) row.title = u.title;
+    if ('icon' in u) row.icon = u.icon ?? null;
+    if ('content' in u) row.content = u.content;
+    if ('parentId' in u) row.parent_id = u.parentId ?? null;
+    if ('projectId' in u) row.project_id = u.projectId ?? null;
+    if ('sortOrder' in u) row.sort_order = u.sortOrder;
+    set((s) => ({
+      pages: s.pages.map((pg) => pg.id === id ? { ...pg, ...u, updatedAt: now } : pg),
+    }));
+    const { error } = await supabase.from('pages').update(row).eq('id', id);
+    if (error) console.error('updatePage error:', error);
+  },
+
+  deletePage: async (id) => {
+    set((s) => ({ pages: s.pages.filter((pg) => pg.id !== id) }));
+    const { error } = await supabase.from('pages').delete().eq('id', id);
+    if (error) console.error('deletePage error:', error);
+  },
+
   addReaction: (messageId, emoji) => {
     set((s) => ({
       messages: s.messages.map((m) => {
@@ -980,6 +1258,8 @@ supabase.auth.onAuthStateChange((event) => {
       users: [LEV, SARAH],
       currentUser: LEV,
       manualOrder: [],
+      meetings: [],
+      userSettings: null,
     });
   }
 });

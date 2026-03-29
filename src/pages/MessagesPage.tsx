@@ -1,9 +1,16 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useStore } from '../store';
 import { supabase } from '../lib/supabase';
-import { Hash, Plus, Search, Smile, Paperclip, Send, X, Pencil, Trash2, MessageSquare, Link, MoreHorizontal, Pin, Copy, ChevronDown, BellOff, Bell, RotateCcw, Archive, Bookmark, ExternalLink, Globe, UserPlus, Mic, MicOff, Play, Pause, FileText, ImageIcon, Loader2, ChevronLeft } from 'lucide-react';
+import { Hash, Plus, Search, Smile, Paperclip, Send, X, Pencil, Trash2, MessageSquare, Link, MoreHorizontal, Pin, Copy, ChevronDown, BellOff, Bell, RotateCcw, Archive, Bookmark, ExternalLink, Globe, UserPlus, Mic, MicOff, Play, Pause, FileText, ImageIcon, Loader2, ChevronLeft, Flag, ArrowRight } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
-import type { Message, User } from '../types';
+import type { Message, MessagePriority, User } from '../types';
+
+const PRIORITY_CONFIG: Record<MessagePriority, { label: string; dot: string; bg: string; text: string; playColor: string }> = {
+  low:    { label: 'Low',    dot: 'bg-sky-400',    bg: 'bg-sky-500/10',    text: 'text-sky-400',    playColor: '#0ea5e9' },
+  medium: { label: 'Medium', dot: 'bg-yellow-400', bg: 'bg-yellow-500/10', text: 'text-yellow-400', playColor: '#eab308' },
+  high:   { label: 'High',   dot: 'bg-orange-400', bg: 'bg-orange-500/10', text: 'text-orange-400', playColor: '#f97316' },
+  urgent: { label: 'Urgent', dot: 'bg-red-500',    bg: 'bg-red-500/10',    text: 'text-red-400',    playColor: '#ef4444' },
+};
 import { uploadToStorage } from '../lib/supabase';
 
 const EMOJIS = ['👍', '❤️', '😂', '🎉', '✅', '🔥'];
@@ -101,7 +108,7 @@ async function compressImage(file: File): Promise<Blob> {
   });
 }
 
-function AudioPlayer({ url, duration }: { url: string; duration?: number }) {
+function AudioPlayer({ url, duration, title, priority }: { url: string; duration?: number; title?: string; priority?: MessagePriority }) {
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -115,12 +122,18 @@ function AudioPlayer({ url, duration }: { url: string; duration?: number }) {
 
   const remaining = duration ? Math.max(0, duration - currentTime) : 0;
   const progress = duration && duration > 0 ? (currentTime / duration) * 100 : 0;
+  const playColor = priority ? PRIORITY_CONFIG[priority].playColor : '#4f46e5'; // brand-600
 
   return (
-    <div className="mt-1.5 flex items-center gap-2.5 px-3 py-2.5 bg-white/[0.05] border border-white/[0.08] rounded-xl max-w-[260px]">
+    <div className="mt-1.5 flex flex-col gap-1.5 px-3 py-2.5 bg-white/[0.05] border border-white/[0.08] rounded-xl max-w-[280px]">
+      {title && (
+        <p className="text-xs font-medium text-white/70 truncate">{title}</p>
+      )}
+      <div className="flex items-center gap-2.5">
       <button
         onClick={toggle}
-        className="w-8 h-8 rounded-full bg-brand-600 hover:bg-brand-500 flex items-center justify-center flex-shrink-0 transition-colors"
+        style={{ backgroundColor: playColor }}
+        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors"
       >
         {playing
           ? <Pause size={13} className="text-white" />
@@ -129,14 +142,15 @@ function AudioPlayer({ url, duration }: { url: string; duration?: number }) {
       <div className="flex-1 min-w-0">
         <div className="h-1 bg-white/10 rounded-full overflow-hidden">
           <div
-            className="h-1 bg-brand-500 rounded-full transition-all"
-            style={{ width: `${progress}%` }}
+            className="h-1 rounded-full transition-all"
+            style={{ width: `${progress}%`, backgroundColor: playColor }}
           />
         </div>
       </div>
       <span className="text-[10px] text-white/40 flex-shrink-0 tabular-nums w-8 text-right">
         {fmtDuration(playing ? remaining : (duration ?? 0))}
       </span>
+      </div>
       <audio
         ref={audioRef}
         src={url}
@@ -222,11 +236,17 @@ interface BubbleProps {
   isSaved?: boolean;
   onSave?: (id: string) => void;
   userStatuses?: Record<string, string>;
+  onSetPriority?: (id: string, p: MessagePriority | null, isReceiver: boolean) => void;
+  onMove?: (id: string, targetChannelId: string) => void;
+  allChannels?: Channel[];
 }
 
-function MessageBubble({ msg, prevMsg, userNames, users, replyCount, isPinned, onReact, onEdit, onDelete, onOpenThread, onPin, onCopyLink, editing, editValue, onEditChange, onEditSave, onEditCancel, isThread, isFirstUnread, isSaved, onSave, userStatuses }: BubbleProps) {
+function MessageBubble({ msg, prevMsg, userNames, users, replyCount, isPinned, onReact, onEdit, onDelete, onOpenThread, onPin, onCopyLink, editing, editValue, onEditChange, onEditSave, onEditCancel, isThread, isFirstUnread, isSaved, onSave, userStatuses, onSetPriority, onMove, allChannels }: BubbleProps) {
   const [showEmoji, setShowEmoji] = useState(false);
+  const [showPriorityPicker, setShowPriorityPicker] = useState(false);
+  const [showMovePicker, setShowMovePicker] = useState(false);
   const author = users.find(u => u.id === msg.authorId);
+  const effectivePriority = msg.receiverPriority ?? msg.priority;
   const isContinuation = prevMsg && prevMsg.authorId === msg.authorId
     && isSameDay(prevMsg.createdAt, msg.createdAt)
     && (new Date(msg.createdAt).getTime() - new Date(prevMsg.createdAt).getTime()) < 5 * 60000;
@@ -243,8 +263,10 @@ function MessageBubble({ msg, prevMsg, userNames, users, replyCount, isPinned, o
         </div>
       )}
     <div
-      className={`group relative flex gap-3 px-4 py-0.5 hover:bg-white/[0.02] rounded-lg transition-colors ${isPinned ? 'bg-amber-500/[0.03] border-l-2 border-amber-500/30 ml-0 pl-3' : ''}`}
-      onMouseLeave={() => setShowEmoji(false)}
+      className={`group relative flex gap-3 px-4 py-0.5 hover:bg-white/[0.02] rounded-lg transition-colors ${
+        isPinned ? 'bg-amber-500/[0.03] border-l-2 border-amber-500/30 ml-0 pl-3' : ''
+      }`}
+      onMouseLeave={() => { setShowEmoji(false); setShowPriorityPicker(false); }}
     >
       {isContinuation ? (
         <div className="w-8 flex-shrink-0 flex items-center justify-center">
@@ -264,6 +286,11 @@ function MessageBubble({ msg, prevMsg, userNames, users, replyCount, isPinned, o
             <span className="text-sm font-semibold text-white">{author?.name || msg.authorId}</span>
             <span className="text-xs text-white/30">{formatTime(msg.createdAt)}</span>
             {msg.editedAt && <span className="text-[10px] text-white/20">(edited)</span>}
+            {effectivePriority && (
+              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${PRIORITY_CONFIG[effectivePriority].bg} ${PRIORITY_CONFIG[effectivePriority].text}`}>
+                {PRIORITY_CONFIG[effectivePriority].label}
+              </span>
+            )}
           </div>
         )}
 
@@ -272,7 +299,7 @@ function MessageBubble({ msg, prevMsg, userNames, users, replyCount, isPinned, o
           <div className="mb-1 flex flex-col gap-2">
             {msg.attachments.map((att, i) => {
               if (att.type === 'audio') {
-                return <AudioPlayer key={i} url={att.url} duration={att.duration} />;
+                return <AudioPlayer key={i} url={att.url} duration={att.duration} title={att.name && !att.name.startsWith('Voice note') ? att.name : undefined} priority={effectivePriority} />;
               }
               if (att.type.startsWith('image/') || att.type === 'image') {
                 return (
@@ -423,6 +450,75 @@ function MessageBubble({ msg, prevMsg, userNames, users, replyCount, isPinned, o
               <Bookmark size={14} />
             </button>
           )}
+          {onSetPriority && (
+            <div className="relative">
+              <button
+                onClick={() => setShowPriorityPicker(v => !v)}
+                className={`p-1.5 rounded-md hover:bg-white/[0.08] transition-colors ${effectivePriority ? PRIORITY_CONFIG[effectivePriority].text : 'text-white/30 hover:text-white/60'}`}
+                title="Set priority"
+              >
+                <Flag size={14} />
+              </button>
+              {showPriorityPicker && (
+                <div className="absolute right-0 bottom-full mb-1 p-1.5 bg-[#1c1c1f] border border-white/[0.08] rounded-xl shadow-xl z-20 flex flex-col gap-0.5 min-w-[110px]">
+                  {(Object.entries(PRIORITY_CONFIG) as [MessagePriority, typeof PRIORITY_CONFIG[MessagePriority]][]).map(([p, cfg]) => (
+                    <button
+                      key={p}
+                      onClick={() => { onSetPriority(msg.id, p, true); setShowPriorityPicker(false); }}
+                      className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors hover:bg-white/[0.08] ${effectivePriority === p ? cfg.text + ' font-semibold' : 'text-white/60'}`}
+                    >
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot}`} />
+                      {cfg.label}
+                    </button>
+                  ))}
+                  {effectivePriority && (
+                    <button
+                      onClick={() => { onSetPriority(msg.id, null, true); setShowPriorityPicker(false); }}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-white/30 hover:text-white/60 hover:bg-white/[0.08] transition-colors border-t border-white/[0.06] mt-0.5 pt-2"
+                    >
+                      <X size={10} /> Clear
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          {onMove && allChannels && (
+            <div className="relative">
+              <button
+                onClick={() => setShowMovePicker(v => !v)}
+                className="p-1.5 rounded-md hover:bg-white/[0.08] text-white/30 hover:text-white/60 transition-colors"
+                title="Move to channel"
+              >
+                <ArrowRight size={14} />
+              </button>
+              {showMovePicker && (
+                <div className="absolute right-0 bottom-full mb-1 p-1.5 bg-[#1c1c1f] border border-white/[0.08] rounded-xl shadow-xl z-20 flex flex-col gap-0.5 min-w-[170px] max-h-64 overflow-y-auto">
+                  <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-2 py-1">Move to...</p>
+                  {allChannels.filter(c => c.id !== msg.channelId && !c.deletedAt).map(c => {
+                    const isDm = c.type === 'dm';
+                    const dmName = isDm
+                      ? c.memberIds.filter(id => id !== msg.authorId).map(id => users.find(u => u.id === id)?.name ?? 'Unknown').join(', ')
+                      : null;
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => { onMove(msg.id, c.id); setShowMovePicker(false); }}
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-white/60 hover:text-white/90 hover:bg-white/[0.08] transition-colors text-left"
+                      >
+                        {isDm ? (
+                          <span className="w-2 h-2 rounded-full bg-white/20 flex-shrink-0" />
+                        ) : (
+                          <Hash size={11} className="flex-shrink-0 text-white/30" />
+                        )}
+                        <span className="truncate">{isDm ? dmName : c.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
           <button
             onClick={() => onDelete(msg.id)}
             className="p-1.5 rounded-md hover:bg-white/[0.08] text-red-400/50 hover:text-red-400 transition-colors"
@@ -443,7 +539,7 @@ export default function MessagesPage() {
     setActiveChannel, sendMessage, addReaction,
     updateMessage, deleteMessage, replyToMessage, addNotification, deleteChannel, addChannel,
     updateChannel, pinMessage, unpinMessage, restoreChannel, permanentlyDeleteChannel,
-    userStatuses,
+    userStatuses, setMessagePriority, moveMessage,
   } = useStore();
 
   const [input, setInput] = useState('');
@@ -463,7 +559,7 @@ export default function MessagesPage() {
   const [showAttachForm, setShowAttachForm] = useState(false);
   const [pendingUrl, setPendingUrl] = useState('');
   const [pendingUrlName, setPendingUrlName] = useState('');
-  const [pendingAttachments, setPendingAttachments] = useState<{ name: string; url: string; type: string }[]>([]);
+  const [pendingAttachments, setPendingAttachments] = useState<{ name: string; url: string; type: string; duration?: number }[]>([]);
   const [showPinned, setShowPinned] = useState(false);
   const [editingDesc, setEditingDesc] = useState(false);
   const [descValue, setDescValue] = useState('');
@@ -483,6 +579,8 @@ export default function MessagesPage() {
   });
   const [showSaved, setShowSaved] = useState(false);
   const [savedChannelFilter, setSavedChannelFilter] = useState<string | null>(null);
+  const [priorityFilter, setPriorityFilter] = useState<MessagePriority | null>(null);
+  const [msgPriority, setMsgPriority] = useState<MessagePriority | null>(null);
   const prevChannelIdRef = useRef<string | null>(null);
 
   // Mobile: 'list' shows the channel sidebar full-screen; 'chat' shows the message area full-screen
@@ -495,6 +593,9 @@ export default function MessagesPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [pendingAudio, setPendingAudio] = useState<{ blob: Blob; duration: number } | null>(null);
+  const [audioTitle, setAudioTitle] = useState('');
+  const audioTitleRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -656,11 +757,13 @@ export default function MessagesPage() {
     sendMessage(
       activeChannelId,
       body,
-      pendingAttachments.length > 0 ? pendingAttachments : undefined
+      pendingAttachments.length > 0 ? pendingAttachments : undefined,
+      msgPriority ?? undefined,
     );
     setInput('');
     setPendingAttachments([]);
     setShowAttachForm(false);
+    setMsgPriority(null);
     inputRef.current?.focus();
   };
 
@@ -724,11 +827,13 @@ export default function MessagesPage() {
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
-      mediaRecorder.onstop = async () => {
+      mediaRecorder.onstop = () => {
         const duration = (Date.now() - recordingStartRef.current) / 1000;
         if (duration < 0.5) return; // too short, discard
         const blob = new Blob(chunksRef.current, { type: mimeType || 'audio/webm' });
-        await uploadAudioBlob(blob, duration);
+        setPendingAudio({ blob, duration });
+        setAudioTitle('');
+        setTimeout(() => audioTitleRef.current?.focus(), 50);
       };
       mediaRecorderRef.current = mediaRecorder;
       recordingStartRef.current = Date.now();
@@ -756,14 +861,15 @@ export default function MessagesPage() {
     setRecordingDuration(0);
   };
 
-  const uploadAudioBlob = async (blob: Blob, duration: number) => {
+  const uploadAudioBlob = async (blob: Blob, duration: number, title?: string) => {
     setIsUploading(true);
+    setPendingAudio(null);
     try {
       const ext = blob.type.includes('mp4') ? 'm4a' : 'webm';
       const path = `audio/${Date.now()}-${currentUser.id}.${ext}`;
       const url = await uploadToStorage('hive-attachments', path, blob);
       setPendingAttachments(prev => [...prev, {
-        name: `Voice note (${fmtDuration(duration)})`,
+        name: title?.trim() || `Voice note (${fmtDuration(duration)})`,
         url,
         type: 'audio',
         duration,
@@ -897,6 +1003,9 @@ export default function MessagesPage() {
           isSaved={savedIds.has(msg.id)}
           onSave={toggleSave}
           userStatuses={userStatuses}
+          onSetPriority={setMessagePriority}
+          onMove={moveMessage}
+          allChannels={channels}
         />
       );
       // Wrap first-unread message in a ref div so we can scroll to it
@@ -936,11 +1045,38 @@ export default function MessagesPage() {
         </div>
 
         <div className="flex-1 overflow-y-auto scrollbar-hide py-2">
+          {/* Priority quick nav */}
+          {!search.trim() && (() => {
+            const prioritized = messages.filter(m => (m.receiverPriority ?? m.priority));
+            if (prioritized.length === 0) return null;
+            return (
+              <div className="px-1 mb-1">
+                {(['urgent', 'high', 'medium', 'low'] as MessagePriority[]).map(p => {
+                  const count = messages.filter(m => (m.receiverPriority ?? m.priority) === p).length;
+                  if (count === 0) return null;
+                  const cfg = PRIORITY_CONFIG[p];
+                  const isActive = priorityFilter === p;
+                  return (
+                    <button
+                      key={p}
+                      onClick={() => { setPriorityFilter(isActive ? null : p); setShowSaved(false); }}
+                      className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${isActive ? 'bg-white/[0.08] text-white' : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'}`}
+                    >
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot}`} />
+                      <span className="flex-1 text-left">{cfg.label}</span>
+                      <span className="text-xs text-white/30">{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
           {/* Saved Items quick nav */}
           {!search.trim() && (
             <div className="px-1 mb-1">
               <button
-                onClick={() => { setShowSaved(v => !v); setSavedChannelFilter(null); }}
+                onClick={() => { setShowSaved(v => !v); setSavedChannelFilter(null); setPriorityFilter(null); }}
                 className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${showSaved ? 'bg-white/[0.08] text-white' : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'}`}
               >
                 <Bookmark size={14} className={showSaved ? 'text-amber-400' : 'text-white/30'} />
@@ -1247,6 +1383,58 @@ export default function MessagesPage() {
         </div>
       </div>
 
+      {/* Priority filtered panel */}
+      {priorityFilter && !showSaved && (() => {
+        const cfg = PRIORITY_CONFIG[priorityFilter];
+        const filtered = messages.filter(m => (m.receiverPriority ?? m.priority) === priorityFilter);
+        const channelsWithMsgs = channels.filter(ch => filtered.some(m => m.channelId === ch.id));
+        return (
+          <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+            <div className="flex items-center gap-3 px-5 min-h-[56px] pt-safe md:pt-0 pb-2 md:pb-0 border-b border-white/[0.06] flex-shrink-0">
+              <button onClick={() => setPriorityFilter(null)} className="md:hidden -ml-1 p-3 text-white/60 hover:text-white transition-colors flex-shrink-0">
+                <ChevronLeft size={26} />
+              </button>
+              <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
+              <h2 className="text-sm font-semibold text-white flex-1">{cfg.label} Priority</h2>
+              <span className="text-xs text-white/30">{filtered.length}</span>
+            </div>
+            <div className="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4">
+              {channelsWithMsgs.length === 0 && (
+                <p className="text-center text-sm text-white/20 py-12">No {cfg.label.toLowerCase()} priority messages</p>
+              )}
+              {channelsWithMsgs.map(ch => {
+                const chMsgs = filtered.filter(m => m.channelId === ch.id);
+                return (
+                  <div key={ch.id}>
+                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <Hash size={10} />{ch.type === 'channel' ? ch.name : getDmName(ch)}
+                    </p>
+                    <div className="space-y-1">
+                      {chMsgs.map(m => {
+                        const author = users.find(u => u.id === m.authorId);
+                        return (
+                          <button
+                            key={m.id}
+                            onClick={() => { setActiveChannel(ch.id); setPriorityFilter(null); setMobileView('chat'); }}
+                            className="w-full text-left px-3 py-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.05] transition-colors"
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-semibold text-white/70">{author?.name || m.authorId}</span>
+                              <span className="text-[10px] text-white/25">{formatTime(m.createdAt)}</span>
+                            </div>
+                            <p className="text-sm text-white/60 leading-relaxed line-clamp-2">{m.body || (m.attachments?.[0]?.type === 'audio' ? '🎙 Voice message' : m.attachments?.[0]?.name)}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Saved Items panel */}
       {showSaved && (
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
@@ -1359,7 +1547,7 @@ export default function MessagesPage() {
       )}
 
       {/* Main message area — full-screen on mobile in chat view, always visible on desktop */}
-      {!showSaved && <div className={`${mobileView === 'list' ? 'hidden md:flex' : 'flex'} flex-1 flex-col min-w-0`}>
+      {!showSaved && !priorityFilter && <div className={`${mobileView === 'list' ? 'hidden md:flex' : 'flex'} flex-1 flex-col min-w-0`}>
         {/* Header — pt-safe pushes content below Dynamic Island; min-h instead of h so it expands */}
         <div className="flex items-center gap-3 px-3 min-h-[56px] pt-safe md:pt-0 pb-2 md:pb-0 border-b border-white/[0.06] flex-shrink-0">
           {/* Back to channel list — mobile only. Large tap target (44×44 min per Apple HIG) */}
@@ -1613,7 +1801,7 @@ export default function MessagesPage() {
                 if (att.type === 'audio') {
                   return (
                     <div key={i} className="flex items-center gap-2">
-                      <AudioPlayer url={att.url} duration={att.duration} />
+                      <AudioPlayer url={att.url} duration={att.duration} title={att.name && !att.name.startsWith('Voice note') ? att.name : undefined} />
                       <button
                         onClick={() => setPendingAttachments(prev => prev.filter((_, j) => j !== i))}
                         className="text-white/30 hover:text-red-400 transition-colors flex-shrink-0"
@@ -1648,6 +1836,38 @@ export default function MessagesPage() {
               <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
               <span className="text-xs text-red-400">Recording… {fmtDuration(recordingDuration)}</span>
               <span className="text-[10px] text-white/30 ml-auto">Click 🎙 to stop</span>
+            </div>
+          )}
+
+          {/* Audio title prompt — shown after recording stops */}
+          {pendingAudio && (
+            <div className="mb-2 px-3 py-2.5 bg-white/[0.04] border border-white/[0.08] rounded-xl">
+              <p className="text-[10px] text-white/40 mb-1.5">Voice note · {fmtDuration(pendingAudio.duration)} — give it a title?</p>
+              <div className="flex items-center gap-2">
+                <input
+                  ref={audioTitleRef}
+                  value={audioTitle}
+                  onChange={e => setAudioTitle(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') uploadAudioBlob(pendingAudio.blob, pendingAudio.duration, audioTitle);
+                    if (e.key === 'Escape') uploadAudioBlob(pendingAudio.blob, pendingAudio.duration);
+                  }}
+                  placeholder="e.g. Roof contractor update"
+                  className="flex-1 bg-transparent text-sm text-white/80 placeholder-white/20 focus:outline-none"
+                />
+                <button
+                  onClick={() => uploadAudioBlob(pendingAudio.blob, pendingAudio.duration, audioTitle)}
+                  className="text-xs px-2.5 py-1 bg-brand-600 hover:bg-brand-500 text-white rounded-lg transition-colors flex-shrink-0"
+                >
+                  Send
+                </button>
+                <button
+                  onClick={() => uploadAudioBlob(pendingAudio.blob, pendingAudio.duration)}
+                  className="text-xs text-white/30 hover:text-white/60 transition-colors flex-shrink-0"
+                >
+                  Skip
+                </button>
+              </div>
             </div>
           )}
 
@@ -1712,6 +1932,40 @@ export default function MessagesPage() {
             >
               {isRecording ? <MicOff size={15} /> : <Mic size={15} />}
             </button>
+
+            {/* Priority picker */}
+            <div className="relative flex-shrink-0 mb-0.5">
+              <button
+                type="button"
+                title="Set message priority"
+                onClick={() => setMsgPriority(p => p ? null : 'medium')}
+                className={`p-1.5 rounded-lg transition-colors ${msgPriority ? PRIORITY_CONFIG[msgPriority].text : 'text-white/25 hover:text-white/50'}`}
+              >
+                <Flag size={14} />
+              </button>
+              {msgPriority !== null && (
+                <div className="absolute bottom-full right-0 mb-1 p-1.5 bg-[#1c1c1f] border border-white/[0.08] rounded-xl shadow-xl z-20 flex flex-col gap-0.5 min-w-[110px]">
+                  {(Object.entries(PRIORITY_CONFIG) as [MessagePriority, typeof PRIORITY_CONFIG[MessagePriority]][]).map(([p, cfg]) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setMsgPriority(p)}
+                      className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors hover:bg-white/[0.08] ${msgPriority === p ? cfg.text + ' font-semibold' : 'text-white/60'}`}
+                    >
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot}`} />
+                      {cfg.label}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setMsgPriority(null)}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-white/30 hover:text-white/60 hover:bg-white/[0.08] transition-colors border-t border-white/[0.06] mt-0.5 pt-2"
+                  >
+                    <X size={10} /> No priority
+                  </button>
+                </div>
+              )}
+            </div>
 
             <button
               type="button"
@@ -1782,6 +2036,8 @@ export default function MessagesPage() {
                 isSaved={savedIds.has(threadParentMsg.id)}
                 onSave={toggleSave}
                 userStatuses={userStatuses}
+                onMove={moveMessage}
+                allChannels={channels}
                 isThread
               />
             </div>

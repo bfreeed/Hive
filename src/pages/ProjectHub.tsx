@@ -6,16 +6,19 @@ import { isPast } from 'date-fns';
 import TaskRow from '../components/TaskRow';
 import BoardView from '../components/BoardView';
 import DocEditor from '../components/DocEditor';
+import ProjectWorkspace from '../components/ProjectWorkspace';
+import DriveFolderView from '../components/DriveFolderView';
 import { buildGroups, sortTasks } from '../utils/buildGroups';
 import type { BoardGroupBy, BoardSortBy, BoardSortOrder } from '../utils/buildGroups';
+import { GOOGLE_CLIENT_ID_KEY } from '../lib/storageKeys';
 
 const PROJECT_COLORS = ['#6366f1','#10b981','#f59e0b','#ef4444','#3b82f6','#8b5cf6','#ec4899','#14b8a6'];
 
 export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { projectId: string; onNavigate: (page: string, id?: string) => void; onOpenTask: (id: string) => void }) {
-  const { projects, tasks, users, contacts, addTask, updateProject, addUser, addProject } = useStore();
+  const { projects, tasks, users, contacts, addTask, updateProject, addUser, addProject, userSettings } = useStore();
   const [inviteEmail, setInviteEmail] = useState('');
   const inviteRef = useRef<HTMLInputElement>(null);
-  const [activeTab, setActiveTab] = useState<'tasks' | 'docs' | 'contacts' | 'members'>('tasks');
+  const [activeTab, setActiveTab] = useState<'tasks' | 'workspace' | 'docs' | 'contacts' | 'members'>('tasks');
   const [viewType, setViewType] = useState<'list' | 'board'>('list');
   const [showSort, setShowSort] = useState(false);
   const [groupBy, setGroupBy] = useState<BoardGroupBy>('none');
@@ -26,6 +29,9 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
   const addTaskRef = useRef<HTMLInputElement>(null);
   const [showSharePopover, setShowSharePopover] = useState(false);
   const shareRef = useRef<HTMLDivElement>(null);
+
+  // Sub-project section collapsed state
+  const [subProjectsCollapsed, setSubProjectsCollapsed] = useState(false);
 
   // Sub-project creation
   const [showAddSub, setShowAddSub] = useState(false);
@@ -306,10 +312,19 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
         {(subProjects.length > 0 || !project.parentId) && (
           <div className="mb-8">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xs font-semibold text-white/30 uppercase tracking-wider">
-                Sub-projects {subProjects.length > 0 && <span className="font-normal text-white/20">({subProjects.length})</span>}
-              </h2>
-              {!showAddSub && (
+              <button
+                onClick={() => setSubProjectsCollapsed(v => !v)}
+                className="flex items-center gap-1.5 group"
+              >
+                <ChevronRight
+                  size={13}
+                  className={`text-white/25 transition-transform ${subProjectsCollapsed ? '' : 'rotate-90'}`}
+                />
+                <h2 className="text-xs font-semibold text-white/30 uppercase tracking-wider group-hover:text-white/50 transition-colors">
+                  Sub-projects {subProjects.length > 0 && <span className="font-normal text-white/20">({subProjects.length})</span>}
+                </h2>
+              </button>
+              {!showAddSub && !subProjectsCollapsed && (
                 <button
                   onClick={() => setShowAddSub(true)}
                   className="flex items-center gap-1 text-xs text-white/25 hover:text-white/60 transition-colors"
@@ -319,7 +334,7 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
               )}
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            {!subProjectsCollapsed && <div className="flex flex-wrap gap-3">
               {subProjects.map(sub => {
                 const subActive = tasks.filter(t => (t.projectIds ?? []).includes(sub.id) && t.status !== 'done').length;
                 const subDone = tasks.filter(t => (t.projectIds ?? []).includes(sub.id) && t.status === 'done').length;
@@ -390,13 +405,13 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                   <span className="text-xs">New sub-project</span>
                 </button>
               )}
-            </div>
+            </div>}
           </div>
         )}
 
         {/* Tabs */}
         <div className="flex items-center border-b border-white/[0.06] mb-6">
-          {(['tasks', 'docs', 'contacts', 'members'] as const).map((tab) => (
+          {(['tasks', 'workspace', 'docs', 'contacts', 'members'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -572,15 +587,39 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
           </div>
         )}
 
-        {/* Docs Tab */}
-        {activeTab === 'docs' && (
-          <div>
-            <DocEditor
+        {/* Workspace Tab */}
+        {activeTab === 'workspace' && (
+          <div className="-mx-6 -mb-6 h-[calc(100vh-220px)] flex flex-col">
+            <ProjectWorkspace
               content={project.docContent ?? null}
               onChange={(json) => updateProject(projectId, { docContent: json })}
             />
           </div>
         )}
+
+        {/* Docs Tab */}
+        {activeTab === 'docs' && (() => {
+          const clientId = userSettings?.googleClientId || localStorage.getItem(GOOGLE_CLIENT_ID_KEY) || undefined;
+          if (clientId || project.googleDriveFolderId) {
+            return (
+              <div>
+                <DriveFolderView
+                  folderId={project.googleDriveFolderId}
+                  folderName={project.googleDriveFolderName}
+                  clientId={clientId}
+                  onLink={(folderId, folderName) => updateProject(projectId, { googleDriveFolderId: folderId, googleDriveFolderName: folderName })}
+                  onUnlink={() => updateProject(projectId, { googleDriveFolderId: undefined, googleDriveFolderName: undefined })}
+                />
+              </div>
+            );
+          }
+          return (
+            <DocEditor
+              content={project.docContent ?? null}
+              onChange={(json) => updateProject(projectId, { docContent: json })}
+            />
+          );
+        })()}
       </div>
     </div>
   );

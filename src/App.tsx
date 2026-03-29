@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from './store';
+import { DEFAULT_HOME_SECTIONS } from './types';
 import { useAuth } from './hooks/useAuth';
-import { Home as HomeIcon, CheckSquare, MessageSquare, Users, MoreHorizontal } from 'lucide-react';
+import { Home as HomeIcon, CheckSquare, MessageSquare, Users, MoreHorizontal, Calendar, FolderOpen } from 'lucide-react';
 import LoginPage from './pages/LoginPage';
 import Sidebar from './components/Sidebar';
 import VoicePanel from './components/VoicePanel';
@@ -17,18 +18,23 @@ import TeamMemberView from './pages/TeamMemberView';
 import MessagesPage from './pages/MessagesPage';
 import NotificationsPage from './pages/NotificationsPage';
 import TodayPage from './pages/TodayPage';
+import MeetingsPage, { useUnreviewedMeetingCount } from './pages/MeetingsPage';
+import MobileProjectsPage from './pages/MobileProjectsPage';
 import { useReminderChecker } from './hooks/useReminderChecker';
 import { useHealthSweep } from './hooks/useHealthSweep';
+import { useGranolaSync } from './hooks/useGranolaSync';
 import { getPushoverKey, GOOGLE_CLIENT_ID_KEY, GOOGLE_API_KEY_KEY } from './lib/storageKeys';
 
 function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: any; darkMode: boolean; toggleDarkMode: () => void }) {
-  const { addUserFlag, updateUserFlag, removeUserFlag } = useStore();
+  const { addUserFlag, updateUserFlag, removeUserFlag, userSettings, saveUserSettings } = useStore();
   const clientIdRef = useRef<HTMLInputElement>(null);
   const apiKeyRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
+  const granolaKeyRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const [saved, setSaved] = useState(false);
   const [phoneSaved, setPhoneSaved] = useState(false);
+  const [granolaKeySaved, setGranolaKeySaved] = useState(false);
   const [importPreview, setImportPreview] = useState<any>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [newFlagName, setNewFlagName] = useState('');
@@ -102,9 +108,12 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
 
   const userId = currentUser?.id || 'lev';
 
-  const saveCredentials = () => {
-    if (clientIdRef.current) localStorage.setItem(GOOGLE_CLIENT_ID_KEY, clientIdRef.current.value.trim());
-    if (apiKeyRef.current) localStorage.setItem(GOOGLE_API_KEY_KEY, apiKeyRef.current.value.trim());
+  const saveCredentials = async () => {
+    const clientId = clientIdRef.current?.value.trim() ?? '';
+    const apiKey = apiKeyRef.current?.value.trim() ?? '';
+    if (clientIdRef.current) localStorage.setItem(GOOGLE_CLIENT_ID_KEY, clientId);
+    if (apiKeyRef.current) localStorage.setItem(GOOGLE_API_KEY_KEY, apiKey);
+    await saveUserSettings({ googleClientId: clientId || undefined });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -117,6 +126,13 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
     }
     setPhoneSaved(true);
     setTimeout(() => setPhoneSaved(false), 2000);
+  };
+
+  const saveGranolaKey = async () => {
+    const key = granolaKeyRef.current?.value.trim() ?? '';
+    await saveUserSettings({ granolaApiKey: key || undefined });
+    setGranolaKeySaved(true);
+    setTimeout(() => setGranolaKeySaved(false), 2000);
   };
 
   return (
@@ -315,6 +331,91 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
             </button>
           </div>
         </div>
+
+        {/* Home Layout */}
+        <div className="mb-8">
+          <h2 className="text-xs font-semibold text-white/30 uppercase tracking-wider mb-3">Home Layout</h2>
+          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4">
+            <p className="text-xs text-white/40 mb-4 leading-relaxed">
+              Choose which sections appear on your Home page. Drag to reorder, or use the AI command bar (⌘K) to rearrange with natural language.
+            </p>
+            <div className="space-y-1">
+              {(userSettings?.homeSections ?? DEFAULT_HOME_SECTIONS).map((section, idx) => (
+                <div key={section.id} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/[0.03] transition-colors">
+                  <button
+                    onClick={async () => {
+                      const current = userSettings?.homeSections ?? DEFAULT_HOME_SECTIONS;
+                      const updated = current.map(s => s.id === section.id ? { ...s, enabled: !s.enabled } : s);
+                      await saveUserSettings({ homeSections: updated });
+                    }}
+                    className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${section.enabled ? 'bg-brand-500 border-brand-500' : 'border-white/20 bg-transparent'}`}
+                  >
+                    {section.enabled && <span className="text-white text-[10px]">✓</span>}
+                  </button>
+                  <span className={`text-sm flex-1 ${section.enabled ? 'text-white/70' : 'text-white/25'}`}>{section.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Integrations — AI Meeting Notes */}
+        <div className="mb-8">
+          <h2 className="text-xs font-semibold text-white/30 uppercase tracking-wider mb-3">Meeting Note Integrations</h2>
+          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 space-y-4">
+            <p className="text-xs text-white/40 leading-relaxed">
+              Automatically sync AI meeting notes into Hive. Notes are matched to your contacts and projects.
+            </p>
+
+            {/* Granola */}
+            <div className="border-t border-white/[0.06] pt-4">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-sm font-medium text-white/70">Granola</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 font-semibold">Supported</span>
+                {userSettings?.granolaLastSyncedAt && (
+                  <span className="text-[10px] text-white/25 ml-auto">
+                    Last synced {new Date(userSettings.granolaLastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-white/25 mb-3">
+                Requires Granola Business plan ($18/mo). Get your API key at granola.so → Settings → Integrations.
+              </p>
+              <div className="mb-3">
+                <label className="text-xs text-white/40 block mb-1.5">Granola API Key</label>
+                <input
+                  ref={granolaKeyRef}
+                  type="password"
+                  defaultValue={userSettings?.granolaApiKey ?? ''}
+                  placeholder="gran_..."
+                  className="w-full px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white/60 placeholder-white/20 focus:outline-none focus:border-brand-500/40 font-mono"
+                />
+              </div>
+              <button
+                onClick={saveGranolaKey}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${granolaKeySaved ? 'bg-emerald-500/20 text-emerald-400' : 'bg-brand-600 hover:bg-brand-500 text-white'}`}
+              >
+                {granolaKeySaved ? '✓ Saved — syncing every 15 min' : 'Save API Key'}
+              </button>
+            </div>
+
+            {/* Fireflies — coming soon */}
+            <div className="border-t border-white/[0.06] pt-4 opacity-40">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-white/70">Fireflies</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-white/[0.06] text-white/30 font-semibold">Coming soon</span>
+              </div>
+            </div>
+
+            {/* Otter — coming soon */}
+            <div className="border-t border-white/[0.06] pt-4 opacity-40">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-white/70">Otter.ai</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-white/[0.06] text-white/30 font-semibold">Coming soon</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -356,6 +457,8 @@ type Page =
   | { id: 'today' }
   | { id: 'contacts' }
   | { id: 'messages' }
+  | { id: 'meetings' }
+  | { id: 'projects' }
   | { id: 'project'; projectId: string }
   | { id: 'team-member'; userId: string }
   | { id: 'notifications' }
@@ -367,8 +470,10 @@ function hashToPage(hash: string): Page {
   if (h === 'today') return { id: 'today' };
   if (h === 'contacts') return { id: 'contacts' };
   if (h === 'messages') return { id: 'messages' };
+  if (h === 'meetings') return { id: 'meetings' };
   if (h === 'notifications') return { id: 'notifications' };
   if (h === 'settings') return { id: 'settings' };
+  if (h === 'projects') return { id: 'projects' };
   if (h.startsWith('project-')) return { id: 'project', projectId: h.slice(8) };
   if (h.startsWith('team-member-')) return { id: 'team-member', userId: h.slice(12) };
   return { id: 'home' };
@@ -381,7 +486,7 @@ function pageToHash(p: Page): string {
   return `#${p.id}`;
 }
 
-function MobileBottomNav({ activePage, onNavigate }: { activePage: string; onNavigate: (page: string, id?: string) => void }) {
+function MobileBottomNav({ activePage, onNavigate, unreviewedMeetingCount }: { activePage: string; onNavigate: (page: string, id?: string) => void; unreviewedMeetingCount: number }) {
   const { channels, messages, currentUser } = useStore();
 
   const unreadMessages = channels
@@ -398,7 +503,7 @@ function MobileBottomNav({ activePage, onNavigate }: { activePage: string; onNav
     { id: 'home',     label: 'Home',     icon: <HomeIcon size={22} /> },
     { id: 'tasks',    label: 'Tasks',    icon: <CheckSquare size={22} /> },
     { id: 'messages', label: 'Messages', icon: <MessageSquare size={22} />, badge: unreadMessages },
-    { id: 'contacts', label: 'Contacts', icon: <Users size={22} /> },
+    { id: 'projects', label: 'Projects', icon: <FolderOpen size={22} /> },
     { id: 'more',     label: 'More',     icon: <MoreHorizontal size={22} /> },
   ];
 
@@ -414,15 +519,22 @@ function MobileBottomNav({ activePage, onNavigate }: { activePage: string; onNav
             onClick={e => e.stopPropagation()}
           >
             {[
+              { id: 'contacts',      label: 'Contacts' },
+              { id: 'meetings',      label: 'Meetings', badge: unreviewedMeetingCount },
               { id: 'notifications', label: 'Notifications' },
               { id: 'settings',      label: 'Settings' },
             ].map(item => (
               <button
                 key={item.id}
                 onClick={() => { onNavigate(item.id); setShowMore(false); }}
-                className="w-full px-5 py-3.5 text-left text-sm text-white/70 hover:bg-white/[0.06] border-b border-white/[0.06] last:border-0 transition-colors"
+                className="w-full px-5 py-3.5 text-left text-sm text-white/70 hover:bg-white/[0.06] border-b border-white/[0.06] last:border-0 transition-colors flex items-center justify-between"
               >
                 {item.label}
+                {!!(item as any).badge && (
+                  <span className="min-w-[18px] h-4.5 px-1.5 bg-amber-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                    {(item as any).badge}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -468,9 +580,11 @@ function AuthenticatedApp() {
   const [cmdKOpen, setCmdKOpen] = useState(false);
   const [quickCaptureText, setQuickCaptureText] = useState<string | null>(null);
 
-  // Mount the SMS reminder checker
+  // Mount the SMS reminder checker + Granola sync
   useReminderChecker(currentUser?.id || 'lev');
   useHealthSweep(currentUser?.id || 'lev');
+  useGranolaSync();
+  const unreviewedMeetingCount = useUnreviewedMeetingCount();
 
   // Handle ?task=xxx URL param for deep links from SMS reminders
   useEffect(() => {
@@ -507,10 +621,12 @@ function AuthenticatedApp() {
     else if (pageName === 'today') newPage = { id: 'today' };
     else if (pageName === 'contacts') newPage = { id: 'contacts' };
     else if (pageName === 'messages') newPage = { id: 'messages' };
+    else if (pageName === 'meetings') newPage = { id: 'meetings' };
     else if (pageName === 'project' && id) newPage = { id: 'project', projectId: id };
     else if (pageName === 'team-member' && id) newPage = { id: 'team-member', userId: id };
     else if (pageName === 'notifications') newPage = { id: 'notifications' };
     else if (pageName === 'settings') newPage = { id: 'settings' };
+    else if (pageName === 'projects') newPage = { id: 'projects' };
     window.location.hash = pageToHash(newPage);
     setPage(newPage);
   };
@@ -529,10 +645,14 @@ function AuthenticatedApp() {
         return <TasksPage onOpenTask={setOpenTaskId} />;
       case 'today':
         return <TodayPage onOpenTask={setOpenTaskId} />;
+      case 'projects':
+        return <MobileProjectsPage onNavigate={navigate} />;
       case 'contacts':
         return <ContactsPage />;
       case 'messages':
         return <MessagesPage />;
+      case 'meetings':
+        return <MeetingsPage />;
       case 'project':
         return <ProjectHub projectId={(page as any).projectId} onNavigate={navigate} onOpenTask={setOpenTaskId} />;
       case 'team-member':
@@ -553,13 +673,13 @@ function AuthenticatedApp() {
         <Sidebar activePage={activePage} onNavigate={navigate} />
       </div>
       {/* Main content — add bottom padding on mobile so content clears the nav bar */}
-      <main className="flex-1 flex flex-col overflow-hidden pb-16 md:pb-0">
+      <main className="flex-1 flex flex-col overflow-hidden pb-16 md:pb-0 pt-safe md:pt-0">
         <ErrorBoundary>
           {renderPage()}
         </ErrorBoundary>
       </main>
       {/* Mobile bottom nav */}
-      <MobileBottomNav activePage={activePage} onNavigate={navigate} />
+      <MobileBottomNav activePage={activePage} onNavigate={navigate} unreviewedMeetingCount={unreviewedMeetingCount} />
       <VoicePanel />
       {openTaskId && <TaskDetail taskId={openTaskId} onClose={() => setOpenTaskId(null)} />}
       {cmdKOpen && (

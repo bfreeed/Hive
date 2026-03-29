@@ -1,0 +1,1304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hive — Pitch Deck</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --brand:     #6366f1;
+      --brand-dim: #4f46e5;
+      --brand-glow: rgba(99,102,241,0.18);
+      --bg:        #0c0c0f;
+      --bg2:       #111115;
+      --bg3:       #18181b;
+      --bg4:       #1f1f24;
+      --border:    rgba(255,255,255,0.07);
+      --border2:   rgba(255,255,255,0.12);
+      --text:      rgba(255,255,255,0.90);
+      --text2:     rgba(255,255,255,0.55);
+      --text3:     rgba(255,255,255,0.28);
+      --text4:     rgba(255,255,255,0.14);
+      --red:       #ef4444;
+      --orange:    #f97316;
+      --amber:     #f59e0b;
+      --emerald:   #10b981;
+      --violet:    #8b5cf6;
+    }
+
+    html { scroll-behavior: smooth; font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); }
+    body { overflow-x: hidden; }
+
+    /* NAV DOTS */
+    .nav-dots {
+      position: fixed; right: 28px; top: 50%; transform: translateY(-50%);
+      z-index: 100; display: flex; flex-direction: column; gap: 10px;
+    }
+    .nav-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--text4); cursor: pointer; transition: all 0.3s;
+      border: none; outline: none;
+    }
+    .nav-dot.active { background: var(--brand); transform: scale(1.4); }
+
+    /* SECTIONS */
+    section {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      padding: 80px 60px; position: relative;
+    }
+    section + section { border-top: 1px solid var(--border); }
+
+    .section-inner { max-width: 1100px; width: 100%; }
+    .section-inner.wide { max-width: 1300px; }
+    .section-inner.narrow { max-width: 760px; }
+
+    /* FADE IN ANIMATION */
+    .reveal { opacity: 0; transform: translateY(28px); transition: opacity 0.65s ease, transform 0.65s ease; }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+    .reveal-delay-1 { transition-delay: 0.1s; }
+    .reveal-delay-2 { transition-delay: 0.2s; }
+    .reveal-delay-3 { transition-delay: 0.3s; }
+    .reveal-delay-4 { transition-delay: 0.45s; }
+    .reveal-delay-5 { transition-delay: 0.6s; }
+
+    /* TYPOGRAPHY */
+    .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--brand); margin-bottom: 18px; }
+    .headline { font-size: clamp(38px, 5vw, 68px); font-weight: 800; line-height: 1.08; letter-spacing: -0.02em; }
+    .headline .dim { color: var(--text2); }
+    .subhead { font-size: clamp(17px, 2vw, 22px); color: var(--text2); line-height: 1.6; margin-top: 20px; font-weight: 400; }
+    .section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text3); margin-bottom: 12px; }
+
+    /* CARDS */
+    .card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 16px; padding: 28px 32px;
+    }
+    .card-sm { padding: 20px 24px; border-radius: 12px; }
+
+    /* PILL TAG */
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--brand-glow); border: 1px solid rgba(99,102,241,0.25);
+      color: #a5b4fc; font-size: 12px; font-weight: 500;
+      padding: 5px 12px; border-radius: 100px;
+    }
+    .pill-red   { background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.2); color: #fca5a5; }
+    .pill-amber { background: rgba(245,158,11,0.12); border-color: rgba(245,158,11,0.2); color: #fcd34d; }
+    .pill-green { background: rgba(16,185,129,0.12); border-color: rgba(16,185,129,0.2); color: #6ee7b7; }
+
+    /* GRID */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .flex-row { display: flex; align-items: center; gap: 16px; }
+
+    /* ============================================================
+       APP MOCKUP — DESKTOP
+    ============================================================ */
+    .mockup-shell {
+      background: var(--bg3); border: 1px solid var(--border2);
+      border-radius: 14px; overflow: hidden;
+      box-shadow: 0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px var(--border);
+    }
+    .mockup-titlebar {
+      background: var(--bg2); height: 38px; display: flex; align-items: center;
+      padding: 0 14px; gap: 7px; border-bottom: 1px solid var(--border);
+    }
+    .dot { width: 11px; height: 11px; border-radius: 50%; }
+    .dot-red { background: #ff5f57; }
+    .dot-yellow { background: #febc2e; }
+    .dot-green { background: #28c840; }
+    .mockup-body { display: flex; height: 540px; }
+
+    /* Sidebar */
+    .mockup-sidebar {
+      width: 196px; background: var(--bg2); border-right: 1px solid var(--border);
+      padding: 12px 8px; flex-shrink: 0; display: flex; flex-direction: column; gap: 2px;
+    }
+    .mock-logo {
+      display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin-bottom: 8px;
+    }
+    .mock-logo-icon {
+      width: 26px; height: 26px; background: var(--brand); border-radius: 7px;
+      display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: white;
+    }
+    .mock-logo-text { font-size: 14px; font-weight: 700; color: var(--text); }
+    .mock-nav-item {
+      display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 8px;
+      font-size: 12.5px; color: var(--text2); cursor: default;
+    }
+    .mock-nav-item.active { background: var(--brand-glow); color: #c7d2fe; }
+    .mock-nav-item svg { width: 14px; height: 14px; opacity: 0.6; flex-shrink: 0; }
+    .mock-nav-item.active svg { opacity: 1; }
+    .mock-nav-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); margin-left: auto; }
+    .mock-project-section { margin-top: 12px; padding: 0 10px; }
+    .mock-project-label { font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+    .mock-project-item { display: flex; align-items: center; gap: 7px; padding: 5px 0; font-size: 12px; color: var(--text2); }
+    .mock-project-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .sidebar-spacer { flex: 1; }
+    .mock-avatar { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-top: 1px solid var(--border); margin-top: 8px; }
+    .mock-avatar-circle { width: 24px; height: 24px; border-radius: 50%; background: var(--brand-dim); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: white; }
+    .mock-avatar-name { font-size: 12px; color: var(--text2); }
+
+    /* Main content */
+    .mockup-main { flex: 1; padding: 24px 28px; overflow: hidden; }
+    .mock-date-label { font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; }
+    .mock-page-title { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+    .mock-page-sub { font-size: 12px; color: var(--text3); margin-bottom: 20px; }
+    .mock-section-header { font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+    .mock-section-header .count { font-size: 10px; opacity: 0.5; }
+    .mock-task-row {
+      display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+      border-radius: 8px; margin-bottom: 2px; cursor: default;
+    }
+    .mock-task-row:hover { background: rgba(255,255,255,0.03); }
+    .mock-task-check { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid rgba(255,255,255,0.2); flex-shrink: 0; }
+    .mock-task-title { font-size: 13px; color: var(--text); flex: 1; }
+    .mock-task-badge { font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 500; }
+    .badge-red { background: rgba(239,68,68,0.15); color: #fca5a5; }
+    .badge-orange { background: rgba(249,115,22,0.15); color: #fdba74; }
+    .badge-violet { background: rgba(139,92,246,0.15); color: #c4b5fd; }
+    .badge-brand { background: rgba(99,102,241,0.15); color: #a5b4fc; }
+    .badge-gray { background: rgba(255,255,255,0.07); color: var(--text2); }
+    .mock-section { margin-bottom: 20px; }
+
+    /* ============================================================
+       MEETINGS MOCKUP
+    ============================================================ */
+    .mockup-meetings-body { display: flex; height: 540px; }
+    .meetings-list { width: 280px; border-right: 1px solid var(--border); padding: 16px 12px; flex-shrink: 0; overflow: hidden; }
+    .meetings-search { background: var(--bg4); border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px; font-size: 12px; color: var(--text3); margin-bottom: 14px; }
+    .meeting-item { padding: 10px 10px; border-radius: 8px; margin-bottom: 4px; cursor: default; }
+    .meeting-item.active { background: var(--brand-glow); border: 1px solid rgba(99,102,241,0.2); }
+    .meeting-item-title { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 3px; }
+    .meeting-item-meta { font-size: 11px; color: var(--text3); display: flex; gap: 8px; align-items: center; }
+    .granola-badge { font-size: 10px; background: rgba(255,255,255,0.06); color: var(--text3); padding: 1px 6px; border-radius: 4px; }
+    .meeting-detail { flex: 1; padding: 20px 24px; overflow: hidden; }
+    .meeting-detail-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+    .meeting-detail-meta { font-size: 12px; color: var(--text3); margin-bottom: 16px; }
+    .detail-section { margin-bottom: 16px; }
+    .detail-section-label { font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
+    .action-item-row { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: var(--bg4); border-radius: 8px; margin-bottom: 4px; font-size: 12px; }
+    .action-item-icon { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); flex-shrink: 0; }
+    .action-btn { margin-left: auto; font-size: 10px; padding: 3px 8px; background: var(--bg3); border-radius: 4px; color: var(--text2); }
+    .participant-chip { display: inline-flex; align-items: center; gap: 5px; background: var(--bg4); border-radius: 6px; padding: 4px 9px; font-size: 12px; color: var(--text2); margin-right: 6px; }
+
+    /* ============================================================
+       COMMAND PALETTE MOCKUP
+    ============================================================ */
+    .cmdpal-overlay { background: rgba(0,0,0,0.55); border-radius: 14px; padding: 40px; display: flex; align-items: flex-start; justify-content: center; }
+    .cmdpal-box { width: 100%; max-width: 520px; background: var(--bg3); border: 1px solid var(--border2); border-radius: 16px; overflow: hidden; box-shadow: 0 25px 50px rgba(0,0,0,0.5); }
+    .cmdpal-input-row { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+    .cmdpal-icon { color: var(--brand); font-size: 14px; }
+    .cmdpal-input { font-size: 15px; color: var(--text); flex: 1; font-family: 'Inter', sans-serif; }
+    .cmdpal-kbd { font-size: 10px; color: var(--text3); background: rgba(255,255,255,0.06); padding: 3px 7px; border-radius: 5px; font-family: monospace; }
+    .cmdpal-result { padding: 10px 18px; display: flex; align-items: center; gap: 10px; }
+    .cmdpal-result.active { background: rgba(99,102,241,0.1); }
+    .cmdpal-result-icon { color: var(--brand); font-size: 14px; }
+    .cmdpal-result-text { font-size: 13.5px; color: #c4b5fd; flex: 1; }
+    .cmdpal-result-sub { font-size: 11px; color: rgba(165,180,252,0.6); margin-left: auto; }
+    .cmdpal-ai-answer { padding: 16px 18px; font-size: 13px; color: var(--text2); line-height: 1.7; border-top: 1px solid var(--border); white-space: pre-line; }
+
+    /* ============================================================
+       WORKSPACE MOCKUP
+    ============================================================ */
+    .workspace-body { display: flex; height: 540px; }
+    .workspace-sidebar { width: 200px; background: var(--bg2); border-right: 1px solid var(--border); padding: 16px 12px; flex-shrink: 0; }
+    .workspace-tree { margin-top: 12px; }
+    .tree-item { display: flex; align-items: center; gap: 7px; padding: 5px 8px; border-radius: 6px; font-size: 12px; color: var(--text2); cursor: default; }
+    .tree-item.active { background: var(--brand-glow); color: #c7d2fe; }
+    .tree-item.indent { padding-left: 22px; }
+    .tree-emoji { font-size: 13px; }
+    .workspace-editor { flex: 1; padding: 28px 36px; overflow: hidden; }
+    .editor-title { font-size: 26px; font-weight: 700; margin-bottom: 20px; outline: none; }
+    .editor-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+    .editor-col { background: var(--bg4); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+    .editor-col-header { font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+    .editor-col-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .editor-task-mini { display: flex; align-items: center; gap: 7px; padding: 5px 0; font-size: 12px; color: var(--text2); }
+    .editor-task-mini-check { width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid rgba(255,255,255,0.2); flex-shrink: 0; }
+    .editor-meeting-mini { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 12px; color: var(--text2); }
+    .slash-hint { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text3); margin-top: 14px; }
+    .slash-key { background: var(--bg3); border: 1px solid var(--border); border-radius: 5px; padding: 2px 7px; font-size: 11px; font-family: monospace; color: var(--text2); }
+
+    /* ============================================================
+       MOBILE MOCKUP
+    ============================================================ */
+    .phone-frame {
+      width: 280px; height: 580px; background: #0c0c0f; border: 2px solid rgba(255,255,255,0.12);
+      border-radius: 42px; overflow: hidden; position: relative; flex-shrink: 0;
+      box-shadow: 0 30px 60px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.06);
+    }
+    .phone-notch { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 100px; height: 28px; background: #0c0c0f; border-radius: 0 0 18px 18px; z-index: 10; }
+    .phone-screen { height: 100%; background: var(--bg); display: flex; flex-direction: column; padding-top: 30px; }
+    .phone-header { padding: 14px 18px 10px; }
+    .phone-page-title { font-size: 18px; font-weight: 700; margin-bottom: 2px; }
+    .phone-page-sub { font-size: 11px; color: var(--text3); }
+    .phone-content { flex: 1; padding: 4px 12px; overflow: hidden; }
+    .phone-task { display: flex; align-items: center; gap: 9px; padding: 9px 8px; border-radius: 8px; margin-bottom: 2px; }
+    .phone-task-check { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid rgba(255,255,255,0.18); flex-shrink: 0; }
+    .phone-task-info { flex: 1; }
+    .phone-task-title { font-size: 13px; color: var(--text); }
+    .phone-task-proj { font-size: 10px; color: var(--text3); margin-top: 1px; }
+    .phone-section-label { font-size: 9px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; padding: 6px 8px 4px; }
+    .phone-bottom-nav { height: 66px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-around; padding: 0 4px 8px; }
+    .phone-nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 14px; border-radius: 10px; }
+    .phone-nav-item.active { background: var(--brand-glow); }
+    .phone-nav-icon { font-size: 16px; }
+    .phone-nav-label { font-size: 9px; font-weight: 500; color: var(--text3); }
+    .phone-nav-item.active .phone-nav-label { color: #a5b4fc; }
+
+    /* ============================================================
+       FEATURE GRID
+    ============================================================ */
+    .feature-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 16px; padding: 28px; transition: border-color 0.2s;
+    }
+    .feature-card:hover { border-color: var(--border2); }
+    .feature-icon { font-size: 24px; margin-bottom: 14px; }
+    .feature-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .feature-desc { font-size: 14px; color: var(--text2); line-height: 1.6; }
+
+    /* ============================================================
+       PRICING TABLE
+    ============================================================ */
+    .pricing-compare { width: 100%; border-collapse: collapse; }
+    .pricing-compare th, .pricing-compare td { padding: 14px 20px; text-align: left; border-bottom: 1px solid var(--border); font-size: 14px; }
+    .pricing-compare th { font-size: 12px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; }
+    .pricing-compare td:first-child { color: var(--text2); }
+    .pricing-compare td:not(:first-child) { color: var(--text); font-weight: 500; }
+    .pricing-compare tr.highlight td { background: rgba(99,102,241,0.07); }
+    .pricing-compare tr.highlight td:first-child { color: #a5b4fc; font-weight: 600; }
+    .price-total { font-size: 22px; font-weight: 800; color: var(--text); }
+    .price-sub { font-size: 12px; color: var(--text3); margin-top: 3px; }
+    .price-savings { font-size: 13px; font-weight: 600; color: var(--emerald); margin-top: 6px; }
+
+    /* ============================================================
+       ROADMAP
+    ============================================================ */
+    .roadmap-item { display: flex; gap: 16px; align-items: flex-start; padding: 16px 0; border-bottom: 1px solid var(--border); }
+    .roadmap-status { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 6px; white-space: nowrap; margin-top: 2px; }
+    .status-live { background: rgba(16,185,129,0.15); color: #6ee7b7; }
+    .status-building { background: rgba(245,158,11,0.12); color: #fcd34d; }
+    .status-next { background: rgba(99,102,241,0.12); color: #a5b4fc; }
+    .roadmap-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+    .roadmap-desc { font-size: 13px; color: var(--text2); line-height: 1.6; }
+
+    /* ============================================================
+       HERO SPECIFIC
+    ============================================================ */
+    .hero-section { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding: 80px 60px; background: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(99,102,241,0.12) 0%, transparent 70%); }
+    .hero-kicker { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; }
+    .hero-logo { width: 36px; height: 36px; background: var(--brand); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 900; color: white; }
+    .hero-wordmark { font-size: 18px; font-weight: 700; color: var(--text); }
+    .hero-headline { font-size: clamp(44px, 6vw, 76px); font-weight: 900; line-height: 1.04; letter-spacing: -0.03em; margin-bottom: 24px; }
+    .hero-headline .accent { color: var(--brand); }
+    .hero-sub { font-size: 20px; color: var(--text2); line-height: 1.6; max-width: 580px; margin-bottom: 40px; font-weight: 400; }
+    .hero-cta-row { display: flex; align-items: center; gap: 16px; margin-bottom: 70px; }
+    .btn-primary { background: var(--brand); color: white; font-weight: 600; font-size: 15px; padding: 13px 28px; border-radius: 10px; display: inline-block; }
+    .btn-ghost { color: var(--text2); font-size: 15px; font-weight: 500; }
+    .hero-stats { display: flex; gap: 48px; }
+    .hero-stat-num { font-size: 28px; font-weight: 800; color: var(--text); }
+    .hero-stat-label { font-size: 13px; color: var(--text3); margin-top: 2px; }
+
+    /* Problem section */
+    .tool-pile { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
+    .tool-chip { display: flex; align-items: center; gap: 8px; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 16px; font-size: 14px; font-weight: 500; color: var(--text2); }
+    .tool-icon { font-size: 18px; }
+    .pain-arrow { color: var(--text4); font-size: 24px; align-self: center; }
+    .pain-point { display: flex; align-items: flex-start; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--border); }
+    .pain-num { font-size: 12px; font-weight: 700; color: var(--brand); min-width: 24px; margin-top: 2px; }
+    .pain-text { font-size: 15px; color: var(--text2); line-height: 1.5; }
+    .pain-text strong { color: var(--text); font-weight: 600; }
+
+    /* Vision quote */
+    .vision-quote { font-size: clamp(22px, 3vw, 36px); font-weight: 700; line-height: 1.35; color: var(--text); border-left: 3px solid var(--brand); padding-left: 28px; }
+    .vision-attr { font-size: 14px; color: var(--text3); margin-top: 16px; padding-left: 28px; }
+
+    /* Template gallery mockup */
+    .template-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .template-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 18px; cursor: default; transition: border-color 0.2s; }
+    .template-card:hover { border-color: var(--border2); }
+    .template-card.featured { border-color: rgba(99,102,241,0.3); background: linear-gradient(135deg, rgba(99,102,241,0.08), var(--bg2)); }
+    .template-emoji { font-size: 20px; margin-bottom: 10px; }
+    .template-name { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+    .template-desc { font-size: 11px; color: var(--text3); line-height: 1.5; }
+    .template-uses { font-size: 10px; color: var(--text4); margin-top: 8px; }
+
+    /* AI feature callout */
+    .ai-feature { display: flex; gap: 16px; padding: 20px; background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 14px; }
+    .ai-feature-icon { font-size: 22px; flex-shrink: 0; margin-top: 2px; }
+    .ai-feature-title { font-size: 15px; font-weight: 600; margin-bottom: 5px; }
+    .ai-feature-desc { font-size: 13px; color: var(--text2); line-height: 1.6; }
+
+    /* Closing */
+    .closing-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 48px; }
+    .closing-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 28px; text-align: center; }
+    .closing-icon { font-size: 32px; margin-bottom: 14px; }
+    .closing-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .closing-desc { font-size: 13px; color: var(--text2); line-height: 1.6; }
+
+    @media (max-width: 900px) {
+      section { padding: 60px 24px; }
+      .hero-section { padding: 60px 24px; }
+      .grid-2, .grid-3, .grid-4, .closing-grid, .template-grid { grid-template-columns: 1fr; }
+      .mockup-sidebar { display: none; }
+      .nav-dots { display: none; }
+      .hero-stats { gap: 28px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV DOTS -->
+<nav class="nav-dots" id="navDots"></nav>
+
+<!-- ============================================================
+  1. HERO
+============================================================ -->
+<section class="hero-section" data-section="hero">
+  <div class="section-inner wide">
+    <div class="hero-kicker reveal">
+      <div class="hero-logo">H</div>
+      <span class="hero-wordmark">Hive</span>
+    </div>
+
+    <h1 class="hero-headline reveal reveal-delay-1">
+      One workspace for<br/>
+      <span class="accent">how work actually</span><br/>
+      happens.
+    </h1>
+
+    <p class="hero-sub reveal reveal-delay-2">
+      Tasks, meetings, docs, messages, and AI — in one place. Built for founders, operators, and consultants who are tired of living across five tools.
+    </p>
+
+    <div class="hero-cta-row reveal reveal-delay-3">
+      <span class="btn-primary">Request early access</span>
+      <span class="btn-ghost">See how it works ↓</span>
+    </div>
+
+    <!-- App mockup hero -->
+    <div class="reveal reveal-delay-4">
+      <div class="mockup-shell">
+        <div class="mockup-titlebar">
+          <div class="dot dot-red"></div>
+          <div class="dot dot-yellow"></div>
+          <div class="dot dot-green"></div>
+        </div>
+        <div class="mockup-body">
+          <div class="mockup-sidebar">
+            <div class="mock-logo">
+              <div class="mock-logo-icon">H</div>
+              <span class="mock-logo-text">Hive</span>
+            </div>
+            <div class="mock-nav-item active">
+              <svg viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
+              Home
+              <div class="mock-nav-dot"></div>
+            </div>
+            <div class="mock-nav-item">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 8h6M5 11h4"/></svg>
+              My Tasks
+            </div>
+            <div class="mock-nav-item">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M5 3V1.5M11 3V1.5M2 6.5h12"/></svg>
+              Meetings
+            </div>
+            <div class="mock-nav-item">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3h12M2 6h12M2 9h8"/></svg>
+              Workspace
+            </div>
+            <div class="mock-nav-item">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 13V4a1 1 0 011-1h10a1 1 0 011 1v9M2 13h12M6 6h4M6 9h4"/></svg>
+              Messages
+            </div>
+
+            <div class="mock-project-section">
+              <div class="mock-project-label">Projects</div>
+              <div class="mock-project-item">
+                <div class="mock-project-dot" style="background:#6366f1"></div>
+                RFF Foundation Grant
+              </div>
+              <div class="mock-project-item">
+                <div class="mock-project-dot" style="background:#f59e0b"></div>
+                Roof Renovation
+              </div>
+              <div class="mock-project-item">
+                <div class="mock-project-dot" style="background:#10b981"></div>
+                Q2 Planning
+              </div>
+            </div>
+            <div class="sidebar-spacer"></div>
+            <div class="mock-avatar">
+              <div class="mock-avatar-circle">L</div>
+              <span class="mock-avatar-name">Lev</span>
+            </div>
+          </div>
+
+          <div class="mockup-main">
+            <div class="mock-date-label">Friday, March 28</div>
+            <div class="flex-row" style="justify-content:space-between; margin-bottom:18px;">
+              <span style="font-size:13px; color:var(--text3);">22 active tasks · 3 projects</span>
+              <span style="font-size:12px; background:var(--brand); color:white; padding:5px 14px; border-radius:8px; font-weight:600;">+ New Task</span>
+            </div>
+
+            <div class="mock-section">
+              <div class="mock-section-header" style="color:#ef4444;">
+                <span>⚠</span> Overdue <span class="count">3</span>
+              </div>
+              <div class="mock-task-row">
+                <div class="mock-task-check"></div>
+                <span class="mock-task-title">Submit permit application to city</span>
+                <span class="mock-task-badge badge-red">3 days late</span>
+              </div>
+              <div class="mock-task-row">
+                <div class="mock-task-check"></div>
+                <span class="mock-task-title">Send Q1 report to RFF Foundation</span>
+                <span class="mock-task-badge badge-red">1 day late</span>
+              </div>
+            </div>
+
+            <div class="mock-section">
+              <div class="mock-section-header" style="color:#f59e0b;">
+                <span>★</span> Meetings to Review <span class="count">2</span>
+              </div>
+              <div class="mock-task-row">
+                <div style="width:7px;height:7px;border-radius:50%;background:#f59e0b;flex-shrink:0;"></div>
+                <span class="mock-task-title">Weekly sync with Sarah — Mar 27</span>
+                <span class="mock-task-badge badge-orange">Review →</span>
+              </div>
+              <div class="mock-task-row">
+                <div style="width:7px;height:7px;border-radius:50%;background:#f59e0b;flex-shrink:0;"></div>
+                <span class="mock-task-title">RFF Foundation kickoff — Mar 25</span>
+                <span class="mock-task-badge badge-orange">Review →</span>
+              </div>
+            </div>
+
+            <div class="mock-section">
+              <div class="mock-section-header" style="color:#6366f1;">
+                <span>▼</span> Inbox <span class="count">4</span>
+              </div>
+              <div class="mock-task-row">
+                <div class="mock-task-check"></div>
+                <span class="mock-task-title">Review roofing contractor quote</span>
+                <span class="mock-task-badge badge-brand">No project</span>
+              </div>
+              <div class="mock-task-row">
+                <div class="mock-task-check"></div>
+                <span class="mock-task-title">Follow up on permit office call</span>
+                <span class="mock-task-badge badge-brand">No project</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+  2. THE PROBLEM
+============================================================ -->
+<section data-section="problem">
+  <div class="section-inner">
+    <div class="eyebrow reveal">The problem</div>
+    <h2 class="headline reveal reveal-delay-1">You're running your work<br/><span class="dim">across five different apps.</span></h2>
+    <p class="subhead reveal reveal-delay-2" style="max-width:560px;">None of them talk to each other. After every meeting you manually copy action items into your task manager. Your contacts live in one place, your notes in another. You pay for all of it.</p>
+
+    <div class="tool-pile reveal reveal-delay-3">
+      <div class="tool-chip"><span class="tool-icon">✅</span> Todoist — tasks</div>
+      <div class="tool-chip"><span class="tool-icon">📝</span> Notion — docs</div>
+      <div class="tool-chip"><span class="tool-icon">🎙</span> Granola — meetings</div>
+      <div class="tool-chip"><span class="tool-icon">💬</span> Slack — messages</div>
+      <div class="tool-chip"><span class="tool-icon">📧</span> Superhuman — email</div>
+      <span class="pain-arrow">→ $60–90/month</span>
+    </div>
+
+    <div style="margin-top: 40px;">
+      <div class="pain-point reveal reveal-delay-1">
+        <span class="pain-num">01</span>
+        <span class="pain-text"><strong>Meeting ends.</strong> You have 6 action items. You open your task manager in another tab and type them in manually. Half get lost.</span>
+      </div>
+      <div class="pain-point reveal reveal-delay-2">
+        <span class="pain-num">02</span>
+        <span class="pain-text"><strong>You want to remember something about a client.</strong> Was it in Notion? In the Granola note? In your email thread? You open all three.</span>
+      </div>
+      <div class="pain-point reveal reveal-delay-3">
+        <span class="pain-num">03</span>
+        <span class="pain-text"><strong>A new team member joins.</strong> You have to invite them to five different tools, set permissions in each one, explain where everything lives.</span>
+      </div>
+      <div class="pain-point reveal reveal-delay-4">
+        <span class="pain-num">04</span>
+        <span class="pain-text"><strong>You want to find a decision you made 3 months ago.</strong> Which tool was it in? Search doesn't work across all of them. You give up.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+  3. THE SOLUTION
+============================================================ -->
+<section data-section="solution" style="background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(99,102,241,0.08) 0%, transparent 60%);">
+  <div class="section-inner">
+    <div class="eyebrow reveal">The solution</div>
+    <h2 class="headline reveal reveal-delay-1">Everything connected.<br/><span class="dim">One workspace.</span></h2>
+    <p class="subhead reveal reveal-delay-2" style="max-width:540px; margin-bottom:48px;">Hive brings tasks, meetings, docs, and messages into one place — and uses AI to connect all of it automatically.</p>
+
+    <div class="grid-3 reveal reveal-delay-3">
+      <div class="feature-card">
+        <div class="feature-icon">📋</div>
+        <div class="feature-title">Intelligent Tasks</div>
+        <div class="feature-desc">A home page that shows exactly what needs attention today. Overdue, due today, high priority, waiting on someone — all in sections you can arrange with AI.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🎙</div>
+        <div class="feature-title">Meeting Intelligence</div>
+        <div class="feature-desc">Meetings sync from Granola automatically. Action items surface as tasks. Ask questions across all your meetings in natural language. Open in Granola in one click.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📄</div>
+        <div class="feature-title">Workspace & Docs</div>
+        <div class="feature-desc">Pages with column layouts, live task and meeting modules, and 10+ templates. Start from a Project Brief or Meeting Notes template — never from blank.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⌘</div>
+        <div class="feature-title">AI Command Bar</div>
+        <div class="feature-desc">Hit ⌘K and type anything. Navigate, search, create tasks, ask AI questions across all your data, or rearrange your home layout — all from one input.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">💬</div>
+        <div class="feature-title">Messages</div>
+        <div class="feature-desc">Direct messages and channels, built in. No Slack needed for small teams. Voice messages, file sharing, and saved items — all linked to the right project.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">👤</div>
+        <div class="feature-title">Contacts + Context</div>
+        <div class="feature-desc">Every contact shows their linked tasks, meetings, and projects. See the full history of your relationship without digging through five different apps.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+  4. MEETINGS + AI
+============================================================ -->
+<section data-section="meetings">
+  <div class="section-inner wide">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:60px; align-items:center;">
+      <div>
+        <div class="eyebrow reveal">Meeting intelligence</div>
+        <h2 class="headline reveal reveal-delay-1" style="font-size:clamp(30px,3.5vw,48px);">Your meetings,<br/><span class="dim">connected to your work.</span></h2>
+        <p class="subhead reveal reveal-delay-2" style="font-size:16px; margin-bottom:32px;">Meetings sync from Granola every 15 minutes. Hive auto-links them to contacts and projects. Action items become tasks with one click.</p>
+
+        <div class="ai-feature reveal reveal-delay-2">
+          <div class="ai-feature-icon">✦</div>
+          <div>
+            <div class="ai-feature-title">Ask your meetings</div>
+            <div class="ai-feature-desc">"Show me all action items from this week, by meeting." "What did we decide about the timeline?" Natural language search across every note.</div>
+          </div>
+        </div>
+        <div class="ai-feature reveal reveal-delay-3">
+          <div class="ai-feature-icon">↗</div>
+          <div>
+            <div class="ai-feature-title">Action items → Tasks</div>
+            <div class="ai-feature-desc">Granola surfaces action items. You choose who owns each one — yourself, Sarah, or someone else. One click creates the task with the right assignee.</div>
+          </div>
+        </div>
+        <div class="ai-feature reveal reveal-delay-4">
+          <div class="ai-feature-icon">🔗</div>
+          <div>
+            <div class="ai-feature-title">Auto-linked context</div>
+            <div class="ai-feature-desc">Meetings are automatically matched to contacts by participant email and to projects by content. Open a project — see every meeting that mentioned it.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="reveal reveal-delay-2">
+        <div class="mockup-shell">
+          <div class="mockup-titlebar">
+            <div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div>
+          </div>
+          <div class="mockup-meetings-body">
+            <div class="meetings-list">
+              <div class="meetings-search">Search meetings...</div>
+              <div class="meeting-item active">
+                <div class="meeting-item-title">Weekly sync with Sarah</div>
+                <div class="meeting-item-meta">Mar 27 · <span class="granola-badge">Granola</span></div>
+              </div>
+              <div class="meeting-item">
+                <div class="meeting-item-title">RFF Foundation kickoff</div>
+                <div class="meeting-item-meta">Mar 25 · <span class="granola-badge">Granola</span></div>
+              </div>
+              <div class="meeting-item">
+                <div class="meeting-item-title">Permit office call</div>
+                <div class="meeting-item-meta">Mar 24 · <span class="granola-badge">Granola</span></div>
+              </div>
+              <div class="meeting-item">
+                <div class="meeting-item-title">Contractor review</div>
+                <div class="meeting-item-meta">Mar 21 · <span class="granola-badge">Granola</span></div>
+              </div>
+            </div>
+            <div class="meeting-detail">
+              <div class="meeting-detail-title">Weekly sync with Sarah</div>
+              <div class="meeting-detail-meta">Thursday, March 27 · 45 min · Sarah, Lev</div>
+              <div class="detail-section">
+                <div class="detail-section-label">Participants</div>
+                <span class="participant-chip">👤 Lev</span>
+                <span class="participant-chip">👤 Sarah</span>
+              </div>
+              <div class="detail-section">
+                <div class="detail-section-label">Action Items</div>
+                <div class="action-item-row">
+                  <div class="action-item-icon"></div>
+                  <span style="font-size:12px;flex:1;">Follow up with permit office on timeline</span>
+                  <span class="action-btn">+ Task</span>
+                </div>
+                <div class="action-item-row">
+                  <div class="action-item-icon"></div>
+                  <span style="font-size:12px;flex:1;">Send updated budget to RFF Foundation</span>
+                  <span class="action-btn">+ Task</span>
+                </div>
+                <div class="action-item-row" style="opacity:0.5;">
+                  <div class="action-item-icon" style="background:var(--emerald)"></div>
+                  <span style="font-size:12px;flex:1;text-decoration:line-through;">Review Q1 numbers</span>
+                  <span style="font-size:10px;color:var(--emerald);">Done</span>
+                </div>
+              </div>
+              <div class="detail-section">
+                <div class="detail-section-label">Linked to</div>
+                <span class="mock-task-badge badge-violet" style="margin-right:6px;">RFF Foundation Grant</span>
+                <span class="mock-task-badge badge-orange">Roof Renovation</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+  5. COMMAND BAR
+============================================================ -->
+<section data-section="commandbar">
+  <div class="section-inner wide">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:60px; align-items:center;">
+      <div class="reveal">
+        <div class="mockup-shell">
+          <div class="mockup-titlebar">
+            <div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div>
+          </div>
+          <div style="padding:32px 28px;">
+            <div class="cmdpal-box">
+              <div class="cmdpal-input-row">
+                <span class="cmdpal-icon">✦</span>
+                <span class="cmdpal-input">show me all action items from this week</span>
+                <span class="cmdpal-kbd">ESC</span>
+              </div>
+              <div class="cmdpal-result active">
+                <span class="cmdpal-result-icon">✦</span>
+                <span class="cmdpal-result-text">Ask AI: "show me all action items from this week"</span>
+                <span class="cmdpal-result-sub">✨ Search across everything</span>
+              </div>
+              <div class="cmdpal-ai-answer">From your meetings this week:
+
+<strong style="color:var(--text);">Weekly sync with Sarah (Mar 27)</strong>
+→ Follow up with permit office on timeline
+→ Send updated budget to RFF Foundation
+
+<strong style="color:var(--text);">RFF Foundation kickoff (Mar 25)</strong>
+→ Schedule site visit for April 3
+→ Submit final grant documentation by Apr 15</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="eyebrow reveal">⌘K Command bar</div>
+        <h2 class="headline reveal reveal-delay-1" style="font-size:clamp(30px,3.5vw,48px);">Ask anything.<br/><span class="dim">Do anything.</span></h2>
+        <p class="subhead reveal reveal-delay-2" style="font-size:16px; margin-bottom:32px;">Hit ⌘K from anywhere. Navigate, search, create tasks, or ask AI questions across everything — tasks, meetings, projects — in one keystroke.</p>
+
+        <div class="grid-2 reveal reveal-delay-3">
+          <div class="card card-sm">
+            <div style="font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text);">Navigate</div>
+            <div style="font-size:12px;color:var(--text2);">"Go to Meetings" or jump to any project instantly</div>
+          </div>
+          <div class="card card-sm">
+            <div style="font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text);">AI Query</div>
+            <div style="font-size:12px;color:var(--text2);">"Find tasks assigned to Sarah" — searches everything</div>
+          </div>
+          <div class="card card-sm">
+            <div style="font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text);">Layout Control</div>
+            <div style="font-size:12px;color:var(--text2);">"Hide the upcoming section" — rearranges your home page</div>
+          </div>
+          <div class="card card-sm">
+            <div style="font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text);">AI Task Capture</div>
+            <div style="font-size:12px;color:var(--text2);">"Follow up with John about the roof permit by Friday" → creates a structured task</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+  6. WORKSPACE
+============================================================ -->
+<section data-section="workspace">
+  <div class="section-inner wide">
+    <div class="eyebrow reveal" style="text-align:center;">Workspace</div>
+    <h2 class="headline reveal reveal-delay-1" style="text-align:center; font-size:clamp(32px,4vw,56px);">Pages that know<br/><span class="dim">what's in your projects.</span></h2>
+    <p class="subhead reveal reveal-delay-2" style="text-align:center; max-width:560px; margin:0 auto 48px;">Not just a text editor. Hive pages can embed live tasks, meetings, and contacts — turning any page into a project dashboard.</p>
+
+    <div class="reveal reveal-delay-3">
+      <div class="mockup-shell">
+        <div class="mockup-titlebar">
+          <div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div>
+        </div>
+        <div class="workspace-body">
+          <div class="workspace-sidebar">
+            <div class="mock-logo">
+              <div class="mock-logo-icon" style="font-size:11px;">H</div>
+              <span style="font-size:13px;font-weight:700;">Workspace</span>
+            </div>
+            <div class="workspace-tree">
+              <div class="tree-item">
+                <span class="tree-emoji">📁</span> Projects
+              </div>
+              <div class="tree-item indent active">
+                <span class="tree-emoji">🏠</span> Roof Renovation
+              </div>
+              <div class="tree-item indent" style="padding-left:36px;">
+                <span class="tree-emoji">📋</span> Project Brief
+              </div>
+              <div class="tree-item indent" style="padding-left:36px;">
+                <span class="tree-emoji">💰</span> Budget Tracker
+              </div>
+              <div class="tree-item indent">
+                <span class="tree-emoji">🌱</span> RFF Foundation
+              </div>
+              <div class="tree-item" style="margin-top:8px;">
+                <span class="tree-emoji">📝</span> Personal Notes
+              </div>
+              <div class="tree-item">
+                <span class="tree-emoji">📅</span> Weekly Reviews
+              </div>
+              <div class="tree-item indent">
+                <span class="tree-emoji">📅</span> Week of Mar 28
+              </div>
+            </div>
+          </div>
+          <div class="workspace-editor">
+            <div class="editor-title">🏠 Roof Renovation</div>
+            <div class="editor-cols">
+              <div class="editor-col">
+                <div class="editor-col-header">
+                  <div class="editor-col-dot" style="background:#6366f1;"></div>
+                  Active Tasks · 6
+                </div>
+                <div class="editor-task-mini"><div class="editor-task-mini-check"></div>Submit permit application</div>
+                <div class="editor-task-mini"><div class="editor-task-mini-check"></div>Call Mike Chen (contractor)</div>
+                <div class="editor-task-mini"><div class="editor-task-mini-check"></div>Review roofing quote</div>
+                <div class="editor-task-mini"><div class="editor-task-mini-check"></div>Schedule site inspection</div>
+              </div>
+              <div class="editor-col">
+                <div class="editor-col-header">
+                  <div class="editor-col-dot" style="background:#f59e0b;"></div>
+                  Upcoming Meetings · 2
+                </div>
+                <div class="editor-meeting-mini">
+                  <span style="font-size:10px;color:var(--text3);min-width:42px;">Apr 3</span>
+                  Contractor site visit
+                </div>
+                <div class="editor-meeting-mini">
+                  <span style="font-size:10px;color:var(--text3);min-width:42px;">Apr 11</span>
+                  Permit office review
+                </div>
+              </div>
+            </div>
+            <div style="font-size:13px;color:var(--text2);line-height:1.8;margin-bottom:12px;">
+              <strong style="color:var(--text);">Goal:</strong> Full roof replacement before rainy season.<br/>
+              <strong style="color:var(--text);">Budget target:</strong> $85K · <strong style="color:var(--text);">Timeline:</strong> Complete by June 30<br/>
+              <strong style="color:var(--text);">Main constraint:</strong> City permit — expect 3–4 week processing time.
+            </div>
+            <div class="slash-hint">
+              <span class="slash-key">/</span> Type to add a block — tasks, meetings, table, callout, columns...
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+  7. TEMPLATES
+============================================================ -->
+<section data-section="templates">
+  <div class="section-inner wide">
+    <div class="eyebrow reveal" style="text-align:center;">Templates</div>
+    <h2 class="headline reveal reveal-delay-1" style="text-align:center; font-size:clamp(30px,3.5vw,52px);">Never start<br/><span class="dim">from blank.</span></h2>
+    <p class="subhead reveal reveal-delay-2" style="text-align:center; max-width:520px; margin:0 auto 48px;">10 built-in templates for the work you actually do. Pre-filled sections, ready to use. Community templates coming soon.</p>
+
+    <div class="template-grid reveal reveal-delay-3">
+      <div class="template-card featured">
+        <div class="template-emoji">📋</div>
+        <div class="template-name">Meeting Notes</div>
+        <div class="template-desc">Agenda, decisions, action items, parking lot. Open before the call, close it done.</div>
+        <div class="template-uses">Most used</div>
+      </div>
+      <div class="template-card featured">
+        <div class="template-emoji">🚀</div>
+        <div class="template-name">Project Brief</div>
+        <div class="template-desc">Goal, background, success criteria, timeline, stakeholders. Answers "what are we building and why."</div>
+        <div class="template-uses">Most used</div>
+      </div>
+      <div class="template-card featured">
+        <div class="template-emoji">🔁</div>
+        <div class="template-name">Weekly Review</div>
+        <div class="template-desc">Wins, misses, blockers, next week priorities. The Friday ritual that keeps you honest.</div>
+        <div class="template-uses">Most used</div>
+      </div>
+      <div class="template-card">
+        <div class="template-emoji">🤝</div>
+        <div class="template-name">1:1 Agenda</div>
+        <div class="template-desc">Recurring topics, updates from each side, career, action items to carry forward.</div>
+      </div>
+      <div class="template-card">
+        <div class="template-emoji">📊</div>
+        <div class="template-name">Client Summary</div>
+        <div class="template-desc">Context, what we discussed, next steps, open questions. Sent after every client meeting.</div>
+      </div>
+      <div class="template-card">
+        <div class="template-emoji">📖</div>
+        <div class="template-name">SOP</div>
+        <div class="template-desc">Purpose, who this applies to, steps, edge cases. For the processes your team does more than twice.</div>
+      </div>
+      <div class="template-card">
+        <div class="template-emoji">🔍</div>
+        <div class="template-name">Research Notes</div>
+        <div class="template-desc">Question, sources, findings, conclusions. Structured thinking for any exploration.</div>
+      </div>
+      <div class="template-card">
+        <div class="template-emoji">⚖️</div>
+        <div class="template-name">Decision Log</div>
+        <div class="template-desc">Decision, context, options considered, why we chose this. Never re-litigate the same decision.</div>
+      </div>
+      <div class="template-card" style="border-style:dashed; display:flex; align-items:center; justify-content:center; gap:8px; color:var(--text3); font-size:14px;">
+        <span>+</span> Share yours
+        <span style="font-size:11px;color:var(--text4);">Coming soon</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+  8. MOBILE
+============================================================ -->
+<section data-section="mobile">
+  <div class="section-inner">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:60px; align-items:center;">
+      <div>
+        <div class="eyebrow reveal">Mobile</div>
+        <h2 class="headline reveal reveal-delay-1" style="font-size:clamp(30px,3.5vw,52px);">Your work.<br/><span class="dim">In your pocket.</span></h2>
+        <p class="subhead reveal reveal-delay-2" style="font-size:16px; margin-bottom:32px;">Hive is a Progressive Web App — install it from any browser. Full mobile experience with bottom navigation, swipe gestures, and offline support.</p>
+
+        <div class="reveal reveal-delay-3" style="display:flex;flex-direction:column;gap:12px;">
+          <div class="flex-row" style="gap:12px;">
+            <span style="font-size:20px;">📲</span>
+            <div>
+              <div style="font-size:14px;font-weight:600;margin-bottom:3px;">Install from browser</div>
+              <div style="font-size:13px;color:var(--text2);">No App Store required. Add to Home Screen from Safari or Chrome.</div>
+            </div>
+          </div>
+          <div class="flex-row" style="gap:12px;">
+            <span style="font-size:20px;">⚡</span>
+            <div>
+              <div style="font-size:14px;font-weight:600;margin-bottom:3px;">Fast, native feel</div>
+              <div style="font-size:13px;color:var(--text2);">Bottom navigation, iOS safe area support, no browser chrome.</div>
+            </div>
+          </div>
+          <div class="flex-row" style="gap:12px;">
+            <span style="font-size:20px;">🎙</span>
+            <div>
+              <div style="font-size:14px;font-weight:600;margin-bottom:3px;">Voice messages</div>
+              <div style="font-size:13px;color:var(--text2);">Record and send voice notes in Messages. Plays inline.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="reveal reveal-delay-2" style="display:flex;justify-content:center;">
+        <div class="phone-frame">
+          <div class="phone-notch"></div>
+          <div class="phone-screen">
+            <div class="phone-header">
+              <div class="phone-page-title">Home</div>
+              <div class="phone-page-sub">Friday, March 28 · 22 active tasks</div>
+            </div>
+            <div class="phone-content">
+              <div class="phone-section-label" style="color:#ef4444;">Overdue · 3</div>
+              <div class="phone-task">
+                <div class="phone-task-check"></div>
+                <div class="phone-task-info">
+                  <div class="phone-task-title">Submit permit application</div>
+                  <div class="phone-task-proj">Roof Renovation</div>
+                </div>
+              </div>
+              <div class="phone-task">
+                <div class="phone-task-check"></div>
+                <div class="phone-task-info">
+                  <div class="phone-task-title">Send Q1 report to RFF</div>
+                  <div class="phone-task-proj">RFF Foundation Grant</div>
+                </div>
+              </div>
+
+              <div class="phone-section-label" style="color:#f59e0b;margin-top:4px;">Meetings to Review · 2</div>
+              <div class="phone-task" style="background:rgba(245,158,11,0.07);border-radius:8px;">
+                <div style="width:8px;height:8px;border-radius:50%;background:#f59e0b;flex-shrink:0;"></div>
+                <div class="phone-task-info">
+                  <div class="phone-task-title">Weekly sync with Sarah</div>
+                  <div class="phone-task-proj">Mar 27 · Granola</div>
+                </div>
+              </div>
+
+              <div class="phone-section-label" style="color:#6366f1;margin-top:4px;">Inbox · 4</div>
+              <div class="phone-task">
+                <div class="phone-task-check"></div>
+                <div class="phone-task-info">
+                  <div class="phone-task-title">Review contractor quote</div>
+                  <div class="phone-task-proj">Unassigned</div>
+                </div>
+              </div>
+            </div>
+            <div class="phone-bottom-nav">
+              <div class="phone-nav-item active">
+                <div class="phone-nav-icon">⊞</div>
+                <div class="phone-nav-label" style="color:#a5b4fc;">Home</div>
+              </div>
+              <div class="phone-nav-item">
+                <div class="phone-nav-icon">✓</div>
+                <div class="phone-nav-label">Tasks</div>
+              </div>
+              <div class="phone-nav-item">
+                <div class="phone-nav-icon">🎙</div>
+                <div class="phone-nav-label">Meetings</div>
+              </div>
+              <div class="phone-nav-item">
+                <div class="phone-nav-icon">💬</div>
+                <div class="phone-nav-label">Messages</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+  9. AI THROUGHOUT
+============================================================ -->
+<section data-section="ai" style="background: radial-gradient(ellipse 50% 40% at 50% 50%, rgba(99,102,241,0.07) 0%, transparent 70%);">
+  <div class="section-inner">
+    <div class="eyebrow reveal" style="text-align:center;">AI throughout</div>
+    <h2 class="headline reveal reveal-delay-1" style="text-align:center; font-size:clamp(32px,4vw,56px);">Not an AI feature.<br/><span class="dim">An AI-native product.</span></h2>
+    <p class="subhead reveal reveal-delay-2" style="text-align:center; max-width:520px; margin:0 auto 48px;">AI isn't a chatbot tacked on. It's woven through every surface — so the app thinks about your work so you don't have to.</p>
+
+    <div class="grid-2 reveal reveal-delay-3" style="max-width:860px; margin:0 auto;">
+      <div class="ai-feature">
+        <div class="ai-feature-icon">📋</div>
+        <div>
+          <div class="ai-feature-title">AI task capture</div>
+          <div class="ai-feature-desc">Type a sentence in ⌘K: "Follow up with Mike about the roof permit by Friday." AI creates a structured task with due date and project auto-detected.</div>
+        </div>
+      </div>
+      <div class="ai-feature">
+        <div class="ai-feature-icon">🏠</div>
+        <div>
+          <div class="ai-feature-title">AI layout customization</div>
+          <div class="ai-feature-desc">"Move inbox to the top" or "hide the upcoming section." Your home page rearranges instantly. Every user builds their own version.</div>
+        </div>
+      </div>
+      <div class="ai-feature">
+        <div class="ai-feature-icon">🎙</div>
+        <div>
+          <div class="ai-feature-title">Meeting intelligence</div>
+          <div class="ai-feature-desc">"What is Sarah responsible for this week?" or "Show all decisions made in the RFF meetings." Answers come from your actual meeting notes.</div>
+        </div>
+      </div>
+      <div class="ai-feature">
+        <div class="ai-feature-icon">🔗</div>
+        <div>
+          <div class="ai-feature-title">Auto-linking</div>
+          <div class="ai-feature-desc">Meetings are automatically linked to the right contacts and projects. No tagging, no manual assignment. Open a project and see every meeting that mentioned it.</div>
+        </div>
+      </div>
+      <div class="ai-feature">
+        <div class="ai-feature-icon">⏰</div>
+        <div>
+          <div class="ai-feature-title">SMS reminders</div>
+          <div class="ai-feature-desc">Set a reminder on any task. Get a text when it's due. Works without the app open. Built on Twilio.</div>
+        </div>
+      </div>
+      <div class="ai-feature">
+        <div class="ai-feature-icon">🌅</div>
+        <div>
+          <div class="ai-feature-title">Morning briefing</div>
+          <div class="ai-feature-desc">Hit the briefing button. Hive reads your overdue tasks, what's due today, and what Sarah needs from you — out loud. Start the day knowing exactly what matters.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+  10. PRICING
+============================================================ -->
+<section data-section="pricing">
+  <div class="section-inner">
+    <div class="eyebrow reveal" style="text-align:center;">Pricing</div>
+    <h2 class="headline reveal reveal-delay-1" style="text-align:center; font-size:clamp(30px,3.5vw,52px);">Replace five tools.<br/><span class="dim">Pay for one.</span></h2>
+    <p class="subhead reveal reveal-delay-2" style="text-align:center; max-width:500px; margin:0 auto 48px;">Most people in Hive's target market already spend $60–90/month across disconnected tools. Hive replaces all of them.</p>
+
+    <div class="grid-2 reveal reveal-delay-3" style="max-width:900px; margin:0 auto; gap:32px;">
+      <div>
+        <div class="section-label" style="margin-bottom:16px;">What you pay today</div>
+        <table class="pricing-compare">
+          <thead>
+            <tr><th>Tool</th><th>$/month</th><th>What it does</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Todoist</td><td>$5</td><td>Tasks only</td></tr>
+            <tr><td>Notion</td><td>$16</td><td>Docs + wiki</td></tr>
+            <tr><td>Granola</td><td>$18</td><td>Meeting notes</td></tr>
+            <tr><td>Slack</td><td>$8</td><td>Team messages</td></tr>
+            <tr><td>Superhuman</td><td>$30</td><td>Email only</td></tr>
+            <tr style="border-top:2px solid var(--border2);">
+              <td><strong>Total</strong></td>
+              <td><strong>$77</strong></td>
+              <td style="color:var(--text3);">5 separate apps</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div>
+        <div class="section-label" style="margin-bottom:16px;">What you pay with Hive</div>
+        <table class="pricing-compare">
+          <thead>
+            <tr><th>Plan</th><th>$/month</th><th>Includes</th></tr>
+          </thead>
+          <tbody>
+            <tr class="highlight">
+              <td>Hive Solo</td>
+              <td>$20</td>
+              <td>Tasks, meetings, docs, workspace</td>
+            </tr>
+            <tr class="highlight">
+              <td>Hive Team</td>
+              <td>$35</td>
+              <td>Everything + messages, shared projects</td>
+            </tr>
+            <tr class="highlight">
+              <td>Hive Pro</td>
+              <td>$50</td>
+              <td>+ Native meeting capture (Granola-free)</td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="margin-top:24px; padding:20px; background:rgba(16,185,129,0.07); border:1px solid rgba(16,185,129,0.15); border-radius:12px;">
+          <div class="price-total">Save $27–57/month</div>
+          <div class="price-sub">vs. maintaining a full tool stack</div>
+          <div class="price-savings">↑ Breakeven on Granola subscription alone in month one</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+  11. ROADMAP
+============================================================ -->
+<section data-section="roadmap">
+  <div class="section-inner">
+    <div class="eyebrow reveal">Built + roadmap</div>
+    <h2 class="headline reveal reveal-delay-1" style="font-size:clamp(30px,3.5vw,52px);">What's shipped.<br/><span class="dim">What's next.</span></h2>
+
+    <div style="max-width:760px; margin-top:40px;">
+      <div class="roadmap-item reveal reveal-delay-1">
+        <span class="roadmap-status status-live">Live</span>
+        <div>
+          <div class="roadmap-title">Intelligent Home page</div>
+          <div class="roadmap-desc">Configurable sections (Inbox, Overdue, Due Today, High Priority, Meetings to Review). Sections render only when they have content. Order and visibility controlled per user.</div>
+        </div>
+      </div>
+      <div class="roadmap-item reveal reveal-delay-1">
+        <span class="roadmap-status status-live">Live</span>
+        <div>
+          <div class="roadmap-title">Tasks + Projects + Contacts</div>
+          <div class="roadmap-desc">Full task management with priorities, due dates, assignees, flags, snooze. Sub-projects. Contacts linked to tasks, meetings, and projects.</div>
+        </div>
+      </div>
+      <div class="roadmap-item reveal reveal-delay-1">
+        <span class="roadmap-status status-live">Live</span>
+        <div>
+          <div class="roadmap-title">Granola meeting sync</div>
+          <div class="roadmap-desc">Polls every 15 minutes. Auto-links meetings to contacts and projects. Action items surfaced for review. Open in Granola in one click. AI Q&A across all meetings.</div>
+        </div>
+      </div>
+      <div class="roadmap-item reveal reveal-delay-1">
+        <span class="roadmap-status status-live">Live</span>
+        <div>
+          <div class="roadmap-title">⌘K AI command bar</div>
+          <div class="roadmap-desc">Natural language search, AI task capture, AI layout commands. Rearrange your home page by typing "move inbox to the top."</div>
+        </div>
+      </div>
+      <div class="roadmap-item reveal reveal-delay-1">
+        <span class="roadmap-status status-live">Live</span>
+        <div>
+          <div class="roadmap-title">Messages (full channel + DM)</div>
+          <div class="roadmap-desc">Team messaging with channels, DMs, voice messages, file attachments, saved items. Mobile-optimized with full-screen chat.</div>
+        </div>
+      </div>
+      <div class="roadmap-item reveal reveal-delay-1">
+        <span class="roadmap-status status-live">Live</span>
+        <div>
+          <div class="roadmap-title">Mobile PWA</div>
+          <div class="roadmap-desc">Install from any browser. Bottom navigation, iOS safe area support, full mobile experience.</div>
+        </div>
+      </div>
+      <div class="roadmap-item reveal reveal-delay-2">
+        <span class="roadmap-status status-building">Building</span>
+        <div>
+          <div class="roadmap-title">Workspace — Pages + Column Grid</div>
+          <div class="roadmap-desc">Hierarchical pages with slash commands, column layouts (1×2, 2×2), live task/meeting modules, callout blocks, toggles. 10 built-in templates.</div>
+        </div>
+      </div>
+      <div class="roadmap-item reveal reveal-delay-2">
+        <span class="roadmap-status status-building">Building</span>
+        <div>
+          <div class="roadmap-title">SMS reminders via Twilio</div>
+          <div class="roadmap-desc">Set a reminder on any task. Get texted when it's due. Works even when the app isn't open.</div>
+        </div>
+      </div>
+      <div class="roadmap-item reveal reveal-delay-3">
+        <span class="roadmap-status status-next">Next</span>
+        <div>
+          <div class="roadmap-title">Google Drive bridge</div>
+          <div class="roadmap-desc">Drive links displayed as first-class items in projects. No migration needed for teams already on Google Workspace.</div>
+        </div>
+      </div>
+      <div class="roadmap-item reveal reveal-delay-3">
+        <span class="roadmap-status status-next">Next</span>
+        <div>
+          <div class="roadmap-title">Native meeting capture</div>
+          <div class="roadmap-desc">Tauri (Rust) companion app for Mac. Captures system audio via ScreenCaptureKit. Whisper transcription + Claude summary. Removes Granola dependency.</div>
+        </div>
+      </div>
+      <div class="roadmap-item reveal reveal-delay-3">
+        <span class="roadmap-status status-next">Next</span>
+        <div>
+          <div class="roadmap-title">Community template gallery</div>
+          <div class="roadmap-desc">Share a template → get a public link. Browse community-built workspace layouts. Import with one click. The growth loop.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+  12. CLOSING
+============================================================ -->
+<section data-section="closing" style="background: radial-gradient(ellipse 70% 50% at 50% 100%, rgba(99,102,241,0.10) 0%, transparent 60%);">
+  <div class="section-inner narrow" style="text-align:center;">
+    <div class="reveal">
+      <div class="hero-logo" style="width:52px;height:52px;border-radius:14px;font-size:26px;margin:0 auto 28px;">H</div>
+    </div>
+    <div class="vision-quote reveal reveal-delay-1" style="border:none;padding:0;text-align:center;font-size:clamp(22px,3vw,34px);">
+      "Built for people who use AI every day and are tired of their tools not keeping up."
+    </div>
+    <p class="subhead reveal reveal-delay-2" style="margin:28px auto 48px; max-width:500px;">
+      Hive started as a personal tool and is becoming a product for everyone who needs their digital life in one place — and wants AI to do the connecting.
+    </p>
+
+    <div class="closing-grid reveal reveal-delay-3">
+      <div class="closing-card">
+        <div class="closing-icon">🎯</div>
+        <div class="closing-title">Target customer</div>
+        <div class="closing-desc">Founders, operators, and consultants who run on calls and tasks. Already paying for 4–5 tools. Tired of the context switching.</div>
+      </div>
+      <div class="closing-card">
+        <div class="closing-icon">⚡</div>
+        <div class="closing-title">Why now</div>
+        <div class="closing-desc">AI makes the marginal cost of connecting tools near-zero. The right person can build in weeks what would have taken a team a year.</div>
+      </div>
+      <div class="closing-card">
+        <div class="closing-icon">🌱</div>
+        <div class="closing-title">The moat</div>
+        <div class="closing-desc">Every user's Hive is different. AI-customized layouts, community templates, and meeting context create a workspace that fits how you think — not how a PM imagined you do.</div>
+      </div>
+    </div>
+
+    <div class="reveal reveal-delay-4" style="margin-top:56px; padding:32px; background:var(--bg2); border:1px solid var(--border); border-radius:20px;">
+      <div style="font-size:28px;font-weight:800;margin-bottom:8px;">Ready to try it?</div>
+      <div style="font-size:15px;color:var(--text2);margin-bottom:24px;">Hive is in private beta. Early access for founders and operators.</div>
+      <span class="btn-primary" style="font-size:16px;padding:15px 36px;border-radius:12px;">Request early access</span>
+    </div>
+  </div>
+</section>
+
+<script>
+  // Section IDs for nav dots
+  const sections = Array.from(document.querySelectorAll('section[data-section]'));
+  const navDots = document.getElementById('navDots');
+  const labels = {
+    hero: 'Hive', problem: 'Problem', solution: 'Solution',
+    meetings: 'Meetings', commandbar: 'Command Bar', workspace: 'Workspace',
+    templates: 'Templates', mobile: 'Mobile', ai: 'AI',
+    pricing: 'Pricing', roadmap: 'Roadmap', closing: 'Vision'
+  };
+
+  // Create nav dots
+  sections.forEach((sec, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'nav-dot';
+    btn.title = labels[sec.dataset.section] || sec.dataset.section;
+    btn.addEventListener('click', () => sec.scrollIntoView({ behavior: 'smooth' }));
+    navDots.appendChild(btn);
+  });
+
+  const dots = navDots.querySelectorAll('.nav-dot');
+
+  // Scroll-reveal observer
+  const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        revealObserver.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12 });
+
+  document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+  // Active nav dot observer
+  const sectionObserver = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        const idx = sections.indexOf(e.target);
+        dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+      }
+    });
+  }, { threshold: 0.4 });
+
+  sections.forEach(sec => sectionObserver.observe(sec));
+</script>
+</body>
+</html>

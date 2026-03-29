@@ -1,43 +1,46 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '../store';
-import { AlertTriangle, Clock, MessageSquare, CheckCircle, ArrowRight, Plus, X, Sun } from 'lucide-react';
-import { isPast } from 'date-fns';
+import { AlertTriangle, Clock, MessageSquare, CheckCircle, ArrowRight, Plus, X, Sun, Inbox, Calendar, Sparkles, ChevronRight } from 'lucide-react';
+import { isPast, addDays, isWithinInterval, startOfDay } from 'date-fns';
 import TaskRow from '../components/TaskRow';
+import { DEFAULT_HOME_SECTIONS, type HomeSection } from '../types';
 
-function Section({ title, icon, tasks, onOpenTask, color = 'text-white/50' }: {
-  title: string; icon: React.ReactNode; tasks: import('../types').Task[];
-  onOpenTask: (id: string) => void; color?: string;
+function Section({ title, icon, count, color = 'text-white/50', children }: {
+  title: string; icon: React.ReactNode; count: number;
+  color?: string; children: React.ReactNode;
 }) {
-  if (tasks.length === 0) return null;
+  if (count === 0) return null;
   return (
     <div className="mb-6">
       <div className={`flex items-center gap-2 mb-2 ${color}`}>
         {icon}
         <span className="text-xs font-semibold uppercase tracking-wider">{title}</span>
-        <span className="text-xs opacity-50 ml-1">{tasks.length}</span>
+        <span className="text-xs opacity-50 ml-1">{count}</span>
       </div>
-      <div className="space-y-0.5">
-        {tasks.map((t) => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} showProject />)}
-      </div>
+      <div className="space-y-0.5">{children}</div>
     </div>
   );
 }
 
 export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: string, id?: string) => void; onOpenTask: (id: string) => void }) {
-  const { tasks, projects, addTask } = useStore();
+  const { tasks, projects, meetings, addTask, userSettings, saveUserSettings } = useStore();
   const [showCapture, setShowCapture] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [captureTitle, setCaptureTitle] = useState('');
+  const [captureProject, setCaptureProject] = useState('');
+  const captureRef = useRef<HTMLInputElement>(null);
 
-  // Cancel speech if user navigates away from Home
+  // Cancel speech if user navigates away
   useEffect(() => () => { window.speechSynthesis?.cancel(); }, []);
+
+  // Get active sections (user prefs or defaults)
+  const sections: HomeSection[] = userSettings?.homeSections ?? DEFAULT_HOME_SECTIONS;
 
   const triggerBriefing = useCallback(async () => {
     const now2 = new Date();
     const h = now2.getHours();
     const greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-    // Use local date (not UTC) to match how task due dates are stored
     const todayStr = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, '0')}-${String(now2.getDate()).padStart(2, '0')}`;
-
     const overdueTasks = tasks.filter(t => t.status !== 'done' && t.dueDate && t.dueDate < todayStr);
     const dueTodayCount = tasks.filter(t => t.status !== 'done' && t.dueDate === todayStr).length;
     const urgentTasks = tasks.filter(t =>
@@ -45,32 +48,15 @@ export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: st
       !(t.dueDate && t.dueDate < todayStr)
     );
     const sarahTasks = tasks.filter(t => t.status !== 'done' && t.flags?.some(f => f.flagId === 'flag-checkin'));
-
-    // Build natural-language speech
-    const sentences: string[] = [];
-    sentences.push(`${greet}, Lev.`);
-
-    if (overdueTasks.length > 0) {
-      sentences.push(`You have ${overdueTasks.length} overdue task${overdueTasks.length !== 1 ? 's' : ''}: ${overdueTasks.map(t => t.title).join(', ')}.`);
-    }
-    if (dueTodayCount > 0) {
-      sentences.push(`${dueTodayCount} task${dueTodayCount !== 1 ? 's are' : ' is'} due today.`);
-    }
-    if (urgentTasks.length > 0) {
-      sentences.push(`Urgent items: ${urgentTasks.map(t => t.title).join(', ')}.`);
-    }
-    if (sarahTasks.length > 0) {
-      sentences.push(`Sarah needs you on: ${sarahTasks.map(t => t.title).join(', ')}.`);
-    }
-    if (overdueTasks.length === 0 && dueTodayCount === 0 && urgentTasks.length === 0 && sarahTasks.length === 0) {
-      sentences.push('All clear — nothing urgent today.');
-    }
-    const speechText = sentences.join(' ');
-
-    // Speak it
+    const sentences: string[] = [`${greet}, Lev.`];
+    if (overdueTasks.length > 0) sentences.push(`You have ${overdueTasks.length} overdue task${overdueTasks.length !== 1 ? 's' : ''}: ${overdueTasks.map(t => t.title).join(', ')}.`);
+    if (dueTodayCount > 0) sentences.push(`${dueTodayCount} task${dueTodayCount !== 1 ? 's are' : ' is'} due today.`);
+    if (urgentTasks.length > 0) sentences.push(`Urgent items: ${urgentTasks.map(t => t.title).join(', ')}.`);
+    if (sarahTasks.length > 0) sentences.push(`Sarah needs you on: ${sarahTasks.map(t => t.title).join(', ')}.`);
+    if (overdueTasks.length === 0 && dueTodayCount === 0 && urgentTasks.length === 0 && sarahTasks.length === 0) sentences.push('All clear — nothing urgent today.');
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(speechText);
+      const utterance = new SpeechSynthesisUtterance(sentences.join(' '));
       utterance.rate = 0.92;
       utterance.pitch = 1;
       setIsSpeaking(true);
@@ -78,32 +64,20 @@ export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: st
       utterance.onerror = () => setIsSpeaking(false);
       window.speechSynthesis.speak(utterance);
     }
-
   }, [tasks]);
-  const [captureTitle, setCaptureTitle] = useState('');
-  const [captureProject, setCaptureProject] = useState('');
-  const captureRef = useRef<HTMLInputElement>(null);
 
-  const now = new Date();
-  const hour = now.getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-  const today = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-
-  // N key shortcut to open capture
+  // N key shortcut
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'n' && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
-        e.preventDefault();
-        setShowCapture(true);
+        e.preventDefault(); setShowCapture(true);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  useEffect(() => {
-    if (showCapture) captureRef.current?.focus();
-  }, [showCapture]);
+  useEffect(() => { if (showCapture) captureRef.current?.focus(); }, [showCapture]);
 
   const handleCapture = () => {
     if (!captureTitle.trim()) return;
@@ -111,38 +85,143 @@ export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: st
     addTask({
       title: captureTitle.trim(),
       projectIds: captureProject ? [captureProject] : [],
-      status: 'todo',
-      priority: 'medium',
-      assigneeIds: ['lev'],
-      flags: [],
-      isPrivate: selectedProject?.isPrivate ?? false,
-      linkedContactIds: [],
-      linkedDocIds: [],
+      status: 'todo', priority: 'medium', assigneeIds: ['lev'],
+      flags: [], isPrivate: selectedProject?.isPrivate ?? false,
+      linkedContactIds: [], linkedDocIds: [],
     });
     setCaptureTitle('');
     setShowCapture(false);
   };
 
-  // Filter out snoozed tasks
-  const activeTasks = tasks.filter((t) => {
+  const now = new Date();
+  const today = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+  const activeTasks = tasks.filter(t => {
     if (t.status === 'done') return false;
-    if (t.snoozeDate && new Date(t.snoozeDate) > new Date()) return false;
+    if (t.snoozeDate && new Date(t.snoozeDate) > now) return false;
     return true;
   });
 
-  const within72 = activeTasks.filter((t) => t.flags?.some(f => f.flagId === 'flag-72h'));
-  const questionsForLev = activeTasks.filter((t) => t.flags?.some(f => f.flagId === 'flag-questions'));
-  const updateAtCheckin = activeTasks.filter((t) => t.flags?.some(f => f.flagId === 'flag-checkin'));
-  const overdue = activeTasks.filter((t) => t.dueDate && isPast(new Date(t.dueDate)) && !within72.includes(t));
-  const todayTasks = activeTasks.filter((t) => {
-    if (!t.dueDate || within72.includes(t) || overdue.includes(t)) return false;
-    const d = new Date(t.dueDate);
-    return d.toDateString() === new Date().toDateString();
-  });
-  const highPriority = activeTasks.filter((t) =>
+  // Section data
+  const inboxTasks = activeTasks.filter(t => !t.projectIds || t.projectIds.length === 0);
+  const within72 = activeTasks.filter(t => t.flags?.some(f => f.flagId === 'flag-72h'));
+  const overdue = activeTasks.filter(t => t.dueDate && t.dueDate < todayStr && !within72.includes(t));
+  const todayTasks = activeTasks.filter(t => t.dueDate === todayStr && !within72.includes(t) && !overdue.includes(t));
+  const highPriority = activeTasks.filter(t =>
     (t.priority === 'urgent' || t.priority === 'high') &&
     !within72.includes(t) && !overdue.includes(t) && !todayTasks.includes(t)
   );
+  const upcoming = activeTasks.filter(t => {
+    if (!t.dueDate) return false;
+    if (within72.includes(t) || overdue.includes(t) || todayTasks.includes(t)) return false;
+    const d = new Date(t.dueDate);
+    return isWithinInterval(d, { start: addDays(startOfDay(now), 1), end: addDays(startOfDay(now), 7) });
+  });
+  const questions = activeTasks.filter(t => t.flags?.some(f => f.flagId === 'flag-questions'));
+  const sarahsUpdates = activeTasks.filter(t => t.flags?.some(f => f.flagId === 'flag-checkin'));
+  const unreviewedMeetings = meetings.filter(m => m.reviewed === false && m.provider && m.provider !== 'manual');
+
+  const sectionData: Record<string, { tasks?: typeof activeTasks; count: number; render: () => React.ReactNode }> = {
+    inbox: {
+      count: inboxTasks.length,
+      render: () => (
+        <Section title="Inbox" icon={<Inbox size={13} />} count={inboxTasks.length} color="text-brand-400">
+          {inboxTasks.map(t => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} showProject />)}
+        </Section>
+      ),
+    },
+    unreviewed_meetings: {
+      count: unreviewedMeetings.length,
+      render: () => unreviewedMeetings.length === 0 ? null : (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-2 text-amber-400">
+            <Sparkles size={13} />
+            <span className="text-xs font-semibold uppercase tracking-wider">Meetings to Review</span>
+            <span className="text-xs opacity-50 ml-1">{unreviewedMeetings.length}</span>
+          </div>
+          <div className="space-y-0.5">
+            {unreviewedMeetings.slice(0, 5).map(m => (
+              <button
+                key={m.id}
+                onClick={() => onNavigate('meetings')}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/[0.04] text-left transition-colors group"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
+                <span className="flex-1 text-sm text-white/70 truncate">{m.title}</span>
+                <ChevronRight size={12} className="text-white/20 group-hover:text-white/40 flex-shrink-0" />
+              </button>
+            ))}
+            {unreviewedMeetings.length > 5 && (
+              <button onClick={() => onNavigate('meetings')} className="text-xs text-white/30 hover:text-white/50 px-3 py-1 transition-colors">
+                +{unreviewedMeetings.length - 5} more
+              </button>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    within_72h: {
+      count: within72.length,
+      render: () => (
+        <Section title="Within 72 Hours" icon={<AlertTriangle size={13} />} count={within72.length} color="text-red-400">
+          {within72.map(t => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} showProject />)}
+        </Section>
+      ),
+    },
+    overdue: {
+      count: overdue.length,
+      render: () => (
+        <Section title="Overdue" icon={<AlertTriangle size={13} />} count={overdue.length} color="text-red-500">
+          {overdue.map(t => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} showProject />)}
+        </Section>
+      ),
+    },
+    today: {
+      count: todayTasks.length,
+      render: () => (
+        <Section title="Due Today" icon={<Clock size={13} />} count={todayTasks.length} color="text-orange-400">
+          {todayTasks.map(t => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} showProject />)}
+        </Section>
+      ),
+    },
+    high_priority: {
+      count: highPriority.length,
+      render: () => (
+        <Section title="High Priority" icon={<ArrowRight size={13} />} count={highPriority.length} color="text-white/40">
+          {highPriority.map(t => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} showProject />)}
+        </Section>
+      ),
+    },
+    upcoming: {
+      count: upcoming.length,
+      render: () => (
+        <Section title="Coming Up" icon={<Calendar size={13} />} count={upcoming.length} color="text-white/30">
+          {upcoming.map(t => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} showProject />)}
+        </Section>
+      ),
+    },
+    questions: {
+      count: questions.length,
+      render: () => (
+        <Section title="Questions for Me" icon={<MessageSquare size={13} />} count={questions.length} color="text-purple-400">
+          {questions.map(t => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} showProject />)}
+        </Section>
+      ),
+    },
+    sarahs_updates: {
+      count: sarahsUpdates.length,
+      render: () => (
+        <Section title="Sarah's Updates" icon={<CheckCircle size={13} />} count={sarahsUpdates.length} color="text-emerald-400">
+          {sarahsUpdates.map(t => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} showProject />)}
+        </Section>
+      ),
+    },
+  };
+
+  const totalSignal = sections
+    .filter(s => s.enabled)
+    .reduce((sum, s) => sum + (sectionData[s.id]?.count ?? 0), 0);
 
   return (
     <div className="flex-1 overflow-y-auto scrollbar-hide">
@@ -152,7 +231,7 @@ export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: st
           <p className="text-white/30 text-xs font-medium tracking-wide uppercase mb-3">{today}</p>
           <div className="flex items-center justify-between gap-3">
             <p className="text-white/50 text-sm">
-              {activeTasks.length} active tasks · {new Set(activeTasks.flatMap((t) => t.projectIds ?? [])).size} projects
+              {activeTasks.length} active tasks · {new Set(activeTasks.flatMap(t => t.projectIds ?? [])).size} projects
             </p>
             <div className="flex items-center gap-2 flex-shrink-0">
               <button
@@ -180,8 +259,8 @@ export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: st
             <input
               ref={captureRef}
               value={captureTitle}
-              onChange={(e) => setCaptureTitle(e.target.value)}
-              onKeyDown={(e) => {
+              onChange={e => setCaptureTitle(e.target.value)}
+              onKeyDown={e => {
                 if (e.key === 'Enter') handleCapture();
                 if (e.key === 'Escape') { setShowCapture(false); setCaptureTitle(''); }
               }}
@@ -190,7 +269,7 @@ export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: st
             />
             <select
               value={captureProject}
-              onChange={(e) => setCaptureProject(e.target.value)}
+              onChange={e => setCaptureProject(e.target.value)}
               className="text-xs bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-1.5 text-white/60 focus:outline-none"
             >
               <option value="">No project</option>
@@ -210,15 +289,15 @@ export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: st
           </button>
         )}
 
-        {/* Sections */}
-        <Section title="Within 72 Hours" icon={<AlertTriangle size={13} />} tasks={within72} onOpenTask={onOpenTask} color="text-red-400" />
-        <Section title="Due Today" icon={<Clock size={13} />} tasks={todayTasks} onOpenTask={onOpenTask} color="text-orange-400" />
-        <Section title="Overdue" icon={<AlertTriangle size={13} />} tasks={overdue} onOpenTask={onOpenTask} color="text-red-500" />
-        <Section title="Questions for Lev" icon={<MessageSquare size={13} />} tasks={questionsForLev} onOpenTask={onOpenTask} color="text-purple-400" />
-        <Section title="Sarah's Updates" icon={<CheckCircle size={13} />} tasks={updateAtCheckin} onOpenTask={onOpenTask} color="text-emerald-400" />
-        <Section title="High Priority" icon={<ArrowRight size={13} />} tasks={highPriority} onOpenTask={onOpenTask} color="text-white/40" />
+        {/* Sections — rendered in user-defined order */}
+        {sections.filter(s => s.enabled).map(s => (
+          <React.Fragment key={s.id}>
+            {sectionData[s.id]?.render()}
+          </React.Fragment>
+        ))}
 
-        {within72.length === 0 && overdue.length === 0 && todayTasks.length === 0 && questionsForLev.length === 0 && highPriority.length === 0 && !showCapture && (
+        {/* All clear */}
+        {totalSignal === 0 && !showCapture && (
           <div className="text-center py-16">
             <p className="text-white/20 text-lg">All clear.</p>
             <p className="text-white/10 text-sm mt-1">Nothing urgent today.</p>
