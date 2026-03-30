@@ -425,7 +425,9 @@ export const useStore = create<AppStore>()((set, get) => ({
   loadData: async () => {
     set({ isLoading: true });
     try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
+      // Use getSession (reads from localStorage, no network call) to reliably get the current user
+      const { data: { session } } = await supabase.auth.getSession();
+      const authUser = session?.user ?? null;
 
       // Load all tables in parallel
       const [
@@ -509,11 +511,11 @@ export const useStore = create<AppStore>()((set, get) => ({
         updates.channels = userChannels.length > 0 ? userChannels.map(dbToChannel) : CHANNELS;
         updates.messages = userMessages.map(dbToMessage);
       } else {
-        // Not logged in — use seed defaults (empty)
-        if (allProjects.length > 0) updates.projects = allProjects.map(dbToProject);
-        if (allTasks.length > 0) updates.tasks = allTasks.map(dbToTask);
-        if (allChannels.length > 0) updates.channels = allChannels.map(dbToChannel);
-        if (allMessages.length > 0) updates.messages = allMessages.map(dbToMessage);
+        // No authenticated user — show nothing
+        updates.projects = [];
+        updates.tasks = [];
+        updates.channels = CHANNELS;
+        updates.messages = [];
       }
 
       if (contactsRes.data && contactsRes.data.length > 0) {
