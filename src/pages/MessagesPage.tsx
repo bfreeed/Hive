@@ -6,7 +6,7 @@ import { format, isToday, isYesterday } from 'date-fns';
 import type { Message, MessagePriority, User } from '../types';
 
 const PRIORITY_CONFIG: Record<MessagePriority, { label: string; dot: string; bg: string; text: string; playColor: string }> = {
-  low:    { label: 'Low',    dot: 'bg-sky-400',    bg: 'bg-sky-500/10',    text: 'text-sky-400',    playColor: '#0ea5e9' },
+  low:    { label: 'Low',    dot: 'bg-emerald-400', bg: 'bg-emerald-500/10', text: 'text-emerald-400', playColor: '#10b981' },
   medium: { label: 'Medium', dot: 'bg-yellow-400', bg: 'bg-yellow-500/10', text: 'text-yellow-400', playColor: '#eab308' },
   high:   { label: 'High',   dot: 'bg-orange-400', bg: 'bg-orange-500/10', text: 'text-orange-400', playColor: '#f97316' },
   urgent: { label: 'Urgent', dot: 'bg-red-500',    bg: 'bg-red-500/10',    text: 'text-red-400',    playColor: '#ef4444' },
@@ -122,7 +122,7 @@ function AudioPlayer({ url, duration, title, priority }: { url: string; duration
 
   const remaining = duration ? Math.max(0, duration - currentTime) : 0;
   const progress = duration && duration > 0 ? (currentTime / duration) * 100 : 0;
-  const playColor = priority ? PRIORITY_CONFIG[priority].playColor : '#4f46e5'; // brand-600
+  const playColor = priority ? PRIORITY_CONFIG[priority].playColor : '#3f3f46'; // zinc-700 — neutral when no priority
 
   return (
     <div className="mt-1.5 flex flex-col gap-1.5 px-3 py-2.5 bg-white/[0.05] border border-white/[0.08] rounded-xl max-w-[280px]">
