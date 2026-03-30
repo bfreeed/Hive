@@ -429,7 +429,15 @@ export const useStore = create<AppStore>()((set, get) => ({
       const { data: { session } } = await supabase.auth.getSession();
       const authUser = session?.user ?? null;
 
-      // Load all tables in parallel
+      // If no auth user, clear everything and bail out early
+      if (!authUser) {
+        set({ isLoading: false, projects: [], tasks: [], channels: CHANNELS, messages: [], meetings: [], pages: [] });
+        return;
+      }
+
+      const uid = authUser.id;
+
+      // Load all tables in parallel — filter at DB level so other users' data never reaches the client
       const [
         tasksRes,
         projectsRes,
@@ -443,80 +451,40 @@ export const useStore = create<AppStore>()((set, get) => ({
         settingsRes,
         pagesRes,
       ] = await Promise.all([
-        supabase.from('tasks').select('*').order('created_at', { ascending: true }),
-        supabase.from('projects').select('*').order('created_at', { ascending: true }),
+        supabase.from('tasks').select('*').contains('assignee_ids', [uid]).order('created_at', { ascending: true }),
+        supabase.from('projects').select('*').contains('member_ids', [uid]).order('created_at', { ascending: true }),
         supabase.from('contacts').select('*'),
-        supabase.from('channels').select('*'),
+        supabase.from('channels').select('*').contains('member_ids', [uid]),
         supabase.from('messages').select('*').order('created_at', { ascending: true }),
         supabase.from('notifications').select('*').order('created_at', { ascending: false }),
         supabase.from('profiles').select('*'),
-        authUser ? supabase.from('user_preferences').select('*').eq('user_id', authUser.id).maybeSingle() : Promise.resolve({ data: null, error: null }),
-        supabase.from('meetings').select('*').order('date', { ascending: false }),
-        authUser ? supabase.from('user_settings').select('*').eq('user_id', authUser.id).maybeSingle() : Promise.resolve({ data: null, error: null }),
-        supabase.from('pages').select('*').order('updated_at', { ascending: false }),
+        supabase.from('user_preferences').select('*').eq('user_id', uid).maybeSingle(),
+        supabase.from('meetings').select('*').eq('user_id', uid).order('date', { ascending: false }),
+        supabase.from('user_settings').select('*').eq('user_id', uid).maybeSingle(),
+        supabase.from('pages').select('*').eq('user_id', uid).order('updated_at', { ascending: false }),
       ]);
 
       const updates: Partial<AppStore> = { isLoading: false };
 
-      // Determine current user identity — used to scope data
-      let currentUserId: string | null = authUser?.id ?? null;
-
-      // Build users list from profiles (do this first so we can set currentUser)
+      // Build users list + set currentUser from profiles
       if (profilesRes.data && profilesRes.data.length > 0) {
         const dbUsers = profilesRes.data.map(dbToUser);
         updates.users = dbUsers.length > 0 ? dbUsers : [LEV];
-
-        // Set currentUser from authenticated profile
-        if (authUser) {
-          const myProfile = profilesRes.data.find(p => p.id === authUser.id);
-          if (myProfile) {
-            updates.currentUser = dbToUser(myProfile);
-            currentUserId = myProfile.id;
-          }
-        }
+        const myProfile = profilesRes.data.find(p => p.id === uid);
+        if (myProfile) updates.currentUser = dbToUser(myProfile);
       }
 
-      // Filter all data to only what belongs to the current user
-      const allProjects = projectsRes.data ?? [];
-      const allTasks = tasksRes.data ?? [];
-      const allChannels = channelsRes.data ?? [];
-      const allMessages = messagesRes.data ?? [];
+      // Data is already filtered at the DB query level — just map it
+      updates.projects = (projectsRes.data ?? []).map(dbToProject);
+      updates.tasks = (tasksRes.data ?? []).map(dbToTask);
+      const userChannels = channelsRes.data ?? [];
+      updates.channels = userChannels.length > 0 ? userChannels.map(dbToChannel) : CHANNELS;
 
-      if (currentUserId) {
-        // Projects: only those where member_ids includes this user's id
-        const userProjects = allProjects.filter(p =>
-          (p.member_ids ?? []).includes(currentUserId!)
-        );
-        const userProjectIdSet = new Set(userProjects.map(p => p.id));
-
-        // Tasks: in the user's projects OR directly assigned to the user
-        const userTasks = allTasks.filter(t =>
-          (t.assignee_ids ?? []).includes(currentUserId!) ||
-          (t.project_ids ?? []).some((pid: string) => userProjectIdSet.has(pid))
-        );
-
-        // Channels: only those where member_ids includes this user
-        const userChannels = allChannels.filter(c =>
-          (c.member_ids ?? []).includes(currentUserId!)
-        );
-        const userChannelIdSet = new Set(userChannels.map(c => c.id));
-
-        // Messages: only from channels the user is in
-        const userMessages = allMessages.filter(m =>
-          userChannelIdSet.has(m.channel_id)
-        );
-
-        updates.projects = userProjects.map(dbToProject);
-        updates.tasks = userTasks.map(dbToTask);
-        updates.channels = userChannels.length > 0 ? userChannels.map(dbToChannel) : CHANNELS;
-        updates.messages = userMessages.map(dbToMessage);
-      } else {
-        // No authenticated user — show nothing
-        updates.projects = [];
-        updates.tasks = [];
-        updates.channels = CHANNELS;
-        updates.messages = [];
-      }
+      // Messages: filter to only channels this user is in
+      const userChannelIds = new Set(userChannels.map((c: any) => c.id));
+      updates.messages = (messagesRes.data ?? [])
+        .filter((m: any) => userChannelIds.has(m.channel_id))
+        .map(dbToMessage);
 
       if (contactsRes.data && contactsRes.data.length > 0) {
         updates.contacts = contactsRes.data.map(dbToContact);
@@ -525,29 +493,17 @@ export const useStore = create<AppStore>()((set, get) => ({
         updates.notifications = notificationsRes.data.map(dbToNotification);
       }
 
-      // Load manual order from user_preferences
       if (prefsRes.data?.manual_order) {
         updates.manualOrder = prefsRes.data.manual_order;
       }
 
-      // Meetings: only this user's meetings
-      if (meetingsRes.data) {
-        updates.meetings = currentUserId
-          ? meetingsRes.data.filter(m => m.user_id === currentUserId).map(dbToMeeting)
-          : meetingsRes.data.map(dbToMeeting);
-      }
+      updates.meetings = (meetingsRes.data ?? []).map(dbToMeeting);
 
-      // User settings
       if (settingsRes.data) {
         updates.userSettings = dbToUserSettings(settingsRes.data);
       }
 
-      // Pages: only this user's pages
-      if (pagesRes.data) {
-        updates.pages = currentUserId
-          ? pagesRes.data.filter(p => p.user_id === currentUserId).map(dbToPage)
-          : pagesRes.data.map(dbToPage);
-      }
+      updates.pages = (pagesRes.data ?? []).map(dbToPage);
 
       set(updates);
     } catch (err) {
