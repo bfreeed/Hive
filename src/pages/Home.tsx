@@ -103,7 +103,7 @@ function Section({ title, icon, count, color = 'text-white/50', children }: {
 }
 
 export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: string, id?: string) => void; onOpenTask: (id: string) => void }) {
-  const { tasks, projects, meetings, messages, channels, addTask, userSettings, saveUserSettings } = useStore();
+  const { tasks, projects, meetings, messages, channels, addTask, userSettings, saveUserSettings, currentUser } = useStore();
   const [showCapture, setShowCapture] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [captureTitle, setCaptureTitle] = useState('');
@@ -266,7 +266,7 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
     addTask({
       title: captureTitle.trim(),
       projectIds: captureProject ? [captureProject] : [],
-      status: 'todo', priority: 'medium', assigneeIds: ['lev'],
+      status: 'todo', priority: 'medium', assigneeIds: [currentUser.id],
       flags: [], isPrivate: selectedProject?.isPrivate ?? false,
       linkedContactIds: [], linkedDocIds: [],
     });

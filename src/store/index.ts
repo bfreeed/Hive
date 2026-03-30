@@ -456,26 +456,10 @@ export const useStore = create<AppStore>()((set, get) => ({
 
       const updates: Partial<AppStore> = { isLoading: false };
 
-      if (tasksRes.data && tasksRes.data.length > 0) {
-        updates.tasks = tasksRes.data.map(dbToTask);
-      }
-      if (projectsRes.data && projectsRes.data.length > 0) {
-        updates.projects = projectsRes.data.map(dbToProject);
-      }
-      if (contactsRes.data && contactsRes.data.length > 0) {
-        updates.contacts = contactsRes.data.map(dbToContact);
-      }
-      if (channelsRes.data && channelsRes.data.length > 0) {
-        updates.channels = channelsRes.data.map(dbToChannel);
-      }
-      if (messagesRes.data && messagesRes.data.length > 0) {
-        updates.messages = messagesRes.data.map(dbToMessage);
-      }
-      if (notificationsRes.data) {
-        updates.notifications = notificationsRes.data.map(dbToNotification);
-      }
+      // Determine current user identity — used to scope data
+      let currentUserId: string | null = authUser?.id ?? null;
 
-      // Build users list from profiles
+      // Build users list from profiles (do this first so we can set currentUser)
       if (profilesRes.data && profilesRes.data.length > 0) {
         const dbUsers = profilesRes.data.map(dbToUser);
         updates.users = dbUsers.length > 0 ? dbUsers : [LEV];
@@ -485,8 +469,58 @@ export const useStore = create<AppStore>()((set, get) => ({
           const myProfile = profilesRes.data.find(p => p.id === authUser.id);
           if (myProfile) {
             updates.currentUser = dbToUser(myProfile);
+            currentUserId = myProfile.id;
           }
         }
+      }
+
+      // Filter all data to only what belongs to the current user
+      const allProjects = projectsRes.data ?? [];
+      const allTasks = tasksRes.data ?? [];
+      const allChannels = channelsRes.data ?? [];
+      const allMessages = messagesRes.data ?? [];
+
+      if (currentUserId) {
+        // Projects: only those where member_ids includes this user's id
+        const userProjects = allProjects.filter(p =>
+          (p.member_ids ?? []).includes(currentUserId!)
+        );
+        const userProjectIdSet = new Set(userProjects.map(p => p.id));
+
+        // Tasks: in the user's projects OR directly assigned to the user
+        const userTasks = allTasks.filter(t =>
+          (t.assignee_ids ?? []).includes(currentUserId!) ||
+          (t.project_ids ?? []).some((pid: string) => userProjectIdSet.has(pid))
+        );
+
+        // Channels: only those where member_ids includes this user
+        const userChannels = allChannels.filter(c =>
+          (c.member_ids ?? []).includes(currentUserId!)
+        );
+        const userChannelIdSet = new Set(userChannels.map(c => c.id));
+
+        // Messages: only from channels the user is in
+        const userMessages = allMessages.filter(m =>
+          userChannelIdSet.has(m.channel_id)
+        );
+
+        updates.projects = userProjects.map(dbToProject);
+        updates.tasks = userTasks.map(dbToTask);
+        updates.channels = userChannels.length > 0 ? userChannels.map(dbToChannel) : CHANNELS;
+        updates.messages = userMessages.map(dbToMessage);
+      } else {
+        // Not logged in — use seed defaults (empty)
+        if (allProjects.length > 0) updates.projects = allProjects.map(dbToProject);
+        if (allTasks.length > 0) updates.tasks = allTasks.map(dbToTask);
+        if (allChannels.length > 0) updates.channels = allChannels.map(dbToChannel);
+        if (allMessages.length > 0) updates.messages = allMessages.map(dbToMessage);
+      }
+
+      if (contactsRes.data && contactsRes.data.length > 0) {
+        updates.contacts = contactsRes.data.map(dbToContact);
+      }
+      if (notificationsRes.data) {
+        updates.notifications = notificationsRes.data.map(dbToNotification);
       }
 
       // Load manual order from user_preferences
@@ -494,9 +528,11 @@ export const useStore = create<AppStore>()((set, get) => ({
         updates.manualOrder = prefsRes.data.manual_order;
       }
 
-      // Meetings
+      // Meetings: only this user's meetings
       if (meetingsRes.data) {
-        updates.meetings = meetingsRes.data.map(dbToMeeting);
+        updates.meetings = currentUserId
+          ? meetingsRes.data.filter(m => m.user_id === currentUserId).map(dbToMeeting)
+          : meetingsRes.data.map(dbToMeeting);
       }
 
       // User settings
@@ -504,9 +540,11 @@ export const useStore = create<AppStore>()((set, get) => ({
         updates.userSettings = dbToUserSettings(settingsRes.data);
       }
 
-      // Pages
+      // Pages: only this user's pages
       if (pagesRes.data) {
-        updates.pages = pagesRes.data.map(dbToPage);
+        updates.pages = currentUserId
+          ? pagesRes.data.filter(p => p.user_id === currentUserId).map(dbToPage)
+          : pagesRes.data.map(dbToPage);
       }
 
       set(updates);

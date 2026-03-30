@@ -10,7 +10,7 @@ const SUGGESTIONS = [
 ];
 
 export default function VoicePanel() {
-  const { voiceOpen, toggleVoice, tasks, projects } = useStore();
+  const { voiceOpen, toggleVoice, tasks, projects, currentUser } = useStore();
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [response, setResponse] = useState('');
@@ -29,7 +29,7 @@ export default function VoicePanel() {
     const q = query.toLowerCase();
 
     if (q.includes('brief') || q.includes('today')) {
-      const lines = [`Here's your daily brief, Lev.`];
+      const lines = [`Here's your daily brief, ${currentUser.name.split(' ')[0]}.`];
       if (within72.length) lines.push(`You have ${within72.length} task${within72.length > 1 ? 's' : ''} marked within 72 hours: ${within72.map((t) => t.title).join(', ')}.`);
       if (overdue.length) lines.push(`${overdue.length} task${overdue.length > 1 ? 's are' : ' is'} overdue: ${overdue.map((t) => t.title).join(', ')}.`);
       if (questions.length) lines.push(`Sarah has ${questions.length} question${questions.length > 1 ? 's' : ''} for you.`);

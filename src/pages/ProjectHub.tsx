@@ -15,7 +15,7 @@ import { GOOGLE_CLIENT_ID_KEY } from '../lib/storageKeys';
 const PROJECT_COLORS = ['#6366f1','#10b981','#f59e0b','#ef4444','#3b82f6','#8b5cf6','#ec4899','#14b8a6'];
 
 export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { projectId: string; onNavigate: (page: string, id?: string) => void; onOpenTask: (id: string) => void }) {
-  const { projects, tasks, users, contacts, addTask, updateProject, addUser, addProject, userSettings } = useStore();
+  const { projects, tasks, users, contacts, addTask, updateProject, addUser, addProject, userSettings, currentUser } = useStore();
   const [inviteEmail, setInviteEmail] = useState('');
   const inviteRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<'tasks' | 'workspace' | 'docs' | 'contacts' | 'members'>('tasks');
@@ -49,7 +49,7 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
       name: newSubName.trim(),
       color: newSubColor,
       status: 'active',
-      memberIds: project?.memberIds ?? ['lev'],
+      memberIds: project?.memberIds ?? [currentUser.id],
       isPrivate: project?.isPrivate ?? false,
       parentId: projectId,
     });
@@ -79,7 +79,7 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
       projectIds: [projectId],
       status: 'todo',
       priority: 'medium',
-      assigneeIds: ['lev'],
+      assigneeIds: [currentUser.id],
       flags: [],
       isPrivate: project?.isPrivate ?? false,
       linkedContactIds: [],
@@ -202,7 +202,7 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                             {project.memberIds.map(mid => {
                               const u = users.find(u => u.id === mid);
                               if (!u) return null;
-                              const isOwner = mid === 'lev';
+                              const isOwner = mid === currentUser.id;
                               return (
                                 <div key={mid} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.04]">
                                   <span className="w-6 h-6 rounded-full bg-brand-600/40 flex items-center justify-center text-xs font-semibold text-white/70 flex-shrink-0">

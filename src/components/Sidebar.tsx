@@ -127,7 +127,7 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
       name: newSubName.trim(),
       color: newSubColor,
       status: 'active',
-      memberIds: parent?.memberIds ?? ['lev'],
+      memberIds: parent?.memberIds ?? [currentUser.id],
       isPrivate: parent?.isPrivate ?? false,
       parentId: newSubParentId,
     });
@@ -205,7 +205,7 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
       name: newProjectName.trim(),
       color: newProjectColor,
       status: 'active',
-      memberIds: ['lev'],
+      memberIds: [currentUser.id],
       isPrivate: false,
     });
     setNewProjectName('');
