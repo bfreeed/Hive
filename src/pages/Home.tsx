@@ -134,7 +134,7 @@ export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: st
       t.status !== 'done' && (t.priority === 'urgent' || t.priority === 'high') &&
       !(t.dueDate && t.dueDate < todayStr)
     );
-    const sentences: string[] = [`${greet}.`];
+    const sentences: string[] = [];
     if (overdueTasks.length > 0) sentences.push(`You have ${overdueTasks.length} overdue task${overdueTasks.length !== 1 ? 's' : ''}: ${overdueTasks.map(t => t.title).join(', ')}.`);
     if (dueTodayCount > 0) sentences.push(`${dueTodayCount} task${dueTodayCount !== 1 ? 's are' : ' is'} due today.`);
     if (urgentTasks.length > 0) sentences.push(`Urgent items: ${urgentTasks.map(t => t.title).join(', ')}.`);
