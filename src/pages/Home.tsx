@@ -7,6 +7,84 @@ import TaskRow from '../components/TaskRow';
 import { DEFAULT_HOME_SECTIONS, type HomeSection } from '../types';
 import { ANTHROPIC_API_KEY_KEY } from '../lib/storageKeys';
 
+const CARD_STYLES: Record<string, { border: string; label: string; dot: string }> = {
+  overdue:        { border: 'border-red-500/30',    label: 'text-red-400',     dot: 'bg-red-500' },
+  urgent:         { border: 'border-red-500/30',    label: 'text-red-400',     dot: 'bg-red-500' },
+  'due today':    { border: 'border-orange-500/30', label: 'text-orange-400',  dot: 'bg-orange-400' },
+  today:          { border: 'border-orange-500/30', label: 'text-orange-400',  dot: 'bg-orange-400' },
+  'high priority':{ border: 'border-orange-400/25', label: 'text-orange-300',  dot: 'bg-orange-400' },
+  high:           { border: 'border-orange-400/25', label: 'text-orange-300',  dot: 'bg-orange-400' },
+  'medium priority':{ border: 'border-yellow-500/25', label: 'text-yellow-400', dot: 'bg-yellow-400' },
+  upcoming:       { border: 'border-brand-500/25',  label: 'text-brand-400',   dot: 'bg-brand-400' },
+  'coming up':    { border: 'border-brand-500/25',  label: 'text-brand-400',   dot: 'bg-brand-400' },
+  messages:       { border: 'border-purple-500/25', label: 'text-purple-400',  dot: 'bg-purple-400' },
+  'low priority': { border: 'border-emerald-500/25',label: 'text-emerald-400', dot: 'bg-emerald-400' },
+};
+
+function getCardStyle(title: string) {
+  const key = title.toLowerCase().trim();
+  return CARD_STYLES[key] ?? { border: 'border-white/[0.08]', label: 'text-white/60', dot: 'bg-white/30' };
+}
+
+function ClaudeCardResponse({ text }: { text: string }) {
+  // Split into intro + sections
+  const parts = text.split(/\n(?=## )/);
+  const intro = parts[0].startsWith('## ') ? null : parts[0].trim();
+  const sectionParts = parts[0].startsWith('## ') ? parts : parts.slice(1);
+
+  const sections = sectionParts.map(block => {
+    const lines = block.split('\n');
+    const title = lines[0].replace(/^##\s*/, '').trim();
+    const items = lines.slice(1)
+      .map(l => l.replace(/^[-*]\s*/, '').trim())
+      .filter(l => l.length > 0);
+    return { title, items };
+  }).filter(s => s.items.length > 0 || s.title);
+
+  // If no sections found, fall back to plain markdown
+  if (sections.length === 0) {
+    return (
+      <div className="px-4 py-3 rounded-xl border border-white/[0.06] bg-white/[0.03]">
+        <ReactMarkdown
+          components={{
+            p: ({ children }) => <p className="text-sm text-white/75 leading-relaxed mb-2 last:mb-0">{children}</p>,
+            strong: ({ children }) => <strong className="text-white/90 font-semibold">{children}</strong>,
+            ul: ({ children }) => <ul className="space-y-1">{children}</ul>,
+            li: ({ children }) => <li className="text-sm text-white/70 flex gap-2"><span className="text-brand-400 flex-shrink-0">•</span><span>{children}</span></li>,
+          }}
+        >{text}</ReactMarkdown>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {intro && (
+        <p className="text-sm text-white/50 px-1 pb-1">{intro}</p>
+      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {sections.map((section, i) => {
+          const style = getCardStyle(section.title);
+          return (
+            <div key={i} className={`rounded-xl border ${style.border} bg-white/[0.02] px-4 py-3`}>
+              <div className="flex items-center gap-2 mb-2.5">
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${style.dot}`} />
+                <span className={`text-xs font-semibold uppercase tracking-wider ${style.label}`}>{section.title}</span>
+                <span className="text-[10px] text-white/20 ml-auto">{section.items.length}</span>
+              </div>
+              <ul className="space-y-1.5">
+                {section.items.map((item, j) => (
+                  <li key={j} className="text-sm text-white/65 leading-snug pl-1">{item}</li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function Section({ title, icon, count, color = 'text-white/50', children }: {
   title: string; icon: React.ReactNode; count: number;
   color?: string; children: React.ReactNode;
@@ -103,6 +181,14 @@ export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: st
     const systemPrompt = `You are a smart assistant embedded in Hive, a personal productivity app. Today is ${todayStr}.
 Answer questions about the user's tasks, projects, and messages concisely. Be direct and specific.
 Never make up tasks or information that isn't in the data.
+
+FORMATTING RULES:
+- When answering questions about priorities, focus areas, or what to do today, ALWAYS organize your response into ## sections.
+- Use these section titles when relevant: ## Overdue, ## Due Today, ## High Priority, ## Upcoming, ## Messages, ## Low Priority
+- Under each section, list items as bullet points (- item)
+- Keep each item to one line — just the task title and any critical detail
+- Add a brief 1-sentence intro before the sections if helpful, but keep it short
+- For open-ended questions not about priorities, you may respond in plain prose
 
 ACTIVE TASKS (${activeTasks.length}):
 ${taskSummary || 'None'}
@@ -378,30 +464,11 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
             )}
           </div>
           {(claudeAnswer || claudeError) && (
-            <div className={`mt-2 px-4 py-4 rounded-xl border ${claudeError ? 'border-red-500/20 bg-red-500/[0.04] text-red-400 text-sm' : 'border-white/[0.06] bg-white/[0.03]'}`}>
-              {claudeError ? claudeError : (
-                <ReactMarkdown
-                  components={{
-                    p: ({ children }) => <p className="text-sm text-white/75 leading-relaxed mb-3 last:mb-0">{children}</p>,
-                    strong: ({ children }) => <strong className="text-white/90 font-semibold">{children}</strong>,
-                    em: ({ children }) => <em className="text-white/70 italic">{children}</em>,
-                    ul: ({ children }) => <ul className="mb-3 last:mb-0 space-y-1">{children}</ul>,
-                    ol: ({ children }) => <ol className="mb-3 last:mb-0 space-y-1 list-decimal list-inside">{children}</ol>,
-                    li: ({ children }) => (
-                      <li className="text-sm text-white/70 leading-relaxed flex gap-2">
-                        <span className="text-brand-400 flex-shrink-0 mt-0.5">•</span>
-                        <span>{children}</span>
-                      </li>
-                    ),
-                    h1: ({ children }) => <h1 className="text-base font-semibold text-white/90 mb-2">{children}</h1>,
-                    h2: ({ children }) => <h2 className="text-sm font-semibold text-white/80 mb-2 mt-3 first:mt-0">{children}</h2>,
-                    h3: ({ children }) => <h3 className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-1.5 mt-3 first:mt-0">{children}</h3>,
-                    code: ({ children }) => <code className="px-1.5 py-0.5 rounded bg-white/[0.07] text-xs text-brand-300 font-mono">{children}</code>,
-                    hr: () => <hr className="border-white/[0.08] my-3" />,
-                  }}
-                >
-                  {claudeAnswer}
-                </ReactMarkdown>
+            <div className="mt-2">
+              {claudeError ? (
+                <div className="px-4 py-3 rounded-xl border border-red-500/20 bg-red-500/[0.04] text-red-400 text-sm">{claudeError}</div>
+              ) : (
+                <ClaudeCardResponse text={claudeAnswer} />
               )}
             </div>
           )}
