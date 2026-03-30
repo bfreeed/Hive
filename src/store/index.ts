@@ -13,83 +13,17 @@ const DEFAULT_FLAGS: UserFlag[] = [
 ];
 
 const LEV: User = { id: 'lev', name: 'Lev Freedman', email: 'lev@example.com', role: 'owner', flags: DEFAULT_FLAGS };
-const SARAH: User = { id: 'sarah', name: 'Sarah', email: 'sarah@example.com', role: 'assistant', flags: DEFAULT_FLAGS };
 
 const now = new Date().toISOString();
-const in2d = new Date(Date.now() + 2 * 864e5).toISOString();
-const in7d = new Date(Date.now() + 7 * 864e5).toISOString();
-const yest = new Date(Date.now() - 864e5).toISOString();
-const minsAgo = (m: number) => new Date(Date.now() - m * 60000).toISOString();
-const hoursAgo = (h: number) => new Date(Date.now() - h * 3600000).toISOString();
-const daysAgo = (d: number) => new Date(Date.now() - d * 864e5).toISOString();
 
-const PROJECTS: Project[] = [
-  { id: 'personal', name: 'Personal Life', description: 'Personal tasks and life admin', color: '#6366f1', status: 'active', memberIds: ['lev', 'sarah'], isPrivate: false, createdAt: now },
-  { id: 'rff', name: 'Resilient Future Foundation', description: 'RFF nonprofit work', color: '#10b981', status: 'active', memberIds: ['lev'], isPrivate: false, createdAt: now },
-  { id: 'jedi', name: 'Jedi Village', description: 'Property in Sebastopol', color: '#f59e0b', status: 'active', memberIds: ['lev'], isPrivate: false, createdAt: now },
-];
-
-const SECTIONS: Section[] = [
-  { id: 'sec-jedi-1', name: 'Active Work', projectId: 'jedi', order: 0 },
-  { id: 'sec-jedi-2', name: 'Backlog', projectId: 'jedi', order: 1 },
-  { id: 'sec-rff-1', name: 'Grant Cycle', projectId: 'rff', order: 0 },
-  { id: 'sec-rff-2', name: 'Board Items', projectId: 'rff', order: 1 },
-  { id: 'sec-personal-1', name: 'Health & Medical', projectId: 'personal', order: 0 },
-  { id: 'sec-personal-2', name: 'Admin', projectId: 'personal', order: 1 },
-];
-
-const TASKS: Task[] = [
-  { id: 't1', title: 'Fix roof leak', projectIds: ['jedi'], sectionId: 'sec-jedi-1', status: 'todo', priority: 'urgent', assigneeIds: ['lev', 'sarah'], flags: [{ flagId: 'flag-72h', appliedBy: 'lev' }], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now, dueDate: in2d },
-  { id: 't2', title: 'Name change with Travis County', projectIds: ['jedi'], sectionId: 'sec-jedi-1', status: 'waiting', priority: 'high', assigneeIds: ['lev'], flags: [], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now },
-  { id: 't3', title: 'Schedule dentist appointment', projectIds: ['personal'], sectionId: 'sec-personal-1', status: 'todo', priority: 'medium', assigneeIds: ['sarah'], flags: [{ flagId: 'flag-checkin', appliedBy: 'lev' }], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now, dueDate: in7d },
-  { id: 't4', title: 'Review RFF grant proposal', projectIds: ['rff'], sectionId: 'sec-rff-1', status: 'review', priority: 'high', assigneeIds: ['lev'], flags: [{ flagId: 'flag-questions', appliedBy: 'lev' }], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now, dependsOn: ['t4-sub2'] },
-  { id: 't5', title: 'Contact storage facility', projectIds: ['jedi'], sectionId: 'sec-jedi-2', status: 'todo', priority: 'medium', assigneeIds: ['sarah'], flags: [], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now },
-  { id: 't6', title: 'Annual physical checkup', projectIds: ['personal'], sectionId: 'sec-personal-1', status: 'todo', priority: 'medium', assigneeIds: ['lev'], flags: [], isPrivate: true, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: true, createdAt: now, updatedAt: now, dueDate: yest },
-  // Subtasks for t1
-  { id: 't1-sub1', title: 'Get quotes from 3 contractors', projectIds: ['jedi'], parentId: 't1', status: 'done', priority: 'high', assigneeIds: ['sarah'], flags: [], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: false, createdAt: daysAgo(2), updatedAt: daysAgo(1), completedAt: daysAgo(1) },
-  { id: 't1-sub2', title: 'Schedule repair appointment', projectIds: ['jedi'], parentId: 't1', status: 'todo', priority: 'urgent', assigneeIds: ['sarah'], flags: [], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: false, createdAt: daysAgo(1), updatedAt: now },
-  { id: 't1-sub3', title: 'Arrange property access', projectIds: ['jedi'], parentId: 't1', status: 'todo', priority: 'medium', assigneeIds: ['lev'], flags: [], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: false, createdAt: daysAgo(1), updatedAt: now },
-  // Subtasks for t4
-  { id: 't4-sub1', title: 'Read sections 1–3', projectIds: ['rff'], parentId: 't4', status: 'done', priority: 'medium', assigneeIds: ['lev'], flags: [], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: false, createdAt: daysAgo(3), updatedAt: daysAgo(1), completedAt: daysAgo(1) },
-  { id: 't4-sub2', title: 'Strengthen impact statement (section 3)', projectIds: ['rff'], parentId: 't4', status: 'todo', priority: 'high', assigneeIds: ['lev'], flags: [], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: false, createdAt: daysAgo(2), updatedAt: now },
-  { id: 't4-sub3', title: 'Send final version to board', projectIds: ['rff'], parentId: 't4', status: 'todo', priority: 'high', assigneeIds: ['sarah'], flags: [], isPrivate: false, linkedContactIds: [], linkedDocIds: [], comments: [], audioNotes: [], attachments: [], calendarSync: false, createdAt: daysAgo(1), updatedAt: now, dependsOn: ['t4-sub2'] },
-];
-
-const CONTACTS: Contact[] = [
-  { id: 'c1', name: 'Sarah', email: 'sarah@example.com', projectIds: ['personal', 'rff', 'jedi'], notes: 'Personal assistant', meetings: [], linkedTaskIds: ['t3', 't5'] },
-  { id: 'c2', name: 'Freddie Kimmel', projectIds: ['personal'], notes: '', meetings: [], linkedTaskIds: [] },
-  { id: 'c3', name: 'Daniel Kaminski', projectIds: ['personal'], notes: '', meetings: [], linkedTaskIds: [] },
-];
-
+const PROJECTS: Project[] = [];
+const SECTIONS: Section[] = [];
+const TASKS: Task[] = [];
+const CONTACTS: Contact[] = [];
 const CHANNELS: Channel[] = [
-  { id: 'general', name: 'general', type: 'channel', memberIds: ['lev', 'sarah'], description: 'General updates and announcements' },
-  { id: 'jedi-village', name: 'jedi-village', type: 'channel', memberIds: ['lev', 'sarah'], description: 'Jedi Village property updates' },
-  { id: 'rff', name: 'rff-foundation', type: 'channel', memberIds: ['lev', 'sarah'], description: 'Resilient Future Foundation work' },
-  { id: 'dm-sarah', name: 'Sarah', type: 'dm', memberIds: ['lev', 'sarah'] },
+  { id: 'general', name: 'general', type: 'channel', memberIds: ['lev'], description: 'General updates and announcements' },
 ];
-
-const MESSAGES: Message[] = [
-  { id: 'm1', channelId: 'general', authorId: 'sarah', body: 'Good morning! I have the weekly task summary ready whenever you want to review it.', createdAt: hoursAgo(2), reactions: {} },
-  { id: 'm2', channelId: 'general', authorId: 'lev', body: 'Great, send it over. Also can you check on the dentist appointment status?', createdAt: hoursAgo(1.8), reactions: { '👍': ['sarah'] } },
-  { id: 'm3', channelId: 'general', authorId: 'sarah', body: 'On it. I called and they have availability next Tuesday or Thursday morning.', createdAt: hoursAgo(1.5), reactions: {} },
-  { id: 'm4', channelId: 'general', authorId: 'lev', body: 'Thursday works. Book it.', createdAt: hoursAgo(1.2), reactions: { '✅': ['sarah'] } },
-  { id: 'm5', channelId: 'general', authorId: 'sarah', body: 'Done! Added to your calendar for Thursday 9am. Confirmation sent to your email.', createdAt: hoursAgo(1), reactions: {} },
-  { id: 'm6', channelId: 'jedi-village', authorId: 'sarah', body: 'Heard back from the roofing contractor. They can come out Wednesday between 10am–2pm.', createdAt: daysAgo(1), reactions: {} },
-  { id: 'm7', channelId: 'jedi-village', authorId: 'lev', body: 'Perfect. Make sure someone is there to let them in.', createdAt: daysAgo(1), reactions: {} },
-  { id: 'm8', channelId: 'jedi-village', authorId: 'sarah', body: 'I can be there. Should I get a quote before approving any work?', createdAt: daysAgo(1), reactions: {} },
-  { id: 'm9', channelId: 'jedi-village', authorId: 'lev', body: 'Yes — get the quote first, anything under $2k just approve. Over that, send it to me.', createdAt: daysAgo(1), reactions: { '👍': ['sarah'] } },
-  { id: 'm10', channelId: 'jedi-village', authorId: 'sarah', body: 'Also the Travis County name change paperwork came back. Looks like we need a notarized signature. Want me to find a mobile notary?', createdAt: hoursAgo(4), reactions: {} },
-  { id: 'm11', channelId: 'jedi-village', authorId: 'lev', body: 'Yes please. Try to find one that can come to me.', createdAt: hoursAgo(3), reactions: {} },
-  { id: 'm12', channelId: 'rff', authorId: 'sarah', body: 'The grant proposal draft is in your review queue. It is due Friday so wanted to flag it early.', createdAt: daysAgo(2), reactions: {} },
-  { id: 'm13', channelId: 'rff', authorId: 'lev', body: 'I saw it. Will review tonight. Any notes from the board?', createdAt: daysAgo(2), reactions: {} },
-  { id: 'm14', channelId: 'rff', authorId: 'sarah', body: 'Nothing formal yet. Marcus mentioned they want a stronger impact statement in section 3.', createdAt: daysAgo(2), reactions: {} },
-  { id: 'm15', channelId: 'rff', authorId: 'lev', body: 'Good to know. I will tighten that section.', createdAt: daysAgo(1), reactions: {} },
-  { id: 'm16', channelId: 'dm-sarah', authorId: 'sarah', body: 'Hey, quick heads up — the storage facility said they need 30 days notice to cancel. Did you want to keep the unit through April?', createdAt: daysAgo(1), reactions: {} },
-  { id: 'm17', channelId: 'dm-sarah', authorId: 'lev', body: "No let's cancel it. Start the 30 day notice now.", createdAt: daysAgo(1), reactions: {} },
-  { id: 'm18', channelId: 'dm-sarah', authorId: 'sarah', body: 'Done. They confirmed cancellation effective April 20th. I will add a task to arrange pickup of anything still there.', createdAt: daysAgo(1), reactions: { '❤️': ['lev'] } },
-  { id: 'm19', channelId: 'dm-sarah', authorId: 'sarah', body: 'Also — are we still doing the weekly check-in call on Friday?', createdAt: minsAgo(30), reactions: {} },
-  { id: 'm20', channelId: 'dm-sarah', authorId: 'lev', body: 'Yes, same time. 10am.', createdAt: minsAgo(15), reactions: {} },
-];
+const MESSAGES: Message[] = [];
 
 // ---------------------------------------------------------------------------
 // Mappers: DB row (snake_case) → TypeScript type (camelCase)
@@ -465,7 +399,7 @@ interface AppStore {
 
 export const useStore = create<AppStore>()((set, get) => ({
   currentUser: LEV,
-  users: [LEV, SARAH],
+  users: [LEV],
   projects: PROJECTS,
   tasks: TASKS,
   contacts: CONTACTS,
@@ -544,11 +478,7 @@ export const useStore = create<AppStore>()((set, get) => ({
       // Build users list from profiles
       if (profilesRes.data && profilesRes.data.length > 0) {
         const dbUsers = profilesRes.data.map(dbToUser);
-        // Keep seed users with string IDs (lev/sarah) because DB tasks still reference
-        // those seed IDs in assigneeIds. Filter out seeds whose ID already exists in DB.
-        const ids = new Set(dbUsers.map(u => u.id));
-        const extras = [LEV, SARAH].filter(u => !ids.has(u.id));
-        updates.users = [...dbUsers, ...extras];
+        updates.users = dbUsers.length > 0 ? dbUsers : [LEV];
 
         // Set currentUser from authenticated profile
         if (authUser) {
@@ -1259,7 +1189,7 @@ supabase.auth.onAuthStateChange((event) => {
       channels: CHANNELS,
       messages: MESSAGES,
       notifications: [],
-      users: [LEV, SARAH],
+      users: [LEV],
       currentUser: LEV,
       manualOrder: [],
       meetings: [],

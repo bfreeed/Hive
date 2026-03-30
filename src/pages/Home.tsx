@@ -134,13 +134,11 @@ export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: st
       t.status !== 'done' && (t.priority === 'urgent' || t.priority === 'high') &&
       !(t.dueDate && t.dueDate < todayStr)
     );
-    const sarahTasks = tasks.filter(t => t.status !== 'done' && t.flags?.some(f => f.flagId === 'flag-checkin'));
-    const sentences: string[] = [`${greet}, Lev.`];
+    const sentences: string[] = [`${greet}.`];
     if (overdueTasks.length > 0) sentences.push(`You have ${overdueTasks.length} overdue task${overdueTasks.length !== 1 ? 's' : ''}: ${overdueTasks.map(t => t.title).join(', ')}.`);
     if (dueTodayCount > 0) sentences.push(`${dueTodayCount} task${dueTodayCount !== 1 ? 's are' : ' is'} due today.`);
     if (urgentTasks.length > 0) sentences.push(`Urgent items: ${urgentTasks.map(t => t.title).join(', ')}.`);
-    if (sarahTasks.length > 0) sentences.push(`Sarah needs you on: ${sarahTasks.map(t => t.title).join(', ')}.`);
-    if (overdueTasks.length === 0 && dueTodayCount === 0 && urgentTasks.length === 0 && sarahTasks.length === 0) sentences.push('All clear — nothing urgent today.');
+    if (overdueTasks.length === 0 && dueTodayCount === 0 && urgentTasks.length === 0) sentences.push('All clear — nothing urgent today.');
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(sentences.join(' '));
@@ -302,7 +300,7 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
     return isWithinInterval(d, { start: addDays(startOfDay(now), 1), end: addDays(startOfDay(now), 7) });
   });
   const questions = activeTasks.filter(t => t.flags?.some(f => f.flagId === 'flag-questions'));
-  const sarahsUpdates = activeTasks.filter(t => t.flags?.some(f => f.flagId === 'flag-checkin'));
+  const checkInUpdates = activeTasks.filter(t => t.flags?.some(f => f.flagId === 'flag-checkin'));
   const unreviewedMeetings = meetings.filter(m => m.reviewed === false && m.provider && m.provider !== 'manual');
 
   const sectionData: Record<string, { tasks?: typeof activeTasks; count: number; render: () => React.ReactNode }> = {
@@ -393,10 +391,10 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
       ),
     },
     sarahs_updates: {
-      count: sarahsUpdates.length,
+      count: checkInUpdates.length,
       render: () => (
-        <Section title="Sarah's Updates" icon={<CheckCircle size={13} />} count={sarahsUpdates.length} color="text-emerald-400">
-          {sarahsUpdates.map(t => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} showProject />)}
+        <Section title="Check-in Updates" icon={<CheckCircle size={13} />} count={checkInUpdates.length} color="text-emerald-400">
+          {checkInUpdates.map(t => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} showProject />)}
         </Section>
       ),
     },
