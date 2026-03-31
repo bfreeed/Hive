@@ -340,7 +340,7 @@ interface AppStore {
   toggleSidebar: () => void;
   toggleDarkMode: () => void;
   toggleVoice: () => void;
-  addTask: (t: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'comments' | 'audioNotes' | 'attachments'>) => void;
+  addTask: (t: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'comments' | 'audioNotes' | 'attachments'>) => Promise<void>;
   addComment: (taskId: string, body: string) => void;
   updateTask: (id: string, u: Partial<Task>) => void;
   deleteTask: (id: string) => void;
@@ -670,9 +670,19 @@ export const useStore = create<AppStore>()((set, get) => ({
   // -------------------------------------------------------------------------
   // Tasks
   // -------------------------------------------------------------------------
-  addTask: (task) => {
+  addTask: async (task) => {
+    // Get the real auth UUID — don't trust currentUser.id if it's still the seed 'lev'
+    let realUid = get().currentUser?.id;
+    if (!realUid || realUid === 'lev') {
+      const { data: { session } } = await supabase.auth.getSession();
+      realUid = session?.user?.id ?? realUid;
+    }
+    const assigneeIds = task.assigneeIds.map(id =>
+      (id === 'lev' && realUid && realUid !== 'lev') ? realUid : id
+    );
     const newTask: Task = {
       ...task,
+      assigneeIds,
       id: uid(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
