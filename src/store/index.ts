@@ -492,8 +492,26 @@ export const useStore = create<AppStore>()((set, get) => ({
       // Data is already filtered at the DB query level — just map it
       updates.projects = (projectsRes.data ?? []).map(dbToProject);
       updates.tasks = (tasksRes.data ?? []).map(dbToTask);
-      const userChannels = channelsRes.data ?? [];
-      updates.channels = userChannels.length > 0 ? userChannels.map(dbToChannel) : CHANNELS;
+      let userChannels = channelsRes.data ?? [];
+
+      // If no channels returned, the general channel likely has old 'lev' member_ids — fix it
+      if (userChannels.length === 0) {
+        await supabase.from('channels').upsert({
+          id: 'general',
+          name: 'general',
+          type: 'channel',
+          member_ids: [uid],
+          description: 'General updates and announcements',
+        }, { onConflict: 'id' });
+        userChannels = [{ id: 'general', name: 'general', type: 'channel', member_ids: [uid], description: 'General updates and announcements', pinned_message_ids: [], muted: false, read_by: {} }];
+      }
+      updates.channels = userChannels.map(dbToChannel);
+
+      // Reset activeChannelId if it points to a channel not in the list
+      const channelIds = new Set(userChannels.map((c: any) => c.id));
+      if (!channelIds.has(get().activeChannelId)) {
+        updates.activeChannelId = userChannels[0]?.id ?? 'general';
+      }
 
       // Messages: filter to only channels this user is in
       const userChannelIds = new Set(userChannels.map((c: any) => c.id));
