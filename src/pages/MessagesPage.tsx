@@ -571,6 +571,8 @@ export default function MessagesPage() {
   const [showDeleted, setShowDeleted] = useState(false);
   const [confirmPermDeleteId, setConfirmPermDeleteId] = useState<string | null>(null);
   const [showMembers, setShowMembers] = useState(false);
+  const [addMemberEmail, setAddMemberEmail] = useState('');
+  const [addMemberStatus, setAddMemberStatus] = useState<'idle' | 'loading' | 'invited' | 'added' | 'notfound'>('idle');
   const [addMemberUserId, setAddMemberUserId] = useState('');
   const [showChannelBrowser, setShowChannelBrowser] = useState(false);
   const [savedIds, setSavedIds] = useState<Set<string>>(() => {
@@ -942,6 +944,24 @@ export default function MessagesPage() {
     addChannel({ name: newChannelName.trim(), type: 'channel', memberIds: [currentUser.id] });
     setNewChannelName('');
     setShowNewChannel(false);
+  };
+
+  const handleInviteMember = async () => {
+    if (!addMemberEmail.trim() || !channel) return;
+    setAddMemberStatus('loading');
+    const email = addMemberEmail.trim().toLowerCase();
+    // Check if a profile with this email already exists
+    const { data } = await supabase.from('profiles').select('id').eq('email', email).maybeSingle();
+    if (data?.id) {
+      // User exists — add directly if not already a member
+      if (!channel.memberIds.includes(data.id)) {
+        updateChannel(channel.id, { memberIds: [...channel.memberIds, data.id] });
+      }
+      setAddMemberStatus('added');
+      setAddMemberEmail('');
+    } else {
+      setAddMemberStatus('notfound');
+    }
   };
 
   const handleAddDm = () => {
@@ -1637,7 +1657,7 @@ export default function MessagesPage() {
               <div className="absolute right-0 top-full mt-1 z-40 w-64 bg-[#1c1c1f] border border-white/[0.1] rounded-xl shadow-xl overflow-hidden">
                 <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06]">
                   <span className="text-xs font-semibold text-white/60">{channel.memberIds.length} member{channel.memberIds.length !== 1 ? 's' : ''}</span>
-                  <button onClick={() => setShowMembers(false)} className="text-white/30 hover:text-white/60 transition-colors"><X size={12} /></button>
+                  <button onClick={() => { setShowMembers(false); setAddMemberEmail(''); setAddMemberStatus('idle'); }} className="text-white/30 hover:text-white/60 transition-colors"><X size={12} /></button>
                 </div>
                 <div className="max-h-52 overflow-y-auto scrollbar-hide">
                   {channel.memberIds.map(id => {
@@ -1662,31 +1682,39 @@ export default function MessagesPage() {
                     );
                   })}
                 </div>
-                {users.filter(u => !channel.memberIds.includes(u.id)).length > 0 && (
-                  <div className="border-t border-white/[0.06] p-2 flex gap-1">
-                    <select
-                      value={addMemberUserId}
-                      onChange={e => setAddMemberUserId(e.target.value)}
-                      className="flex-1 px-2 py-1 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/60 focus:outline-none focus:border-brand-500/40"
-                    >
-                      <option value="">Add member…</option>
-                      {users.filter(u => !channel.memberIds.includes(u.id)).map(u => (
-                        <option key={u.id} value={u.id}>{u.name}</option>
-                      ))}
-                    </select>
+                <div className="border-t border-white/[0.06] p-2 space-y-1.5">
+                  <div className="flex gap-1">
+                    <input
+                      type="email"
+                      value={addMemberEmail}
+                      onChange={e => { setAddMemberEmail(e.target.value); setAddMemberStatus('idle'); }}
+                      onKeyDown={e => e.key === 'Enter' && handleInviteMember()}
+                      placeholder="Invite by email…"
+                      className="flex-1 px-2 py-1.5 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/80 placeholder-white/25 focus:outline-none focus:border-brand-500/40"
+                    />
                     <button
-                      onClick={() => {
-                        if (!addMemberUserId) return;
-                        updateChannel(channel.id, { memberIds: [...channel.memberIds, addMemberUserId] });
-                        setAddMemberUserId('');
-                      }}
-                      disabled={!addMemberUserId}
+                      onClick={handleInviteMember}
+                      disabled={!addMemberEmail.trim() || addMemberStatus === 'loading'}
                       className="px-2.5 py-1 bg-brand-600 hover:bg-brand-500 disabled:opacity-30 text-white text-xs rounded-lg transition-colors"
                     >
                       <UserPlus size={12} />
                     </button>
                   </div>
-                )}
+                  {addMemberStatus === 'added' && (
+                    <p className="text-[11px] text-emerald-400 px-0.5">Added to channel.</p>
+                  )}
+                  {addMemberStatus === 'notfound' && (
+                    <div className="space-y-1">
+                      <p className="text-[11px] text-white/40 px-0.5">No account found. Share this link to invite them:</p>
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(window.location.origin); }}
+                        className="w-full text-left px-2 py-1.5 bg-white/[0.04] hover:bg-white/[0.07] border border-white/[0.08] rounded-lg text-[11px] text-brand-400 truncate transition-colors"
+                      >
+                        {window.location.origin} — copy link
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
