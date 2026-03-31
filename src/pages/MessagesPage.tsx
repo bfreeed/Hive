@@ -1181,6 +1181,12 @@ export default function MessagesPage() {
                             ) : (
                               <>
                                 <button
+                                  onClick={() => { setActiveChannel(c.id); setShowMembers(true); setChannelMenuId(null); }}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/60 hover:bg-white/[0.06] transition-colors"
+                                >
+                                  <UserPlus size={12} /> Manage members
+                                </button>
+                                <button
                                   onClick={() => { updateChannel(c.id, { muted: !c.muted }); setChannelMenuId(null); }}
                                   className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/60 hover:bg-white/[0.06] transition-colors"
                                 >
@@ -1625,19 +1631,6 @@ export default function MessagesPage() {
                 <span>{pinnedMessages.length} pinned</span>
               </button>
             )}
-            <button
-              onClick={() => setShowMembers(v => !v)}
-              className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs transition-colors ${showMembers ? 'bg-white/[0.08]' : 'hover:bg-white/[0.04]'}`}
-            >
-              <div className="flex items-center">
-                {channel?.memberIds.slice(0, 4).map(id => (
-                  <div key={id} className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold text-white border-2 border-[#0f0f10] -ml-1 first:ml-0 ${AVATAR_COLORS[id] || 'bg-white/20'}`}>
-                    {AVATAR_INITIALS[id] || '?'}
-                  </div>
-                ))}
-              </div>
-              <span className="text-xs text-white/30">{channel?.memberIds.length}</span>
-            </button>
 
             {/* Member management panel */}
             {showMembers && channel && (
