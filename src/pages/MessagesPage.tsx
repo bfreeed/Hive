@@ -1259,48 +1259,9 @@ export default function MessagesPage() {
               </div>
 
               <div>
-                <div className="flex items-center justify-between px-3 mb-1">
+                <div className="px-3 mb-1">
                   <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Direct Messages</span>
-                  <button onClick={() => setShowNewDm(v => !v)} className="text-white/30 hover:text-white/60 transition-colors"><Plus size={12} /></button>
                 </div>
-                {showNewDm && (
-                  <div className="mx-2 mb-2 relative">
-                    <div className="flex items-center gap-1">
-                      <input
-                        autoFocus
-                        type="text"
-                        value={dmSearchQuery}
-                        onChange={e => handleDmSearch(e.target.value)}
-                        placeholder="Search by name or email…"
-                        className="flex-1 px-2 py-1.5 bg-white/[0.06] border border-white/[0.1] rounded text-xs text-white/80 placeholder-white/25 focus:outline-none focus:border-brand-500/40"
-                      />
-                      <button onClick={() => { setShowNewDm(false); setDmSearchQuery(''); setDmSearchResults([]); }} className="text-white/30 hover:text-white/60"><X size={12} /></button>
-                    </div>
-                    {(dmSearchResults.length > 0 || dmSearchLoading) && (
-                      <div className="absolute left-0 right-0 top-full mt-0.5 z-50 bg-[#1c1c1f] border border-white/[0.1] rounded-lg shadow-xl overflow-hidden">
-                        {dmSearchLoading && <p className="px-3 py-2 text-xs text-white/30">Searching…</p>}
-                        {dmSearchResults.map(u => (
-                          <button
-                            key={u.id}
-                            onClick={() => handleStartDm(u.id)}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-white/[0.06] text-left transition-colors"
-                          >
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold text-white flex-shrink-0 ${AVATAR_COLORS[u.id] || 'bg-white/20'}`}>
-                              {u.name[0]?.toUpperCase()}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-sm text-white/80 truncate">{u.name}</p>
-                              <p className="text-[10px] text-white/30 truncate">{u.email}</p>
-                            </div>
-                          </button>
-                        ))}
-                        {!dmSearchLoading && dmSearchResults.length === 0 && dmSearchQuery && (
-                          <p className="px-3 py-2 text-xs text-white/30">No users found</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
                 {dmChannels.map(c => {
                   const unread = isUnread(c);
                   const isActive = c.id === activeChannelId;
@@ -1716,7 +1677,17 @@ export default function MessagesPage() {
                       <div key={id} className="flex items-center gap-2.5 px-3 py-2 hover:bg-white/[0.03] group">
                         <Avatar userId={id} size={6} status={userStatuses[id]} />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-white/70 truncate">{u?.name || id}</p>
+                          {id !== currentUser.id ? (
+                            <button
+                              onClick={() => { handleStartDm(id); setShowMembers(false); }}
+                              className="text-sm text-white/70 hover:text-white transition-colors truncate text-left w-full"
+                              title="Send direct message"
+                            >
+                              {u?.name || id}
+                            </button>
+                          ) : (
+                            <p className="text-sm text-white/70 truncate">{u?.name || id} <span className="text-white/25 text-xs">(you)</span></p>
+                          )}
                           {userStatuses[id] && <p className="text-[10px] text-white/30 capitalize">{userStatuses[id]}</p>}
                         </div>
                         {id !== currentUser.id && (
