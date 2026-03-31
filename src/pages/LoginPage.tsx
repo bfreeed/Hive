@@ -17,8 +17,17 @@ export default function LoginPage() {
 
     try {
       if (mode === 'signin') {
-        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) throw signInError;
+        // Ensure profile exists (handles users who signed up before profile upsert was added)
+        if (signInData.user) {
+          await supabase.from('profiles').upsert({
+            id: signInData.user.id,
+            name: signInData.user.user_metadata?.name || email.split('@')[0],
+            email: email.toLowerCase(),
+            role: 'owner',
+          }, { onConflict: 'id', ignoreDuplicates: true });
+        }
       } else {
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,

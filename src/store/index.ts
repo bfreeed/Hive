@@ -467,11 +467,23 @@ export const useStore = create<AppStore>()((set, get) => ({
       const updates: Partial<AppStore> = { isLoading: false };
 
       // Build users list + set currentUser from profiles
+      // Always ensure currentUser.id matches the real auth UUID so new data is saved with the right owner
+      const myProfile = (profilesRes.data ?? []).find((p: any) => p.id === uid);
+      if (myProfile) {
+        updates.currentUser = dbToUser(myProfile);
+      } else {
+        // Profile missing — upsert it so it exists for next time, and use auth identity now
+        const derivedName = authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User';
+        supabase.from('profiles').upsert({
+          id: uid,
+          name: derivedName,
+          email: authUser.email ?? '',
+          role: 'owner',
+        }).then(({ error }) => { if (error) console.error('profile upsert error:', error); });
+        updates.currentUser = { id: uid, name: derivedName, email: authUser.email ?? '', role: 'owner', flags: DEFAULT_FLAGS };
+      }
       if (profilesRes.data && profilesRes.data.length > 0) {
-        const dbUsers = profilesRes.data.map(dbToUser);
-        updates.users = dbUsers.length > 0 ? dbUsers : [LEV];
-        const myProfile = profilesRes.data.find(p => p.id === uid);
-        if (myProfile) updates.currentUser = dbToUser(myProfile);
+        updates.users = profilesRes.data.map(dbToUser);
       }
 
       // Data is already filtered at the DB query level — just map it
