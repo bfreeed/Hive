@@ -450,7 +450,7 @@ export const useStore = create<AppStore>()((set, get) => ({
         meetingsRes,
         settingsRes,
         pagesRes,
-      ] = await Promise.all([
+      ] = await Promise.allSettled([
         supabase.from('tasks').select('*').contains('assignee_ids', [uid]).order('created_at', { ascending: true }),
         supabase.from('projects').select('*').contains('member_ids', [uid]).order('created_at', { ascending: true }),
         supabase.from('contacts').select('*'),
@@ -462,7 +462,10 @@ export const useStore = create<AppStore>()((set, get) => ({
         supabase.from('meetings').select('*').order('date', { ascending: false }),
         supabase.from('user_settings').select('*').eq('user_id', uid).maybeSingle(),
         supabase.from('pages').select('*').eq('user_id', uid).order('updated_at', { ascending: false }),
-      ]);
+      ]).then(results => results.map((r, i) => {
+        if (r.status === 'rejected') { console.error(`loadData query ${i} failed:`, r.reason); return { data: null, error: r.reason }; }
+        return r.value;
+      }));
 
       const updates: Partial<AppStore> = { isLoading: false };
 
