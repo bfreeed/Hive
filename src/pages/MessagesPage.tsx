@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import { supabase } from '../lib/supabase';
 import { Hash, Plus, Search, Smile, Paperclip, Send, X, Pencil, Trash2, MessageSquare, Link, MoreHorizontal, Pin, Copy, ChevronDown, BellOff, Bell, RotateCcw, Archive, Bookmark, ExternalLink, Globe, UserPlus, Mic, MicOff, Play, Pause, FileText, ImageIcon, Loader2, ChevronLeft, Flag, ArrowRight } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
-import type { Message, MessagePriority, User } from '../types';
+import type { Message, MessagePriority, User, Channel } from '../types';
 
 const PRIORITY_CONFIG: Record<MessagePriority, { label: string; dot: string; bg: string; text: string; playColor: string }> = {
   low:    { label: 'Low',    dot: 'bg-emerald-400', bg: 'bg-emerald-500/10', text: 'text-emerald-400', playColor: '#10b981' },
