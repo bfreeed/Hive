@@ -459,7 +459,7 @@ export const useStore = create<AppStore>()((set, get) => ({
         supabase.from('notifications').select('*').order('created_at', { ascending: false }),
         supabase.from('profiles').select('*'),
         supabase.from('user_preferences').select('*').eq('user_id', uid).maybeSingle(),
-        supabase.from('meetings').select('*').or(`user_id.eq.${uid},user_id.is.null`).order('date', { ascending: false }),
+        supabase.from('meetings').select('*').order('date', { ascending: false }),
         supabase.from('user_settings').select('*').eq('user_id', uid).maybeSingle(),
         supabase.from('pages').select('*').eq('user_id', uid).order('updated_at', { ascending: false }),
       ]);
