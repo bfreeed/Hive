@@ -579,6 +579,10 @@ export default function MessagesPage() {
     try { return new Set(JSON.parse(localStorage.getItem('saved_msg_ids') || '[]')); }
     catch { return new Set<string>(); }
   });
+  const [dmSearchQuery, setDmSearchQuery] = useState('');
+  const [dmSearchResults, setDmSearchResults] = useState<{ id: string; name: string; email: string }[]>([]);
+  const [dmSearchLoading, setDmSearchLoading] = useState(false);
+  const dmSearchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showSaved, setShowSaved] = useState(false);
   const [savedChannelFilter, setSavedChannelFilter] = useState<string | null>(null);
   const [priorityFilter, setPriorityFilter] = useState<MessagePriority | null>(null);
@@ -946,6 +950,31 @@ export default function MessagesPage() {
     setShowNewChannel(false);
   };
 
+  const handleDmSearch = (q: string) => {
+    setDmSearchQuery(q);
+    if (dmSearchTimeout.current) clearTimeout(dmSearchTimeout.current);
+    if (!q.trim()) { setDmSearchResults([]); return; }
+    setDmSearchLoading(true);
+    dmSearchTimeout.current = setTimeout(async () => {
+      const { data } = await supabase.from('profiles')
+        .select('id, name, email')
+        .or(`name.ilike.%${q}%,email.ilike.%${q}%`)
+        .neq('id', currentUser.id)
+        .limit(8);
+      setDmSearchResults(data ?? []);
+      setDmSearchLoading(false);
+    }, 300);
+  };
+
+  const handleStartDm = (userId: string) => {
+    const existing = channels.find(c => c.type === 'dm' && c.memberIds.includes(userId) && c.memberIds.includes(currentUser.id));
+    if (existing) { selectChannel(existing.id); }
+    else { addChannel({ name: '', type: 'dm', memberIds: [currentUser.id, userId] }); }
+    setShowNewDm(false);
+    setDmSearchQuery('');
+    setDmSearchResults([]);
+  };
+
   const handleInviteMember = async () => {
     if (!addMemberEmail.trim() || !channel) return;
     setAddMemberStatus('loading');
@@ -1235,20 +1264,41 @@ export default function MessagesPage() {
                   <button onClick={() => setShowNewDm(v => !v)} className="text-white/30 hover:text-white/60 transition-colors"><Plus size={12} /></button>
                 </div>
                 {showNewDm && (
-                  <div className="mx-2 mb-2 flex items-center gap-1">
-                    <select
-                      autoFocus
-                      value={newDmUserId}
-                      onChange={e => setNewDmUserId(e.target.value)}
-                      className="flex-1 px-2 py-1 bg-white/[0.06] border border-white/[0.1] rounded text-xs text-white/80 focus:outline-none focus:border-brand-500/40"
-                    >
-                      <option value="">Select person...</option>
-                      {users.filter(u => u.id !== currentUser.id).map(u => (
-                        <option key={u.id} value={u.id}>{u.name}</option>
-                      ))}
-                    </select>
-                    <button onClick={handleAddDm} className="px-2 py-1 bg-brand-600 hover:bg-brand-500 text-white text-xs rounded transition-colors">Open</button>
-                    <button onClick={() => { setShowNewDm(false); setNewDmUserId(''); }} className="text-white/30 hover:text-white/60"><X size={12} /></button>
+                  <div className="mx-2 mb-2 relative">
+                    <div className="flex items-center gap-1">
+                      <input
+                        autoFocus
+                        type="text"
+                        value={dmSearchQuery}
+                        onChange={e => handleDmSearch(e.target.value)}
+                        placeholder="Search by name or email…"
+                        className="flex-1 px-2 py-1.5 bg-white/[0.06] border border-white/[0.1] rounded text-xs text-white/80 placeholder-white/25 focus:outline-none focus:border-brand-500/40"
+                      />
+                      <button onClick={() => { setShowNewDm(false); setDmSearchQuery(''); setDmSearchResults([]); }} className="text-white/30 hover:text-white/60"><X size={12} /></button>
+                    </div>
+                    {(dmSearchResults.length > 0 || dmSearchLoading) && (
+                      <div className="absolute left-0 right-0 top-full mt-0.5 z-50 bg-[#1c1c1f] border border-white/[0.1] rounded-lg shadow-xl overflow-hidden">
+                        {dmSearchLoading && <p className="px-3 py-2 text-xs text-white/30">Searching…</p>}
+                        {dmSearchResults.map(u => (
+                          <button
+                            key={u.id}
+                            onClick={() => handleStartDm(u.id)}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-white/[0.06] text-left transition-colors"
+                          >
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold text-white flex-shrink-0 ${AVATAR_COLORS[u.id] || 'bg-white/20'}`}>
+                              {u.name[0]?.toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm text-white/80 truncate">{u.name}</p>
+                              <p className="text-[10px] text-white/30 truncate">{u.email}</p>
+                            </div>
+                          </button>
+                        ))}
+                        {!dmSearchLoading && dmSearchResults.length === 0 && dmSearchQuery && (
+                          <p className="px-3 py-2 text-xs text-white/30">No users found</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
                 {dmChannels.map(c => {

@@ -485,8 +485,16 @@ export const useStore = create<AppStore>()((set, get) => ({
         }).then(({ error }) => { if (error) console.error('profile upsert error:', error); });
         updates.currentUser = { id: uid, name: derivedName, email: authUser.email ?? '', role: 'owner', flags: DEFAULT_FLAGS };
       }
+      // Only include users who share a channel with the current user — never expose all of Hive's users
+      // (populated after channels are resolved below, but we set it here using all channel member IDs)
+      const allChannelMemberIds = new Set(
+        (channelsRes.data ?? []).flatMap((c: any) => c.member_ids ?? [])
+      );
+      allChannelMemberIds.add(uid);
       if (profilesRes.data && profilesRes.data.length > 0) {
-        updates.users = profilesRes.data.map(dbToUser);
+        updates.users = profilesRes.data
+          .filter((p: any) => allChannelMemberIds.has(p.id))
+          .map(dbToUser);
       }
 
       // Data is already filtered at the DB query level — just map it
