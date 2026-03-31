@@ -329,6 +329,8 @@ interface AppStore {
   voiceOpen: boolean;
   manualOrder: string[];
   isLoading: boolean;
+  granolaManualSyncTrigger: number;
+  triggerGranolaSync: () => void;
 
   loadData: () => Promise<void>;
 
@@ -417,6 +419,8 @@ export const useStore = create<AppStore>()((set, get) => ({
   voiceOpen: false,
   manualOrder: [],
   isLoading: false,
+  granolaManualSyncTrigger: 0,
+  triggerGranolaSync: () => set(s => ({ granolaManualSyncTrigger: s.granolaManualSyncTrigger + 1 })),
   userStatuses: { lev: 'online', sarah: 'online' },
 
   // -------------------------------------------------------------------------
@@ -459,7 +463,7 @@ export const useStore = create<AppStore>()((set, get) => ({
         supabase.from('notifications').select('*').order('created_at', { ascending: false }),
         supabase.from('profiles').select('*'),
         supabase.from('user_preferences').select('*').eq('user_id', uid).maybeSingle(),
-        supabase.from('meetings').select('*').order('date', { ascending: false }),
+        supabase.from('meetings').select('*').eq('user_id', uid).order('date', { ascending: false }),
         supabase.from('user_settings').select('*').eq('user_id', uid).maybeSingle(),
         supabase.from('pages').select('*').eq('user_id', uid).order('updated_at', { ascending: false }),
       ]).then(results => results.map((r, i) => {
@@ -1056,9 +1060,11 @@ export const useStore = create<AppStore>()((set, get) => ({
   // Meetings
   // -------------------------------------------------------------------------
   addMeeting: async (m) => {
+    const currentUserId = get().currentUser?.id;
     const newMeeting: Meeting = {
       ...m,
       id: uid(),
+      userId: m.userId ?? currentUserId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -1088,11 +1094,19 @@ export const useStore = create<AppStore>()((set, get) => ({
   },
 
   upsertMeeting: async (m) => {
-    // Dedup by (provider, externalId) — return existing if already synced
     const existing = get().meetings.find(
       x => x.provider === m.provider && x.externalId === m.externalId
     );
-    if (existing) return existing;
+    // If exists, update notes/summary/participants in case they changed since last sync
+    if (existing) {
+      const updates: Partial<Meeting> = {};
+      if (m.notes && m.notes !== existing.notes) updates.notes = m.notes;
+      if (m.summary && m.summary !== existing.summary) updates.summary = m.summary;
+      if (m.participantNames?.length && JSON.stringify(m.participantNames) !== JSON.stringify(existing.participantNames)) updates.participantNames = m.participantNames;
+      if (m.participantEmails?.length && JSON.stringify(m.participantEmails) !== JSON.stringify(existing.participantEmails)) updates.participantEmails = m.participantEmails;
+      if (Object.keys(updates).length > 0) await get().updateMeeting(existing.id, updates);
+      return { ...existing, ...updates };
+    }
     return get().addMeeting(m);
   },
 

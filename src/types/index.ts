@@ -128,6 +128,7 @@ export interface Contact {
 export interface ActionItem {
   id: string;
   text: string;
+  assignee?: string;    // person name from AI extraction
   taskId?: string;      // set once converted to a Task
   accepted: boolean;
   dismissed: boolean;

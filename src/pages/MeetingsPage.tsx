@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { useStore } from '../store';
-import { Calendar, Search, Check, X, Clock, Link2, AlertCircle, Plus, ChevronRight, ExternalLink, Sparkles, Send, Loader2 } from 'lucide-react';
+import { Calendar, Search, X, Clock, ExternalLink, Sparkles, Send, Loader2, Plus, ChevronRight, Mail } from 'lucide-react';
 import { format, isToday, isYesterday, isThisWeek } from 'date-fns';
+import ReactMarkdown from 'react-markdown';
 import type { Meeting, ActionItem } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -15,7 +16,6 @@ export function useUnreviewedMeetingCount() {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
 function groupLabel(dateStr: string): string {
   const d = new Date(dateStr);
   if (isToday(d)) return 'Today';
@@ -30,10 +30,10 @@ function providerBadge(provider?: string) {
     fireflies: { label: 'Fireflies', color: 'text-orange-400 bg-orange-500/10' },
     otter: { label: 'Otter', color: 'text-blue-400 bg-blue-500/10' },
     native: { label: 'Hive', color: 'text-brand-400 bg-brand-500/10' },
-    manual: { label: 'Manual', color: 'text-white/90 bg-white/[0.04]' },
+    manual: { label: 'Manual', color: 'text-white/40 bg-white/[0.04]' },
   };
   if (!provider) return null;
-  const { label, color } = map[provider] ?? { label: provider, color: 'text-white/90 bg-white/[0.04]' };
+  const { label, color } = map[provider] ?? { label: provider, color: 'text-white/40 bg-white/[0.04]' };
   return (
     <span className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md ${color}`}>
       {label}
@@ -42,351 +42,161 @@ function providerBadge(provider?: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Review Panel — shown in meeting detail when reviewed === false
+// Action Item Row
 // ---------------------------------------------------------------------------
-function ReviewPanel({ meeting, onClose }: { meeting: Meeting; onClose: () => void }) {
-  const { projects, contacts, tasks, addTask, updateMeeting, users } = useStore();
-  const [acceptedItems, setAcceptedItems] = useState<Set<string>>(new Set());
-  const [dismissedItems, setDismissedItems] = useState<Set<string>>(new Set());
-  const [acceptedSuggested, setAcceptedSuggested] = useState<Set<string>>(new Set());
-  // assignee picker: maps action item id → pending state
-  const [pendingAssignee, setPendingAssignee] = useState<{ item: ActionItem } | null>(null);
+function ActionItemRow({
+  item,
+  meetingId,
+  showMeetingTitle,
+  meetingTitle,
+  isMe,
+}: {
+  item: ActionItem;
+  meetingId: string;
+  showMeetingTitle?: boolean;
+  meetingTitle?: string;
+  isMe: boolean;
+}) {
+  const { updateMeeting, addTask, users, currentUser } = useStore();
+  const [showAssigneePicker, setShowAssigneePicker] = useState(false);
 
-  const handleAcceptProject = (pid: string) => {
-    setAcceptedSuggested(prev => new Set([...prev, pid]));
-    updateMeeting(meeting.id, {
-      linkedProjectIds: [...(meeting.linkedProjectIds ?? []), pid],
-      suggestedProjectIds: (meeting.suggestedProjectIds ?? []).filter(id => id !== pid),
-    });
+  const handleAccept = () => {
+    if (users.length > 1) {
+      setShowAssigneePicker(true);
+    } else {
+      createTask(currentUser?.id ?? '');
+    }
   };
 
-  const handleDismissProject = (pid: string) => {
-    updateMeeting(meeting.id, {
-      suggestedProjectIds: (meeting.suggestedProjectIds ?? []).filter(id => id !== pid),
-    });
-  };
-
-  // Step 1: show assignee picker
-  const handleAcceptAction = (item: ActionItem) => {
-    setPendingAssignee({ item });
-  };
-
-  // Step 2: create task with chosen assignee
-  const handleConfirmAssignee = (assigneeId: string) => {
-    if (!pendingAssignee) return;
-    const { item } = pendingAssignee;
-    setAcceptedItems(prev => new Set([...prev, item.id]));
+  const createTask = (assigneeId: string) => {
     addTask({
       title: item.text,
-      projectIds: meeting.linkedProjectIds ?? [],
+      projectIds: [],
       status: 'todo',
       priority: 'medium',
       assigneeIds: [assigneeId],
       flags: [],
       isPrivate: false,
-      linkedContactIds: meeting.linkedContactIds ?? [],
+      linkedContactIds: [],
       linkedDocIds: [],
     });
-    updateMeeting(meeting.id, {
-      actionItems: (meeting.actionItems ?? []).map(a =>
-        a.id === item.id ? { ...a, accepted: true, taskId: 'pending' } : a
+    const meeting = useStore.getState().meetings.find(m => m.id === meetingId);
+    updateMeeting(meetingId, {
+      actionItems: (meeting?.actionItems ?? []).map(a =>
+        a.id === item.id ? { ...a, accepted: true } : a
       ),
     });
-    setPendingAssignee(null);
+    setShowAssigneePicker(false);
   };
 
-  const handleDismissAction = (item: ActionItem) => {
-    setDismissedItems(prev => new Set([...prev, item.id]));
-    updateMeeting(meeting.id, {
-      actionItems: (meeting.actionItems ?? []).map(a =>
+  const handleDismiss = () => {
+    const meeting = useStore.getState().meetings.find(m => m.id === meetingId);
+    useStore.getState().updateMeeting(meetingId, {
+      actionItems: (meeting?.actionItems ?? []).map(a =>
         a.id === item.id ? { ...a, dismissed: true } : a
       ),
     });
   };
 
-  const handleMarkReviewed = () => {
-    updateMeeting(meeting.id, { reviewed: true });
-    onClose();
-  };
-
-  const pendingSuggested = (meeting.suggestedProjectIds ?? []).filter(
-    id => !acceptedSuggested.has(id)
-  );
-  const pendingActions = (meeting.actionItems ?? []).filter(
-    a => !a.accepted && !a.dismissed && !acceptedItems.has(a.id) && !dismissedItems.has(a.id)
-  );
-
-  if (pendingSuggested.length === 0 && pendingActions.length === 0) {
-    return (
-      <div className="mt-4 p-4 bg-emerald-500/8 rounded-xl border border-emerald-500/20">
-        <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium">
-          <Check size={14} /> All items reviewed
-        </div>
-        <button
-          onClick={handleMarkReviewed}
-          className="mt-3 w-full py-2 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 text-sm rounded-lg transition-colors"
-        >
-          Mark as reviewed
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="mt-4 p-4 bg-amber-500/8 rounded-xl border border-amber-500/20 space-y-4">
-      <div className="flex items-center gap-2 text-amber-400 text-sm font-semibold">
-        <AlertCircle size={14} /> Needs your review
-      </div>
-
-      {/* Suggested projects */}
-      {pendingSuggested.length > 0 && (
-        <div>
-          <p className="text-xs text-white/90 uppercase tracking-wider mb-2">Suggested projects</p>
-          <div className="space-y-1.5">
-            {pendingSuggested.map(pid => {
-              const project = projects.find(p => p.id === pid);
-              if (!project) return null;
-              return (
-                <div key={pid} className="flex items-center gap-2">
-                  <span
-                    className="flex-1 text-sm px-2 py-1 rounded-lg border"
-                    style={{ borderColor: project.color + '40', color: project.color + 'cc', background: project.color + '10' }}
-                  >
-                    {project.name}
-                  </span>
-                  <button
-                    onClick={() => handleAcceptProject(pid)}
-                    className="p-1 text-emerald-400 hover:text-emerald-300 transition-colors"
-                    title="Link to this meeting"
-                  >
-                    <Check size={14} />
-                  </button>
-                  <button
-                    onClick={() => handleDismissProject(pid)}
-                    className="p-1 text-white/90 hover:text-white/90 transition-colors"
-                    title="Dismiss suggestion"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
+    <div className="group">
+      <div className="flex items-start gap-2 py-2 px-3 rounded-lg hover:bg-white/[0.03] transition-colors">
+        <div className="flex-1 min-w-0">
+          {showMeetingTitle && meetingTitle && (
+            <p className="text-[10px] text-white/30 mb-0.5 truncate">{meetingTitle}</p>
+          )}
+          <p className="text-sm text-white/80 leading-snug">{item.text}</p>
+          {item.assignee && (
+            <p className={`text-xs mt-0.5 ${isMe ? 'text-brand-400' : 'text-white/35'}`}>
+              {isMe ? 'You' : item.assignee}
+            </p>
+          )}
         </div>
-      )}
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5">
+          <button
+            onClick={handleAccept}
+            className="p-1 text-emerald-400 hover:text-emerald-300 transition-colors"
+            title="Create task"
+          >
+            <Plus size={13} />
+          </button>
+          <button
+            onClick={handleDismiss}
+            className="p-1 text-white/25 hover:text-white/50 transition-colors"
+            title="Dismiss"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      </div>
 
       {/* Assignee picker */}
-      {pendingAssignee && (
-        <div className="p-3 bg-white/[0.06] rounded-xl border border-white/[0.10] space-y-2">
-          <p className="text-xs text-white/60 mb-1">Assign to:</p>
-          <p className="text-sm text-white/90 mb-2">{pendingAssignee.item.text}</p>
+      {showAssigneePicker && (
+        <div className="mx-3 mb-2 p-3 bg-white/[0.06] rounded-xl border border-white/[0.10] space-y-2">
+          <p className="text-xs text-white/40 mb-2">Assign to:</p>
           <div className="flex flex-wrap gap-2">
             {users.map(u => (
               <button
                 key={u.id}
-                onClick={() => handleConfirmAssignee(u.id)}
-                className="px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-brand-500/20 border border-white/[0.08] hover:border-brand-500/30 text-sm text-white/80 hover:text-brand-300 transition-colors"
+                onClick={() => createTask(u.id)}
+                className="px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-brand-500/20 border border-white/[0.08] hover:border-brand-500/30 text-sm text-white/70 hover:text-brand-300 transition-colors"
               >
                 {u.name}
               </button>
             ))}
           </div>
-          <button
-            onClick={() => setPendingAssignee(null)}
-            className="text-xs text-white/40 hover:text-white/60 transition-colors mt-1"
-          >
+          <button onClick={() => setShowAssigneePicker(false)} className="text-xs text-white/30 hover:text-white/50 transition-colors">
             Cancel
           </button>
         </div>
       )}
-
-      {/* Action items */}
-      {pendingActions.length > 0 && (
-        <div>
-          <p className="text-xs text-white/90 uppercase tracking-wider mb-2">Action items</p>
-          <div className="space-y-1.5">
-            {pendingActions.map(item => (
-              <div key={item.id} className="flex items-start gap-2">
-                <span className="flex-1 text-sm text-white/90 py-1">{item.text}</span>
-                <button
-                  onClick={() => handleAcceptAction(item)}
-                  className="p-1 text-emerald-400 hover:text-emerald-300 transition-colors flex-shrink-0"
-                  title="Create task"
-                >
-                  <Plus size={14} />
-                </button>
-                <button
-                  onClick={() => handleDismissAction(item)}
-                  className="p-1 text-white/90 hover:text-white/90 transition-colors flex-shrink-0"
-                  title="Dismiss"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <button
-        onClick={handleMarkReviewed}
-        className="w-full py-2 bg-white/[0.06] hover:bg-white/[0.10] text-white/90 hover:text-white/80 text-sm rounded-lg transition-colors"
-      >
-        Skip review — mark as reviewed
-      </button>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Meeting Detail
+// Chat Bar (per-meeting or all-meetings)
 // ---------------------------------------------------------------------------
-function MeetingDetail({ meeting }: { meeting: Meeting }) {
-  const { projects, contacts } = useStore();
-  const [showReview, setShowReview] = useState(!meeting.reviewed);
-
-  const linkedProjects = (meeting.linkedProjectIds ?? [])
-    .map(id => projects.find(p => p.id === id))
-    .filter(Boolean) as typeof projects;
-
-  const linkedContacts = (meeting.linkedContactIds ?? [])
-    .map(id => contacts.find(c => c.id === id))
-    .filter(Boolean) as typeof contacts;
-
-  return (
-    <div className="flex-1 overflow-y-auto scrollbar-hide px-8 py-8">
-      {/* Header */}
-      <div className="mb-6">
-        {!meeting.reviewed && (
-          <div className="flex items-center gap-2 mb-3 text-amber-400 text-xs font-semibold">
-            <AlertCircle size={12} /> Needs review
-          </div>
-        )}
-        <h1 className="text-xl font-semibold text-white mb-2">{meeting.title}</h1>
-        <div className="flex items-center gap-3 text-sm text-white/80">
-          <span className="flex items-center gap-1.5">
-            <Clock size={12} />
-            {format(new Date(meeting.date), 'EEEE, MMMM d · h:mm a')}
-          </span>
-          {providerBadge(meeting.provider)}
-        </div>
-      </div>
-
-      {/* Open in Granola */}
-      {meeting.externalId && meeting.provider === 'granola' && (
-        <a
-          href={`https://notes.granola.ai/t/${meeting.externalId}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 px-4 py-2 mb-6 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-medium hover:bg-emerald-500/20 transition-colors"
-        >
-          <ExternalLink size={13} /> Open in Granola
-        </a>
-      )}
-
-      {/* Review Panel */}
-      {showReview && !meeting.reviewed && (
-        <ReviewPanel meeting={meeting} onClose={() => setShowReview(false)} />
-      )}
-
-      {/* Participants */}
-      {(meeting.participantNames ?? []).length > 0 && (
-        <div className="mt-6">
-          <h3 className="text-xs font-semibold text-white/90 uppercase tracking-wider mb-2">Participants</h3>
-          <div className="flex flex-wrap gap-2">
-            {(meeting.participantNames ?? []).map((name, i) => (
-              <span key={i} className="text-xs px-2 py-1 rounded-full bg-white/[0.06] text-white/90">
-                {name}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Linked projects */}
-      {linkedProjects.length > 0 && (
-        <div className="mt-6">
-          <h3 className="text-xs font-semibold text-white/90 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-            <Link2 size={11} /> Projects
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {linkedProjects.map(p => (
-              <span
-                key={p.id}
-                className="text-xs px-2 py-1 rounded-full border"
-                style={{ borderColor: p.color + '40', color: p.color + 'cc' }}
-              >
-                {p.name}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Accepted action items */}
-      {(meeting.actionItems ?? []).filter(a => a.accepted).length > 0 && (
-        <div className="mt-6">
-          <h3 className="text-xs font-semibold text-white/90 uppercase tracking-wider mb-2">Tasks created</h3>
-          <div className="space-y-1">
-            {(meeting.actionItems ?? []).filter(a => a.accepted).map(item => (
-              <div key={item.id} className="flex items-center gap-2 text-sm text-white/90">
-                <Check size={12} className="text-emerald-400 flex-shrink-0" />
-                {item.text}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Intelligence Panel
-// ---------------------------------------------------------------------------
-function IntelligencePanel({ onClose }: { onClose: () => void }) {
+function MeetingChat({ meeting }: { meeting?: Meeting }) {
   const { meetings, users } = useStore();
   const [query, setQuery] = useState('');
   const [answer, setAnswer] = useState('');
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const suggestions = [
-    'Show all action items from this week by meeting',
-    'Which action items haven\'t been added to tasks yet?',
-    'What did we discuss about financials?',
-    'What is Sarah responsible for from recent meetings?',
-  ];
-
   const handleAsk = async (q: string) => {
-    const question = q || query.trim();
+    const question = q.trim();
     if (!question || loading) return;
     setLoading(true);
     setAnswer('');
+    setQuery('');
 
-    // Build a structured summary of all meetings for Claude
-    const meetingSummary = meetings.map(m => ({
+    const meetingList = meeting ? [meeting] : meetings;
+    const meetingSummary = meetingList.map(m => ({
       id: m.id,
       title: m.title,
       date: m.date,
       participants: m.participantNames ?? [],
+      notes: m.notes,
+      summary: m.summary,
       actionItems: (m.actionItems ?? []).map(a => ({
         text: a.text,
+        assignee: a.assignee ?? null,
         addedToTasks: a.accepted,
         dismissed: a.dismissed,
-        assignee: null,
       })),
       projects: m.linkedProjectIds ?? [],
     }));
-
-    const userList = users.map(u => u.name).join(', ');
 
     try {
       const res = await fetch('/api/meeting-intelligence', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, meetings: meetingSummary, users: userList }),
+        body: JSON.stringify({
+          question,
+          meetings: meetingSummary,
+          users: users.map(u => u.name).join(', '),
+        }),
       });
       const data = await res.json() as { answer?: string; error?: string };
       setAnswer(data.answer ?? data.error ?? 'No response.');
@@ -398,66 +208,249 @@ function IntelligencePanel({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden px-8 py-8">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2">
-          <Sparkles size={16} className="text-brand-400" />
-          <h2 className="text-sm font-semibold text-white/90">Ask your meetings</h2>
-        </div>
-        <button onClick={onClose} className="text-xs text-white/40 hover:text-white/60 transition-colors">
-          Back to meetings
-        </button>
-      </div>
-
-      {/* Suggestions */}
-      {!answer && !loading && (
-        <div className="mb-6 space-y-2">
-          <p className="text-xs text-white/40 uppercase tracking-wider mb-3">Try asking</p>
-          {suggestions.map(s => (
-            <button
-              key={s}
-              onClick={() => { setQuery(s); handleAsk(s); }}
-              className="w-full text-left px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white/60 hover:text-white/80 hover:bg-white/[0.06] transition-colors"
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Answer */}
+    <div className="border-t border-white/[0.06] p-4 flex-shrink-0">
       {(answer || loading) && (
-        <div className="flex-1 overflow-y-auto scrollbar-hide mb-6">
+        <div className="mb-3">
           {loading ? (
-            <div className="flex items-center gap-2 text-white/40 text-sm">
-              <Loader2 size={14} className="animate-spin" /> Thinking...
+            <div className="flex items-center gap-2 text-white/30 text-sm">
+              <Loader2 size={13} className="animate-spin" /> Thinking...
             </div>
           ) : (
-            <div className="prose prose-invert prose-sm max-w-none">
-              <pre className="whitespace-pre-wrap text-sm text-white/80 font-sans leading-relaxed">{answer}</pre>
+            <div className="p-3 bg-brand-500/10 border border-brand-500/20 rounded-xl text-sm text-white/80 leading-relaxed max-h-48 overflow-y-auto scrollbar-hide">
+              {answer}
             </div>
           )}
         </div>
       )}
-
-      {/* Input */}
-      <div className="flex gap-2 mt-auto">
+      <div className="flex gap-2">
         <input
           ref={inputRef}
           value={query}
           onChange={e => setQuery(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleAsk(query)}
-          placeholder="Ask anything about your meetings..."
-          className="flex-1 px-4 py-2.5 bg-white/[0.04] border border-white/[0.08] rounded-xl text-sm text-white/80 placeholder-white/20 focus:outline-none focus:border-brand-500/40"
+          placeholder={meeting ? 'Ask about this meeting…' : 'Ask your meetings…'}
+          className="flex-1 px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-xl text-sm text-white/70 placeholder-white/20 focus:outline-none focus:border-brand-500/40"
         />
         <button
           onClick={() => handleAsk(query)}
           disabled={!query.trim() || loading}
-          className="px-4 py-2.5 rounded-xl bg-brand-500 text-white text-sm font-medium disabled:opacity-30 hover:bg-brand-600 transition-colors"
+          className="px-3 py-2 rounded-xl bg-brand-500 text-white disabled:opacity-30 hover:bg-brand-600 transition-colors"
         >
-          <Send size={14} />
+          <Send size={13} />
         </button>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Email action items to a participant
+// ---------------------------------------------------------------------------
+function buildMailto(participantName: string, participantEmail: string, meetingTitle: string, items: ActionItem[]): string {
+  const subject = encodeURIComponent(`Action items from "${meetingTitle}"`);
+  const lines = items.map((item, i) => `${i + 1}. ${item.text}`).join('\n');
+  const body = encodeURIComponent(`Hi ${participantName},\n\nHere are your action items from our meeting "${meetingTitle}":\n\n${lines}\n\nLet me know if you have any questions.`);
+  return `mailto:${participantEmail}?subject=${subject}&body=${body}`;
+}
+
+// ---------------------------------------------------------------------------
+// Meeting Detail
+// ---------------------------------------------------------------------------
+function MeetingDetail({ meeting }: { meeting: Meeting }) {
+  const { currentUser } = useStore();
+  const myName = currentUser?.name?.toLowerCase() ?? '';
+
+  const pendingItems = (meeting.actionItems ?? []).filter(a => !a.accepted && !a.dismissed);
+  const acceptedItems = (meeting.actionItems ?? []).filter(a => a.accepted);
+
+  // Group participants that have action items and have an email
+  const participantsWithItems = (meeting.participantNames ?? []).map((name, i) => {
+    const email = meeting.participantEmails?.[i];
+    const items = pendingItems.filter(a =>
+      a.assignee && a.assignee.toLowerCase() === name.toLowerCase()
+    );
+    return { name, email, items };
+  }).filter(p => p.items.length > 0 && p.email && p.name.toLowerCase() !== myName);
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <div className="flex-1 overflow-y-auto scrollbar-hide">
+        <div className="px-8 py-8">
+          {/* Header */}
+          <div className="mb-6">
+            <h1 className="text-xl font-semibold text-white mb-2">{meeting.title}</h1>
+            <div className="flex items-center gap-3 text-sm text-white/40 flex-wrap">
+              <span className="flex items-center gap-1.5">
+                <Clock size={12} />
+                {format(new Date(meeting.date), 'EEEE, MMMM d · h:mm a')}
+              </span>
+              {providerBadge(meeting.provider)}
+              {meeting.externalId && meeting.provider === 'granola' && (
+                <a
+                  href={`https://notes.granola.ai/t/${meeting.externalId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-xs text-emerald-400/70 hover:text-emerald-400 transition-colors"
+                >
+                  <ExternalLink size={11} /> Open in Granola
+                </a>
+              )}
+            </div>
+            {(meeting.participantNames ?? []).length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-3">
+                {(meeting.participantNames ?? []).map((name, i) => (
+                  <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-white/[0.05] text-white/40">
+                    {name}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Action Items */}
+          {pendingItems.length > 0 && (
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-semibold text-white/30 uppercase tracking-wider">Action Items</h3>
+                {/* Email buttons for participants with items */}
+                {participantsWithItems.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    {participantsWithItems.map(p => (
+                      <a
+                        key={p.name}
+                        href={buildMailto(p.name, p.email!, meeting.title, p.items)}
+                        className="flex items-center gap-1 text-xs text-white/30 hover:text-white/60 transition-colors"
+                        title={`Email ${p.name} their ${p.items.length} action item${p.items.length > 1 ? 's' : ''}`}
+                      >
+                        <Mail size={11} /> {p.name}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="space-y-0.5">
+                {pendingItems.map(item => (
+                  <ActionItemRow
+                    key={item.id}
+                    item={item}
+                    meetingId={meeting.id}
+                    isMe={!item.assignee || item.assignee.toLowerCase() === myName}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Accepted items */}
+          {acceptedItems.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-xs font-semibold text-white/30 uppercase tracking-wider mb-2">Tasks Created</h3>
+              <div className="space-y-1">
+                {acceptedItems.map(item => (
+                  <div key={item.id} className="flex items-center gap-2 px-3 py-1.5 text-sm text-white/35">
+                    <div className="w-3.5 h-3.5 rounded-full border border-emerald-500/50 flex items-center justify-center flex-shrink-0">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    </div>
+                    {item.text}
+                    {item.assignee && <span className="text-xs text-white/25 ml-auto">{item.assignee}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Summary / Notes */}
+          {meeting.notes && (
+            <div>
+              <h3 className="text-xs font-semibold text-white/30 uppercase tracking-wider mb-3">Summary</h3>
+              <div className="prose prose-invert prose-sm max-w-none text-white/65 leading-relaxed
+                prose-headings:text-white/70 prose-headings:font-semibold prose-headings:text-sm
+                prose-p:text-white/65 prose-p:leading-relaxed
+                prose-li:text-white/65
+                prose-strong:text-white/80 prose-strong:font-semibold
+                prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5">
+                <ReactMarkdown>{meeting.notes}</ReactMarkdown>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Sticky chat bar */}
+      <MeetingChat meeting={meeting} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Default view — all pending action items across all meetings
+// ---------------------------------------------------------------------------
+function AllActionItemsView() {
+  const { meetings, currentUser } = useStore();
+  const myName = currentUser?.name?.toLowerCase() ?? '';
+  const [showAll, setShowAll] = useState(false);
+
+  const allPending = useMemo(() => {
+    const items: Array<{ item: ActionItem; meeting: Meeting; isMe: boolean }> = [];
+    for (const m of meetings) {
+      for (const a of (m.actionItems ?? [])) {
+        if (a.accepted || a.dismissed) continue;
+        const isMe = !a.assignee || a.assignee.toLowerCase() === myName;
+        items.push({ item: a, meeting: m, isMe });
+      }
+    }
+    return items;
+  }, [meetings, myName]);
+
+  const filtered = showAll ? allPending : allPending.filter(x => x.isMe);
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <div className="flex-1 overflow-y-auto scrollbar-hide px-8 py-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-sm font-semibold text-white/80">Action Items</h2>
+          <div className="flex items-center gap-1 p-0.5 bg-white/[0.05] rounded-lg">
+            <button
+              onClick={() => setShowAll(false)}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${!showAll ? 'bg-white/[0.08] text-white/80' : 'text-white/35 hover:text-white/60'}`}
+            >
+              Mine
+            </button>
+            <button
+              onClick={() => setShowAll(true)}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${showAll ? 'bg-white/[0.08] text-white/80' : 'text-white/35 hover:text-white/60'}`}
+            >
+              All
+            </button>
+          </div>
+        </div>
+
+        {filtered.length === 0 ? (
+          <div className="text-center py-12">
+            <Calendar size={28} className="text-white/10 mx-auto mb-3" />
+            <p className="text-sm text-white/30">
+              {showAll ? 'No pending action items' : 'No action items for you'}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-0.5">
+            {filtered.map(({ item, meeting, isMe }) => (
+              <ActionItemRow
+                key={`${meeting.id}-${item.id}`}
+                item={item}
+                meetingId={meeting.id}
+                showMeetingTitle
+                meetingTitle={meeting.title}
+                isMe={isMe}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Chat bar */}
+      <MeetingChat />
     </div>
   );
 }
@@ -469,14 +462,9 @@ export default function MeetingsPage() {
   const { meetings } = useStore();
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [filterUnreviewed, setFilterUnreviewed] = useState(false);
-  const [showIntelligence, setShowIntelligence] = useState(false);
-
-  const unreviewedCount = meetings.filter(m => m.reviewed === false && m.provider && m.provider !== 'manual').length;
 
   const filtered = useMemo(() => {
     let list = [...meetings].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    if (filterUnreviewed) list = list.filter(m => !m.reviewed);
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(m =>
@@ -486,9 +474,8 @@ export default function MeetingsPage() {
       );
     }
     return list;
-  }, [meetings, search, filterUnreviewed]);
+  }, [meetings, search]);
 
-  // Group by date label
   const groups = useMemo(() => {
     const map = new Map<string, Meeting[]>();
     for (const m of filtered) {
@@ -504,117 +491,78 @@ export default function MeetingsPage() {
   return (
     <div className="flex flex-1 min-h-0 overflow-hidden">
       {/* Sidebar */}
-      <div className="w-72 flex-shrink-0 border-r border-white/[0.06] flex flex-col">
-        {/* Header */}
+      <div className="w-64 flex-shrink-0 border-r border-white/[0.06] flex flex-col">
         <div className="px-4 pt-6 pb-3 flex-shrink-0">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-white/90">Meetings</h2>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => { setShowIntelligence(true); setSelectedId(null); }}
-                className="flex items-center gap-1 text-xs text-brand-400 bg-brand-500/10 px-2 py-1 rounded-full hover:bg-brand-500/20 transition-colors"
-              >
-                <Sparkles size={10} /> Ask
-              </button>
-            {unreviewedCount > 0 && !filterUnreviewed && (
-              <button
-                onClick={() => setFilterUnreviewed(true)}
-                className="flex items-center gap-1 text-xs text-amber-400 bg-amber-500/12 px-2 py-1 rounded-full hover:bg-amber-500/20 transition-colors"
-              >
-                <AlertCircle size={10} /> {unreviewedCount} to review
-              </button>
-            )}
-            {filterUnreviewed && (
-              <button
-                onClick={() => setFilterUnreviewed(false)}
-                className="text-xs text-white/90 hover:text-white/80 transition-colors"
-              >
-                Show all
-              </button>
-            )}
-            </div>
-          </div>
+          <h2 className="text-sm font-semibold text-white/80 mb-4">Meetings</h2>
           <div className="relative">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/90" />
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25" />
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search meetings..."
-              className="w-full pl-8 pr-3 py-1.5 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white/80 placeholder-white/20 focus:outline-none"
+              placeholder="Search meetings…"
+              className="w-full pl-8 pr-3 py-1.5 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white/70 placeholder-white/20 focus:outline-none"
             />
           </div>
         </div>
 
+        {/* Action items shortcut */}
+        <button
+          onClick={() => setSelectedId(null)}
+          className={`mx-3 mb-1 flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+            selectedId === null ? 'bg-white/[0.08] text-white/80' : 'text-white/40 hover:bg-white/[0.04] hover:text-white/60'
+          }`}
+        >
+          <Sparkles size={13} className="text-brand-400" />
+          Action Items
+        </button>
+
         {/* Meeting list */}
         <div className="flex-1 overflow-y-auto scrollbar-hide pb-4">
           {groups.length === 0 && (
-            <div className="px-4 py-12 text-center">
-              <Calendar size={24} className="text-white/10 mx-auto mb-2" />
-              <p className="text-white/90 text-sm">No meetings yet</p>
-              <p className="text-white/10 text-xs mt-1">
-                Connect Granola in Settings to sync
-              </p>
+            <div className="px-4 py-8 text-center">
+              <p className="text-white/20 text-xs">No meetings yet</p>
             </div>
           )}
           {groups.map(([label, items]) => (
             <div key={label}>
-              <p className="text-[10px] font-semibold text-white/90 uppercase tracking-wider px-4 py-2">
+              <p className="text-[10px] font-semibold text-white/20 uppercase tracking-wider px-4 py-2">
                 {label}
               </p>
-              {items.map(m => (
-                <button
-                  key={m.id}
-                  onClick={() => setSelectedId(m.id)}
-                  className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-colors relative ${
-                    selectedId === m.id ? 'bg-white/[0.08]' : 'hover:bg-white/[0.04]'
-                  }`}
-                >
-                  {/* Unreviewed dot */}
-                  {!m.reviewed && m.provider && m.provider !== 'manual' && (
-                    <span className="absolute left-2 top-4 w-1.5 h-1.5 rounded-full bg-amber-400" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-white/80 truncate font-medium">{m.title}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-white/90">
-                        {format(new Date(m.date), 'h:mm a')}
-                      </span>
-                      {(m.participantNames ?? []).length > 0 && (
-                        <span className="text-xs text-white/90 truncate">
-                          {(m.participantNames ?? []).slice(0, 2).join(', ')}
-                          {(m.participantNames ?? []).length > 2 && ` +${(m.participantNames ?? []).length - 2}`}
-                        </span>
-                      )}
+              {items.map(m => {
+                const pendingCount = (m.actionItems ?? []).filter(a => !a.accepted && !a.dismissed).length;
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => setSelectedId(m.id)}
+                    className={`w-full flex items-start gap-2 px-4 py-2.5 text-left transition-colors ${
+                      selectedId === m.id ? 'bg-white/[0.08]' : 'hover:bg-white/[0.04]'
+                    }`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white/70 truncate">{m.title}</p>
+                      <p className="text-xs text-white/25 mt-0.5">{format(new Date(m.date), 'h:mm a')}</p>
                     </div>
-                  </div>
-                  {selectedId === m.id && (
-                    <ChevronRight size={13} className="text-white/90 flex-shrink-0 mt-0.5" />
-                  )}
-                </button>
-              ))}
+                    {pendingCount > 0 && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-semibold flex-shrink-0 mt-0.5">
+                        {pendingCount}
+                      </span>
+                    )}
+                    {selectedId === m.id && (
+                      <ChevronRight size={12} className="text-white/30 flex-shrink-0 mt-1" />
+                    )}
+                  </button>
+                );
+              })}
             </div>
           ))}
         </div>
       </div>
 
-      {/* Detail */}
-      {showIntelligence ? (
-        <IntelligencePanel onClose={() => setShowIntelligence(false)} />
-      ) : selected ? (
+      {/* Main panel */}
+      {selected ? (
         <MeetingDetail key={selected.id} meeting={selected} />
       ) : (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <Calendar size={32} className="text-white/10 mx-auto mb-3" />
-            <p className="text-white/90 text-sm">Select a meeting</p>
-            <button
-              onClick={() => setShowIntelligence(true)}
-              className="mt-4 flex items-center gap-1.5 mx-auto text-xs text-brand-400 bg-brand-500/10 px-3 py-1.5 rounded-full hover:bg-brand-500/20 transition-colors"
-            >
-              <Sparkles size={11} /> Ask your meetings
-            </button>
-          </div>
-        </div>
+        <AllActionItemsView />
       )}
     </div>
   );

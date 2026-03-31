@@ -26,7 +26,7 @@ import { useGranolaSync } from './hooks/useGranolaSync';
 import { getPushoverKey, GOOGLE_CLIENT_ID_KEY, GOOGLE_API_KEY_KEY, ANTHROPIC_API_KEY_KEY } from './lib/storageKeys';
 
 function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: any; darkMode: boolean; toggleDarkMode: () => void }) {
-  const { addUserFlag, updateUserFlag, removeUserFlag, userSettings, saveUserSettings } = useStore();
+  const { addUserFlag, updateUserFlag, removeUserFlag, userSettings, saveUserSettings, triggerGranolaSync } = useStore();
   const clientIdRef = useRef<HTMLInputElement>(null);
   const apiKeyRef = useRef<HTMLInputElement>(null);
   const anthropicKeyRef = useRef<HTMLInputElement>(null);
@@ -133,9 +133,46 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
 
   const saveGranolaKey = async () => {
     const key = granolaKeyRef.current?.value.trim() ?? '';
-    await saveUserSettings({ granolaApiKey: key || undefined });
+    // Clear granolaLastSyncedAt so the next sync re-fetches all meetings from scratch
+    await saveUserSettings({ granolaApiKey: key || undefined, granolaLastSyncedAt: undefined });
     setGranolaKeySaved(true);
     setTimeout(() => setGranolaKeySaved(false), 2000);
+  };
+
+  const [syncing, setSyncing] = useState(false);
+  const syncGranolaNow = async () => {
+    const apiKey = granolaKeyRef.current?.value.trim() || userSettings?.granolaApiKey || '';
+    if (!apiKey || syncing) return;
+    setSyncing(true);
+    try {
+      const res = await fetch('/api/sync-granola', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey, since: null, limit: 30 }),
+      });
+      if (!res.ok) { setSyncing(false); return; }
+      const { notes } = await res.json() as { notes: any[]; count: number };
+      const { upsertMeeting, updateMeeting, meetings: currentMeetings, contacts, projects } = useStore.getState();
+      const existingIds = new Set(currentMeetings.filter(m => m.externalId).map(m => `${m.provider}:${m.externalId}`));
+      for (const note of notes) {
+        const meeting = await upsertMeeting({ ...note, contactId: '', linkedContactIds: [], linkedProjectIds: [], suggestedProjectIds: [], actionItems: [], hasProjectLinks: false, reviewed: false });
+        const isNew = !existingIds.has(`${note.provider}:${note.externalId}`);
+        const hasNoItems = !meeting.actionItems || meeting.actionItems.length === 0;
+        if ((isNew || hasNoItems) && note.notes) {
+          fetch('/api/link-meeting', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ meetingId: meeting.id, title: note.title, notes: note.notes, transcript: note.transcript, projects: projects.map((p: any) => ({ id: p.id, name: p.name })) }),
+          }).then(r => r.json()).then((linked: any) => {
+            updateMeeting(meeting.id, { linkedProjectIds: linked.linkedProjectIds ?? [], suggestedProjectIds: linked.suggestedProjectIds ?? [], actionItems: linked.actionItems ?? [], hasProjectLinks: (linked.linkedProjectIds?.length ?? 0) > 0 });
+          }).catch(() => {});
+        }
+      }
+      await saveUserSettings({ granolaLastSyncedAt: new Date().toISOString() });
+    } catch (e) {
+      console.error('Sync failed:', e);
+    }
+    setSyncing(false);
   };
 
   return (
@@ -402,11 +439,17 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-sm font-medium text-white/70">Granola</span>
                 <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 font-semibold">Supported</span>
-                {userSettings?.granolaLastSyncedAt && (
-                  <span className="text-[10px] text-white/25 ml-auto">
+                {userSettings?.granolaLastSyncedAt ? (
+                  <span className="text-[10px] text-white/25 ml-auto flex items-center gap-2">
                     Last synced {new Date(userSettings.granolaLastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    <button
+                      onClick={() => saveUserSettings({ granolaLastSyncedAt: undefined })}
+                      className="text-white/30 hover:text-white/60 underline transition-colors"
+                    >
+                      Re-sync all
+                    </button>
                   </span>
-                )}
+                ) : null}
               </div>
               <p className="text-xs text-white/25 mb-3">
                 Requires Granola Business plan ($18/mo). Get your API key at granola.so → Settings → Integrations.
@@ -421,12 +464,21 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
                   className="w-full px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white/60 placeholder-white/20 focus:outline-none focus:border-brand-500/40 font-mono"
                 />
               </div>
-              <button
-                onClick={saveGranolaKey}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${granolaKeySaved ? 'bg-emerald-500/20 text-emerald-400' : 'bg-brand-600 hover:bg-brand-500 text-white'}`}
-              >
-                {granolaKeySaved ? '✓ Saved — syncing every 15 min' : 'Save API Key'}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={saveGranolaKey}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${granolaKeySaved ? 'bg-emerald-500/20 text-emerald-400' : 'bg-brand-600 hover:bg-brand-500 text-white'}`}
+                >
+                  {granolaKeySaved ? '✓ Saved' : 'Save API Key'}
+                </button>
+                <button
+                  onClick={syncGranolaNow}
+                  disabled={syncing}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-white/[0.06] hover:bg-white/[0.10] text-white/60 hover:text-white/80 transition-colors disabled:opacity-50"
+                >
+                  {syncing ? 'Syncing…' : 'Sync Now'}
+                </button>
+              </div>
             </div>
 
             {/* Fireflies — coming soon */}

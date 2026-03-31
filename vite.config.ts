@@ -211,6 +211,12 @@ Return JSON with these fields:
                   })
                 );
 
+                // Log the first note's keys so we can see what Granola actually returns
+                if (detailed.length > 0) {
+                  console.log('[granola-sync] first note keys:', Object.keys(detailed[0]));
+                  console.log('[granola-sync] first note sample:', JSON.stringify(detailed[0]).slice(0, 500));
+                }
+
                 // Normalize to our NormalizedNote shape using official API field names
                 const normalized = detailed.map((n: any) => ({
                   externalId: n.id,
@@ -285,7 +291,7 @@ Return ONLY valid JSON (no markdown, no explanation):
 Rules:
 - highConfidenceProjectIds: project was explicitly named or clearly the main topic
 - lowConfidenceProjectIds: project name wasn't mentioned but meeting clearly relates to it
-- actionItems: max 5, concrete next steps with a clear owner, skip vague commitments
+- actionItems: up to 10, extract concrete next steps for ALL participants — always include the assignee name (use exact name from meeting content); if unclear who owns it, set assignee to null
 - Return empty arrays if nothing fits, never fabricate`;
 
                 const resp = await fetch('https://api.anthropic.com/v1/messages', {
@@ -319,9 +325,10 @@ Rules:
                   meetingId,
                   linkedProjectIds: parsed.highConfidenceProjectIds ?? [],
                   suggestedProjectIds: parsed.lowConfidenceProjectIds ?? [],
-                  actionItems: (parsed.actionItems ?? []).slice(0, 5).map((a: { text: string; assignee?: string | null }, i: number) => ({
+                  actionItems: (parsed.actionItems ?? []).slice(0, 10).map((a: { text: string; assignee?: string | null }, i: number) => ({
                     id: `ai-${meetingId}-${i}`,
                     text: a.text,
+                    assignee: a.assignee ?? undefined,
                     accepted: false,
                     dismissed: false,
                   })),

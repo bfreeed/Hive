@@ -113,6 +113,7 @@ export function useGranolaSync() {
   const upsertMeeting = useStore(s => s.upsertMeeting);
   const updateMeeting = useStore(s => s.updateMeeting);
   const saveUserSettings = useStore(s => s.saveUserSettings);
+  const granolaManualSyncTrigger = useStore(s => s.granolaManualSyncTrigger);
 
   useEffect(() => {
     const sync = async () => {
@@ -139,18 +140,21 @@ export function useGranolaSync() {
 
         const { notes } = await syncRes.json() as { notes: NormalizedNote[]; count: number };
 
-        // --- 2. Deduplicate ---
-        const newNotes = deduplicateNotes(notes, meetings);
-        if (newNotes.length === 0) {
-          // Still update the last-synced timestamp
+        // --- 2. Process all notes (upsertMeeting handles dedup + updating existing) ---
+        // Only skip AI re-linking for notes already in the store (saves API calls)
+        const existingIds = new Set(
+          meetings.filter(m => m.provider && m.externalId).map(m => `${m.provider}:${m.externalId}`)
+        );
+
+        if (notes.length === 0) {
           await saveUserSettings({ granolaLastSyncedAt: new Date().toISOString() });
           return;
         }
 
-        // --- 3. Match contacts & upsert each new note ---
+        // --- 3. Match contacts & upsert each note ---
         const projectsForAI = projects.map(p => ({ id: p.id, name: p.name }));
 
-        for (const note of newNotes) {
+        for (const note of notes) {
           const matchedContactIds = matchParticipantsToContacts(
             note.participantNames ?? [],
             note.participantEmails ?? [],
@@ -163,8 +167,10 @@ export function useGranolaSync() {
             provider: note.provider,
           });
 
-          // --- 4. AI linking (fire-and-forget, don't block sync) ---
-          if (note.notes || note.transcript) {
+          // --- 4. AI linking — run for new notes OR existing notes with no action items yet ---
+          const isNew = !existingIds.has(`${note.provider}:${note.externalId}`);
+          const hasNoActionItems = !meeting.actionItems || meeting.actionItems.length === 0;
+          if ((isNew || hasNoActionItems) && (note.notes || note.transcript)) {
             fetch('/api/link-meeting', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -201,6 +207,6 @@ export function useGranolaSync() {
     const id = setInterval(sync, POLL_INTERVAL_MS);
     return () => clearInterval(id);
 
-    // Re-run if the API key changes (user just configured it)
-  }, [userSettings?.granolaApiKey]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Re-run if the API key changes or manual sync is triggered
+  }, [userSettings?.granolaApiKey, granolaManualSyncTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
 }
