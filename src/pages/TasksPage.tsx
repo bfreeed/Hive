@@ -95,8 +95,14 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  // Tab state
-  const [activeTab, setActiveTab] = useState<ActiveTab>('status');
+  // Tab state — persisted to localStorage
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
+    return (localStorage.getItem('hive_tasks_activeTab') as ActiveTab) ?? 'status';
+  });
+  const handleSetActiveTab = (tab: ActiveTab) => {
+    setActiveTab(tab);
+    localStorage.setItem('hive_tasks_activeTab', tab);
+  };
 
   // Filters
   const [search, setSearch] = useState('');
@@ -848,7 +854,7 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
             .map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as ActiveTab)}
+                onClick={() => handleSetActiveTab(tab.id as ActiveTab)}
                 className={`px-3 py-2 text-sm transition-colors relative ${
                   activeTab === tab.id
                     ? 'text-white font-medium'
