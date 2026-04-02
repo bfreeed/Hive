@@ -700,7 +700,6 @@ export const useStore = create<AppStore>()((set, get) => ({
       .then(({ error }) => {
         if (error) {
           console.error('addTask error:', error);
-          alert('Task save failed: ' + error.message + '\nCode: ' + error.code);
         }
       });
   },

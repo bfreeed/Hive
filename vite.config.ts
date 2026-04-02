@@ -211,12 +211,6 @@ Return JSON with these fields:
                   })
                 );
 
-                // Log the first note's keys so we can see what Granola actually returns
-                if (detailed.length > 0) {
-                  console.log('[granola-sync] first note keys:', Object.keys(detailed[0]));
-                  console.log('[granola-sync] first note sample:', JSON.stringify(detailed[0]).slice(0, 500));
-                }
-
                 // Normalize to our NormalizedNote shape using official API field names
                 const normalized = detailed.map((n: any) => ({
                   externalId: n.id,
