@@ -5,6 +5,7 @@ import type { Task, TaskStatus, Priority } from '../types';
 import { format } from 'date-fns';
 import { useGooglePicker } from '../hooks/useGooglePicker';
 import { syncTaskToCalendar, deleteCalendarEvent, hasCalendarToken, listCalendars, type CalendarEntry } from '../hooks/useGoogleCalendar';
+import { flattenProjects } from '../lib/projectUtils';
 
 const STATUS_OPTIONS: { value: TaskStatus; label: string; active: string }[] = [
   { value: 'todo',    label: 'To Do',     active: 'bg-white/10 text-white/70 ring-1 ring-white/20' },
@@ -443,8 +444,8 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                     <Plus size={10} />
                   </button>
                   {showProjectPicker && (
-                    <div className="flex flex-wrap gap-1">
-                      {projects.filter(p => !(task.projectIds ?? []).includes(p.id)).map(p => (
+                    <div className="flex flex-col gap-0.5 min-w-[160px]">
+                      {flattenProjects(projects).filter(({ project: p }) => !(task.projectIds ?? []).includes(p.id)).map(({ project: p, depth }) => (
                         <button
                           key={p.id}
                           onClick={() => {
@@ -452,7 +453,8 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                             update('projectIds', [...current, p.id]);
                             setShowProjectPicker(false);
                           }}
-                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors bg-white/[0.04] hover:bg-white/[0.07] text-white/40 hover:text-white/70"
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors bg-white/[0.04] hover:bg-white/[0.07] text-white/40 hover:text-white/70 text-left"
+                          style={{ paddingLeft: depth > 0 ? `${0.625 + depth * 0.75}rem` : undefined }}
                         >
                           <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: p.color }} />
                           {p.name}

@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import TaskRow from '../components/TaskRow';
 import { DEFAULT_HOME_SECTIONS, type HomeSection } from '../types';
 import { ANTHROPIC_API_KEY_KEY } from '../lib/storageKeys';
+import { flattenProjects } from '../lib/projectUtils';
 
 const CARD_STYLES: Record<string, { border: string; label: string; dot: string }> = {
   overdue:        { border: 'border-red-500/30',    label: 'text-red-400',     dot: 'bg-red-500' },
@@ -530,7 +531,11 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
                   className="text-xs bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-1.5 text-white/60 focus:outline-none"
                 >
                   <option value="">No project</option>
-                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  {flattenProjects(projects).map(({ project: p, depth }) => (
+                    <option key={p.id} value={p.id}>
+                      {depth > 0 ? '\u00A0\u00A0\u00A0\u00A0'.repeat(depth) : ''}{p.name}
+                    </option>
+                  ))}
                 </select>
 
                 {/* Priority */}
