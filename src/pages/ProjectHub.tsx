@@ -19,9 +19,9 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
   const [inviteEmail, setInviteEmail] = useState('');
   const inviteRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<'tasks' | 'workspace' | 'docs' | 'contacts' | 'members'>('tasks');
+  const [taskViewTab, setTaskViewTab] = useState<'status' | 'priority' | 'date' | 'assignee' | 'today' | 'completed'>('status');
   const [viewType, setViewType] = useState<'list' | 'board'>('list');
   const [showSort, setShowSort] = useState(false);
-  const [groupBy, setGroupBy] = useState<BoardGroupBy>('none');
   const [sortBy, setSortBy] = useState<BoardSortBy>('date');
   const [sortOrder, setSortOrder] = useState<BoardSortOrder>('asc');
   const [showAddTask, setShowAddTask] = useState(false);
@@ -104,18 +104,33 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
     ? Math.round((doneTasks.length / allProjectTasks.length) * 100)
     : 0;
 
-  const sortActive = groupBy !== 'none' || sortBy !== 'date' || sortOrder !== 'asc';
-  // List: active tasks only, sorted
-  const sortedActive = sortTasks(projectTasks, sortBy, sortOrder, projects, users);
-  // Board: all statuses, sorted, grouped
+  const sortActive = sortBy !== 'date' || sortOrder !== 'asc';
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  // Map task view tab to group-by
+  const viewGroupBy: BoardGroupBy =
+    taskViewTab === 'priority' ? 'priority' :
+    taskViewTab === 'date'     ? 'date'     :
+    taskViewTab === 'assignee' ? 'assignee' :
+    'status';
+
+  // Which tasks to show
+  const displayTasks =
+    taskViewTab === 'today'     ? projectTasks.filter(t => t.dueDate === todayStr) :
+    taskViewTab === 'completed' ? doneTasks :
+    projectTasks;
+
+  const sortedDisplay = sortTasks(displayTasks, sortBy, sortOrder, projects, users);
+
+  // Board groups
   const boardGroups = buildGroups(
-    sortTasks(allProjectTasks, sortBy, sortOrder, projects, users),
-    groupBy === 'none' ? 'status' : groupBy,
+    sortTasks(taskViewTab === 'completed' ? allProjectTasks : allProjectTasks.filter(t => t.status !== 'done'), sortBy, sortOrder, projects, users),
+    viewGroupBy,
     projects,
     users,
   );
-  // List grouped (for when groupBy is set)
-  const listGroups = buildGroups(sortedActive, groupBy, projects, users);
+  // List groups
+  const listGroups = buildGroups(sortedDisplay, taskViewTab === 'today' || taskViewTab === 'completed' ? 'none' : viewGroupBy, projects, users);
 
   const SelectFilter = ({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: React.ReactNode }) => (
     <select
@@ -409,8 +424,8 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
           </div>
         )}
 
-        {/* Tabs */}
-        <div className="flex items-center border-b border-white/[0.06] mb-6">
+        {/* Main tabs */}
+        <div className="flex items-center border-b border-white/[0.06] mb-0">
           {(['tasks', 'workspace', 'docs', 'contacts', 'members'] as const).map((tab) => (
             <button
               key={tab}
@@ -423,56 +438,65 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
               )}
             </button>
           ))}
-          {/* List/Board + Sort — only when tasks tab is active */}
-          {activeTab === 'tasks' && (
-            <div className="ml-auto flex items-center gap-1">
-              {([
-                { id: 'list' as const,  icon: <List size={14} />,       label: 'List'  },
-                { id: 'board' as const, icon: <LayoutGrid size={14} />, label: 'Board' },
-              ]).map(v => (
-                <button
-                  key={v.id}
-                  onClick={() => setViewType(v.id)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
-                    viewType === v.id ? 'bg-white/[0.08] text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
-                  }`}
-                >
-                  {v.icon}{v.label}
-                </button>
-              ))}
-              <span className="w-px h-4 bg-white/[0.08] mx-1" />
-              <button
-                onClick={() => setShowSort(s => !s)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
-                  sortActive ? 'bg-brand-600/20 text-brand-300' : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
-                }`}
-              >
-                <ArrowUpDown size={13} />
-                Sort
-                {sortActive && <span className="w-1.5 h-1.5 rounded-full bg-brand-400" />}
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Task Tab */}
         {activeTab === 'tasks' && (
           <>
+            {/* Task view sub-tabs */}
+            <div className="flex items-center gap-0.5 border-b border-white/[0.06] mb-6">
+              {([
+                { id: 'status'    as const, label: 'By Status'    },
+                { id: 'priority'  as const, label: 'By Priority'  },
+                { id: 'date'      as const, label: 'By Date'      },
+                { id: 'assignee'  as const, label: 'By Assignee'  },
+                { id: 'today'     as const, label: 'Today'        },
+                { id: 'completed' as const, label: 'Completed'    },
+              ]).map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => setTaskViewTab(t.id)}
+                  className={`px-2.5 py-1.5 text-xs transition-colors relative ${taskViewTab === t.id ? 'text-white/80 font-medium' : 'text-white/35 hover:text-white/60'}`}
+                >
+                  {t.label}
+                  {taskViewTab === t.id && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500/70 rounded-full" />}
+                </button>
+              ))}
+              {/* List/Board + Sort */}
+              {taskViewTab !== 'completed' && (
+                <div className="ml-auto flex items-center gap-1">
+                  {([
+                    { id: 'list' as const,  icon: <List size={14} />,       label: 'List'  },
+                    { id: 'board' as const, icon: <LayoutGrid size={14} />, label: 'Board' },
+                  ]).map(v => (
+                    <button
+                      key={v.id}
+                      onClick={() => setViewType(v.id)}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                        viewType === v.id ? 'bg-white/[0.08] text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
+                      }`}
+                    >
+                      {v.icon}{v.label}
+                    </button>
+                  ))}
+                  <span className="w-px h-4 bg-white/[0.08] mx-1" />
+                  <button
+                    onClick={() => setShowSort(s => !s)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                      sortActive ? 'bg-brand-600/20 text-brand-300' : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
+                    }`}
+                  >
+                    <ArrowUpDown size={13} />
+                    Sort
+                    {sortActive && <span className="w-1.5 h-1.5 rounded-full bg-brand-400" />}
+                  </button>
+                </div>
+              )}
+            </div>
 
-            {/* Sort/Group panel */}
+            {/* Sort panel */}
             {showSort && (
               <div className="flex items-center gap-3 mb-4 px-3 py-2.5 bg-white/[0.03] border border-white/[0.06] rounded-xl">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-white/30 font-medium w-12">Group</span>
-                  <SelectFilter value={groupBy} onChange={v => setGroupBy(v as BoardGroupBy)}>
-                    <option value="none">No Grouping</option>
-                    <option value="priority">Priority</option>
-                    <option value="date">Date</option>
-                    <option value="assignee">Assignee</option>
-                    <option value="status">Status</option>
-                  </SelectFilter>
-                </div>
-                <div className="w-px h-4 bg-white/10" />
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-white/30 font-medium w-8">Sort</span>
                   <SelectFilter value={sortBy} onChange={v => setSortBy(v as BoardSortBy)}>
@@ -496,7 +520,7 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                 </div>
                 {sortActive && (
                   <button
-                    onClick={() => { setGroupBy('none'); setSortBy('date'); setSortOrder('asc'); }}
+                    onClick={() => { setSortBy('date'); setSortOrder('asc'); }}
                     className="ml-auto text-xs text-white/30 hover:text-white/60 transition-colors"
                   >
                     Reset
@@ -505,63 +529,74 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
               </div>
             )}
 
-            {viewType === 'list' && (
+            {/* Completed view */}
+            {taskViewTab === 'completed' && (
               <div className="space-y-0.5">
-                {groupBy === 'none' ? (
-                  <>
-                    {sortedActive.length === 0 && !showAddTask
-                      ? <p className="text-white/20 text-sm py-8 text-center">No active tasks</p>
-                      : sortedActive.map((t) => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} />)
-                    }
-                  </>
-                ) : (
-                  <div className="space-y-6">
-                    {listGroups.map((group, gi) => (
-                      <div key={gi}>
-                        {group.label && (
-                          <div className="flex items-center gap-2 mb-1 px-1">
-                            {group.color && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: group.color }} />}
-                            <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">{group.label}</span>
-                            <span className="text-xs text-white/20">{group.tasks.length}</span>
-                          </div>
-                        )}
-                        <div className="space-y-0.5">
-                          {group.tasks.map(t => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} />)}
+                {doneTasks.length === 0
+                  ? <p className="text-white/20 text-sm py-8 text-center">No completed tasks</p>
+                  : sortedDisplay.map(t => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} showProject={false} />)
+                }
+              </div>
+            )}
+
+            {/* List view */}
+            {taskViewTab !== 'completed' && viewType === 'list' && (
+              <div className="space-y-0.5">
+                <div className="space-y-6">
+                  {listGroups.filter(g => g.tasks.length > 0).map((group, gi) => (
+                    <div key={gi}>
+                      {group.label && (
+                        <div className="flex items-center gap-2 mb-1 px-1">
+                          {group.color && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: group.color }} />}
+                          <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">{group.label}</span>
+                          <span className="text-xs text-white/20">{group.tasks.length}</span>
                         </div>
+                      )}
+                      <div className="space-y-0.5">
+                        {group.tasks.map(t => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} showProject={false} />)}
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
+                  ))}
+                  {listGroups.every(g => g.tasks.length === 0) && !showAddTask && (
+                    <p className="text-white/20 text-sm py-8 text-center">No tasks</p>
+                  )}
+                </div>
                 {/* Inline add-task */}
-                {showAddTask ? (
-                  <div className="flex items-center gap-2 px-3 py-2">
-                    <div className="w-4 h-4 rounded border-2 border-white/20 flex-shrink-0" />
-                    <input
-                      ref={addTaskRef}
-                      value={newTaskTitle}
-                      onChange={(e) => setNewTaskTitle(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleAddTask();
-                        if (e.key === 'Escape') { setShowAddTask(false); setNewTaskTitle(''); }
-                      }}
-                      onBlur={() => { if (!newTaskTitle.trim()) setShowAddTask(false); }}
-                      placeholder="New task name..."
-                      className="flex-1 bg-transparent text-sm text-white/80 placeholder-white/20 focus:outline-none"
-                    />
-                    <button onClick={handleAddTask} className="px-2.5 py-1 bg-brand-600 text-white text-xs rounded-lg hover:bg-brand-500 transition-colors">Add</button>
-                    <button onClick={() => { setShowAddTask(false); setNewTaskTitle(''); }} className="p-1 text-white/20 hover:text-white/50 transition-colors"><X size={13} /></button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setShowAddTask(true)}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-white/20 hover:text-white/50 hover:bg-white/[0.03] rounded-lg text-sm transition-colors"
-                  >
-                    <Plus size={13} /> Add task
-                  </button>
+                {taskViewTab !== 'today' && taskViewTab !== 'completed' && (
+                  showAddTask ? (
+                    <div className="flex items-center gap-2 px-3 py-2">
+                      <div className="w-4 h-4 rounded border-2 border-white/20 flex-shrink-0" />
+                      <input
+                        ref={addTaskRef}
+                        value={newTaskTitle}
+                        onChange={(e) => setNewTaskTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleAddTask();
+                          if (e.key === 'Escape') { setShowAddTask(false); setNewTaskTitle(''); }
+                        }}
+                        onBlur={() => { if (!newTaskTitle.trim()) setShowAddTask(false); }}
+                        placeholder="New task name..."
+                        className="flex-1 bg-transparent text-sm text-white/80 placeholder-white/20 focus:outline-none"
+                      />
+                      <button onClick={handleAddTask} className="px-2.5 py-1 bg-brand-600 text-white text-xs rounded-lg hover:bg-brand-500 transition-colors">Add</button>
+                      <button onClick={() => { setShowAddTask(false); setNewTaskTitle(''); }} className="p-1 text-white/20 hover:text-white/50 transition-colors"><X size={13} /></button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowAddTask(true)}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-white/20 hover:text-white/50 hover:bg-white/[0.03] rounded-lg text-sm transition-colors"
+                    >
+                      <Plus size={13} /> Add task
+                    </button>
+                  )
                 )}
               </div>
             )}
-            {viewType === 'board' && <BoardView groups={boardGroups} onOpenTask={onOpenTask} addTask={addTask} filterProject={projectId} />}
+
+            {/* Board view */}
+            {taskViewTab !== 'completed' && viewType === 'board' && (
+              <BoardView groups={boardGroups} onOpenTask={onOpenTask} addTask={addTask} filterProject={projectId} />
+            )}
           </>
         )}
 

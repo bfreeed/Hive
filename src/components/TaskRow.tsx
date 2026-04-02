@@ -4,11 +4,11 @@ import { AlertTriangle, GitBranch } from 'lucide-react';
 import { format, isPast, isToday, isTomorrow } from 'date-fns';
 import type { Task } from '../types';
 
-const PRIORITY_DOT: Record<string, string> = {
-  urgent: 'bg-red-400',
-  high: 'bg-orange-400',
-  medium: 'bg-yellow-400',
-  low: 'bg-white/20',
+const PRIORITY_LABEL: Record<string, { text: string; className: string }> = {
+  urgent: { text: 'Urgent',  className: 'text-red-400/80'    },
+  high:   { text: 'High',    className: 'text-orange-400/80'  },
+  medium: { text: 'Medium',  className: 'text-yellow-400/70'  },
+  low:    { text: 'Low',     className: 'text-white/25'        },
 };
 
 interface TaskRowProps {
@@ -62,16 +62,20 @@ const TaskRow = forwardRef<HTMLDivElement, TaskRowProps>(function TaskRow({ task
           </span>
         );
       })}
-      <span className={`flex-shrink-0 w-1.5 h-1.5 rounded-full ${PRIORITY_DOT[task.priority]}`} title={task.priority} />
-      {showProject && project && (
-        <span className="flex-shrink-0 text-xs opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: project.color + 'cc' }}>
-          {project.name}
+      {task.priority && task.priority !== 'low' && (
+        <span className={`flex-shrink-0 text-[11px] font-medium ${PRIORITY_LABEL[task.priority]?.className ?? 'text-white/25'}`}>
+          {PRIORITY_LABEL[task.priority]?.text}
         </span>
       )}
       {task.dueDate && (
-        <span className={`flex-shrink-0 text-xs ${isOverdue ? 'text-red-400' : 'text-white/30'}`}>
+        <span className={`flex-shrink-0 text-[11px] ${isOverdue ? 'text-red-400' : 'text-white/35'}`}>
           {isOverdue && <AlertTriangle size={10} className="inline mr-0.5" />}
           {isToday(new Date(task.dueDate)) ? 'Today' : isTomorrow(new Date(task.dueDate)) ? 'Tomorrow' : format(new Date(task.dueDate), 'MMM d')}
+        </span>
+      )}
+      {showProject && project && (
+        <span className="flex-shrink-0 text-[11px]" style={{ color: project.color + 'bb' }}>
+          {project.name}
         </span>
       )}
     </div>

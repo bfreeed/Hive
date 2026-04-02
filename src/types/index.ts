@@ -167,13 +167,12 @@ export interface Meeting {
 }
 
 export interface HomeSection {
-  id: 'inbox' | 'unreviewed_meetings' | 'within_72h' | 'overdue' | 'today' | 'high_priority' | 'upcoming' | 'questions' | 'sarahs_updates';
+  id: 'unreviewed_meetings' | 'within_72h' | 'overdue' | 'today' | 'high_priority' | 'upcoming' | 'questions' | 'sarahs_updates';
   enabled: boolean;
   label: string;
 }
 
 export const DEFAULT_HOME_SECTIONS: HomeSection[] = [
-  { id: 'inbox',              enabled: true,  label: 'Inbox' },
   { id: 'unreviewed_meetings',enabled: true,  label: 'Meetings to Review' },
   { id: 'within_72h',         enabled: true,  label: 'Within 72 Hours' },
   { id: 'overdue',            enabled: true,  label: 'Overdue' },

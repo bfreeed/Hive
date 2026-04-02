@@ -31,7 +31,7 @@ function isAIQuery(query: string): boolean {
 function isLayoutCommand(query: string): boolean {
   const q = query.toLowerCase();
   return (q.includes('hide') || q.includes('show') || q.includes('move') || q.includes('rearrange') || q.includes('order')) &&
-    (q.includes('section') || q.includes('inbox') || q.includes('overdue') || q.includes('today') || q.includes('priority') || q.includes('meeting') || q.includes('home'));
+    (q.includes('section') || q.includes('overdue') || q.includes('today') || q.includes('priority') || q.includes('meeting') || q.includes('home'));
 }
 
 export default function CommandPalette({ onClose, onNavigate, onOpenTask, onAICapture }: Props) {

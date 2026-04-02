@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '../store';
-import { AlertTriangle, Clock, MessageSquare, CheckCircle, ArrowRight, Plus, X, Sun, Inbox, Calendar, Sparkles, ChevronRight, ChevronDown, Send, Loader2 } from 'lucide-react';
+import { AlertTriangle, Clock, MessageSquare, CheckCircle, ArrowRight, Plus, X, Sun, Calendar, Sparkles, ChevronRight, ChevronDown, Send, Loader2 } from 'lucide-react';
 import { isPast, addDays, isWithinInterval, startOfDay } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import TaskRow from '../components/TaskRow';
+import InlineCapture from '../components/InlineCapture';
 import { DEFAULT_HOME_SECTIONS, type HomeSection } from '../types';
 import { ANTHROPIC_API_KEY_KEY } from '../lib/storageKeys';
-import { flattenProjects } from '../lib/projectUtils';
 
 const CARD_STYLES: Record<string, { border: string; label: string; dot: string }> = {
   overdue:        { border: 'border-red-500/30',    label: 'text-red-400',     dot: 'bg-red-500' },
@@ -104,15 +104,8 @@ function Section({ title, icon, count, color = 'text-white/50', children }: {
 }
 
 export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: string, id?: string) => void; onOpenTask: (id: string) => void }) {
-  const { tasks, projects, meetings, messages, channels, addTask, userSettings, saveUserSettings, currentUser } = useStore();
-  const [showCapture, setShowCapture] = useState(false);
-  const [captureExpanded, setCaptureExpanded] = useState(false);
+  const { tasks, projects, meetings, messages, channels, userSettings, saveUserSettings, currentUser } = useStore();
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [captureTitle, setCaptureTitle] = useState('');
-  const [captureProject, setCaptureProject] = useState('');
-  const [capturePriority, setCapturePriority] = useState<'urgent' | 'high' | 'medium' | 'low'>('medium');
-  const [captureDueDate, setCaptureDueDate] = useState('');
-  const captureRef = useRef<HTMLInputElement>(null);
 
   // Claude bar
   const [claudeInput, setClaudeInput] = useState('');
@@ -251,49 +244,6 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
     }
   }, [claudeInput, userSettings, tasks, projects, messages, channels]);
 
-  // N key shortcut
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'n' && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
-        e.preventDefault(); setShowCapture(true);
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
-
-  useEffect(() => { if (showCapture) captureRef.current?.focus(); }, [showCapture]);
-
-  const handleCapture = () => {
-    if (!captureTitle.trim()) return;
-    const selectedProject = projects.find(p => p.id === captureProject);
-    addTask({
-      title: captureTitle.trim(),
-      projectIds: captureProject ? [captureProject] : [],
-      status: 'todo',
-      priority: capturePriority,
-      assigneeIds: [currentUser.id],
-      dueDate: captureDueDate || undefined,
-      flags: [], isPrivate: selectedProject?.isPrivate ?? false,
-      linkedContactIds: [], linkedDocIds: [],
-    });
-    setCaptureTitle('');
-    setCaptureProject('');
-    setCapturePriority('medium');
-    setCaptureDueDate('');
-    setCaptureExpanded(false);
-    setShowCapture(false);
-  };
-
-  const resetCapture = () => {
-    setShowCapture(false);
-    setCaptureTitle('');
-    setCaptureProject('');
-    setCapturePriority('medium');
-    setCaptureDueDate('');
-    setCaptureExpanded(false);
-  };
-
   const now = new Date();
   const today = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -305,7 +255,6 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
   });
 
   // Section data
-  const inboxTasks = activeTasks.filter(t => !t.projectIds || t.projectIds.length === 0);
   const within72 = activeTasks.filter(t => t.flags?.some(f => f.flagId === 'flag-72h'));
   const overdue = activeTasks.filter(t => t.dueDate && t.dueDate < todayStr && !within72.includes(t));
   const todayTasks = activeTasks.filter(t => t.dueDate === todayStr && !within72.includes(t) && !overdue.includes(t));
@@ -324,14 +273,6 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
   const unreviewedMeetings = meetings.filter(m => m.reviewed === false && m.provider && m.provider !== 'manual');
 
   const sectionData: Record<string, { tasks?: typeof activeTasks; count: number; render: () => React.ReactNode }> = {
-    inbox: {
-      count: inboxTasks.length,
-      render: () => (
-        <Section title="Inbox" icon={<Inbox size={13} />} count={inboxTasks.length} color="text-brand-400">
-          {inboxTasks.map(t => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} showProject />)}
-        </Section>
-      ),
-    },
     unreviewed_meetings: {
       count: unreviewedMeetings.length,
       render: () => unreviewedMeetings.length === 0 ? null : (
@@ -492,86 +433,7 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
           )}
         </div>
 
-        {/* Quick capture */}
-        {showCapture ? (
-          <div className="mb-6 bg-white/[0.04] rounded-xl border border-brand-500/30 overflow-hidden">
-            {/* Main input row */}
-            <div className="flex items-center gap-2 px-3 py-2.5">
-              <input
-                ref={captureRef}
-                value={captureTitle}
-                onChange={e => setCaptureTitle(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') handleCapture();
-                  if (e.key === 'Escape') resetCapture();
-                }}
-                placeholder="What needs to be done?"
-                className="flex-1 bg-transparent text-sm text-white placeholder-white/20 focus:outline-none"
-              />
-              <button
-                onClick={() => setCaptureExpanded(v => !v)}
-                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors ${captureExpanded ? 'bg-brand-500/20 text-brand-400' : 'text-white/30 hover:text-white/60 hover:bg-white/[0.06]'}`}
-              >
-                <ChevronDown size={12} className={`transition-transform ${captureExpanded ? 'rotate-180' : ''}`} />
-                More
-              </button>
-              <button onClick={handleCapture} className="px-3 py-1.5 bg-brand-600 text-white text-xs rounded-lg hover:bg-brand-500 transition-colors">Add</button>
-              <button onClick={resetCapture} className="p-1.5 text-white/30 hover:text-white/60 transition-colors">
-                <X size={14} />
-              </button>
-            </div>
-
-            {/* Expanded fields */}
-            {captureExpanded && (
-              <div className="flex items-center gap-2 px-3 py-2.5 border-t border-white/[0.06] flex-wrap">
-                {/* Project */}
-                <select
-                  value={captureProject}
-                  onChange={e => setCaptureProject(e.target.value)}
-                  className="text-xs bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-1.5 text-white/60 focus:outline-none"
-                >
-                  <option value="">No project</option>
-                  {flattenProjects(projects).map(({ project: p, depth }) => (
-                    <option key={p.id} value={p.id}>
-                      {depth > 0 ? '\u00A0\u00A0\u00A0\u00A0'.repeat(depth) : ''}{p.name}
-                    </option>
-                  ))}
-                </select>
-
-                {/* Priority */}
-                <select
-                  value={capturePriority}
-                  onChange={e => setCapturePriority(e.target.value as any)}
-                  className="text-xs bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-1.5 focus:outline-none"
-                  style={{ color: capturePriority === 'urgent' ? '#f87171' : capturePriority === 'high' ? '#fb923c' : capturePriority === 'medium' ? '#facc15' : '#7dd3fc' }}
-                >
-                  <option value="urgent">Urgent</option>
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
-                </select>
-
-                {/* Due date */}
-                <div className="flex items-center gap-1.5 bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-1.5">
-                  <Calendar size={11} className="text-white/30" />
-                  <input
-                    type="date"
-                    value={captureDueDate}
-                    onChange={e => setCaptureDueDate(e.target.value)}
-                    className="text-xs bg-transparent text-white/60 focus:outline-none w-28"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <button
-            onClick={() => setShowCapture(true)}
-            className="mb-6 w-full flex items-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-white/[0.08] hover:border-white/20 text-white/20 hover:text-white/40 text-sm transition-colors"
-          >
-            <Plus size={14} /> Quick capture… <span className="ml-auto text-xs font-mono bg-white/[0.06] px-1.5 py-0.5 rounded">N</span>
-          </button>
-        )}
+        <InlineCapture />
 
         {/* Sections — rendered in user-defined order */}
         {sections.filter(s => s.enabled).map(s => (

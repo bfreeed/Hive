@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import type { Task, Priority, Section } from '../types';
 import TaskRow from '../components/TaskRow';
+import InlineCapture from '../components/InlineCapture';
 import BoardView from '../components/BoardView';
 import { buildGroups, sortTasks } from '../utils/buildGroups';
 import type { BoardGroupBy, BoardSortBy, BoardSortOrder } from '../utils/buildGroups';
@@ -14,7 +15,7 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import {
-  SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy, arrayMove,
+  SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy, horizontalListSortingStrategy, arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
@@ -39,6 +40,39 @@ function SortableTaskRow({ task, onOpenTask, showProject, focused, focusRef }: {
       <div className="flex-1 min-w-0">
         <TaskRow task={task} onOpenTask={onOpenTask} showProject={showProject} focused={focused} ref={focusRef} />
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sortable tab (used in tab reorder mode)
+// ---------------------------------------------------------------------------
+function SortableTab({ id, label, active, onClick }: {
+  id: string; label: string; active: boolean; onClick: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    touchAction: 'none',
+  };
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') onClick(); }}
+      {...attributes}
+      {...listeners}
+      className={`px-3 py-2 text-sm transition-colors relative select-none ${
+        isDragging ? 'cursor-grabbing' : 'cursor-grab'
+      } ${active ? 'text-white font-medium' : 'text-white/40 hover:text-white/70'}`}
+    >
+      {label}
+      {active && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500 rounded-full" />}
     </div>
   );
 }
@@ -94,6 +128,9 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
+  const tabSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+  );
 
   // Tab state — persisted to localStorage
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
@@ -143,7 +180,6 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
   const focusedRowRef = useRef<HTMLDivElement>(null);
 
   // New task
-  const [newTaskTitle, setNewTaskTitle] = useState('');
 
   // Subtask state
   const [collapsedSubtasks, setCollapsedSubtasks] = useState<Set<string>>(new Set());
@@ -170,7 +206,7 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
     'status';
   const filterToday = activeTab === 'today';
   // Tab definitions
-  const tabs = [
+  const ALL_TABS = [
     { id: 'status' as ActiveTab,    label: 'By Status'   },
     { id: 'priority' as ActiveTab,  label: 'By Priority' },
     { id: 'project' as ActiveTab,   label: 'By Project'  },
@@ -178,6 +214,21 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
     { id: 'today' as ActiveTab,     label: 'Today'       },
     { id: 'completed' as ActiveTab, label: 'Completed'   },
   ];
+  const DEFAULT_TAB_ORDER = ALL_TABS.map(t => t.id);
+  const [tabOrder, setTabOrder] = useState<ActiveTab[]>(() => {
+    try {
+      const saved = localStorage.getItem('hive_tasks_tabOrder');
+      if (saved) {
+        const parsed: ActiveTab[] = JSON.parse(saved);
+        // Ensure all tabs are present (in case new ones added later)
+        const merged = [...parsed.filter(id => DEFAULT_TAB_ORDER.includes(id))];
+        DEFAULT_TAB_ORDER.forEach(id => { if (!merged.includes(id)) merged.push(id); });
+        return merged;
+      }
+    } catch {}
+    return DEFAULT_TAB_ORDER;
+  });
+  const tabs = tabOrder.map(id => ALL_TABS.find(t => t.id === id)!).filter(Boolean);
 
   // ---------------------------------------------------------------------------
   // Filter helpers
@@ -546,9 +597,10 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
     const tasksInProject = filteredTopLevel.filter(t => (t.projectIds ?? []).includes(filterProject));
 
     const renderSectionBody = (sectionIdFilter: string | undefined, sectionKey: string) => {
-      const sectionTasks = tasksInProject.filter(t =>
+      const rawSectionTasks = tasksInProject.filter(t =>
         sectionIdFilter === undefined ? !t.sectionId : t.sectionId === sectionIdFilter,
       );
+      const sectionTasks = sortTasks(rawSectionTasks, isManual ? 'date' : sortBy, sortOrder, projects, users);
 
       if (collapsedSections.has(sectionKey)) return null;
 
@@ -805,8 +857,7 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
   // ---------------------------------------------------------------------------
   const showSectionsView =
     !isBoard &&
-    activeTab !== 'completed' &&
-    activeTab !== 'today' &&
+    activeTab === 'status' &&
     filterProject !== 'all';
 
   const SelectFilter = ({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: React.ReactNode }) => (
@@ -822,53 +873,31 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
   // ---------------------------------------------------------------------------
   // New task inline input (for non-section, non-board views)
   // ---------------------------------------------------------------------------
-  const [showNewTask, setShowNewTask] = useState(false);
+
 
   return (
     <div className="flex-1 overflow-y-auto scrollbar-hide">
-      <div className="max-w-5xl mx-auto px-5 py-8">
+      <div className="max-w-3xl mx-auto px-5 py-8">
 
-        {/* Title */}
+        {/* Title row */}
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-semibold text-white tracking-tight">
             {filterProject && filterProject !== 'all'
               ? projects.find(p => p.id === filterProject)?.name ?? 'Project'
               : 'My Tasks'}
           </h1>
-          {/* Search */}
-          <div className="relative">
-            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/30" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search..."
-              className="bg-white/[0.04] border border-white/[0.08] rounded-lg pl-8 pr-3 py-1.5 text-xs text-white/70 placeholder-white/20 focus:outline-none focus:border-brand-500/50 w-48"
-            />
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex items-center gap-0.5 mb-6 border-b border-white/[0.06] pb-0">
-          {tabs
-            .filter(t => t.id !== 'project' || !filterProject || filterProject === 'all')
-            .map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => handleSetActiveTab(tab.id as ActiveTab)}
-                className={`px-3 py-2 text-sm transition-colors relative ${
-                  activeTab === tab.id
-                    ? 'text-white font-medium'
-                    : 'text-white/40 hover:text-white/70'
-                }`}
-              >
-                {tab.label}
-                {activeTab === tab.id && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500 rounded-full" />
-                )}
-              </button>
-            ))}
-          {/* View toggle + Sort */}
-          <div className="ml-auto flex items-center gap-1">
+          {/* Search + View toggle + Sort */}
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/30" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search..."
+                className="bg-white/[0.04] border border-white/[0.08] rounded-lg pl-8 pr-3 py-1.5 text-xs text-white/70 placeholder-white/20 focus:outline-none focus:border-brand-500/50 w-40"
+              />
+            </div>
+          <div className="flex items-center gap-1">
             {([
               { id: 'list' as const,  icon: <List size={14} />,       label: 'List'  },
               { id: 'board' as const, icon: <LayoutGrid size={14} />, label: 'Board' },
@@ -899,6 +928,41 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
               {sortActive && <span className="w-1.5 h-1.5 rounded-full bg-brand-400" />}
             </button>
           </div>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex items-center gap-0.5 mb-6 border-b border-white/[0.06] pb-0">
+          <DndContext
+            sensors={tabSensors}
+            collisionDetection={closestCenter}
+            onDragEnd={(event: DragEndEvent) => {
+              const { active, over } = event;
+              if (over && active.id !== over.id) {
+                setTabOrder(prev => {
+                  const oldIdx = prev.indexOf(active.id as ActiveTab);
+                  const newIdx = prev.indexOf(over.id as ActiveTab);
+                  const next = arrayMove(prev, oldIdx, newIdx);
+                  localStorage.setItem('hive_tasks_tabOrder', JSON.stringify(next));
+                  return next;
+                });
+              }
+            }}
+          >
+            <SortableContext items={tabs.filter(t => t.id !== 'project' || !filterProject || filterProject === 'all').map(t => t.id)} strategy={horizontalListSortingStrategy}>
+              {tabs
+                .filter(t => t.id !== 'project' || !filterProject || filterProject === 'all')
+                .map(tab => (
+                  <SortableTab
+                    key={tab.id}
+                    id={tab.id}
+                    label={tab.label}
+                    active={activeTab === tab.id}
+                    onClick={() => handleSetActiveTab(tab.id)}
+                  />
+                ))}
+            </SortableContext>
+          </DndContext>
         </div>
 
         {/* Sort panel */}
@@ -912,7 +976,7 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
                 <option value="assignee">Assignee</option>
                 <option value="status">Status</option>
                 <option value="project">Project</option>
-                <option value={'manual' as BoardSortBy}>Manual Order</option>
+                {!showSectionsView && <option value={'manual' as BoardSortBy}>Manual Order</option>}
               </SelectFilter>
             </div>
             <div className="w-px h-4 bg-white/10" />
@@ -938,29 +1002,7 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
           </div>
         )}
 
-        {/* New task input (for non-section, non-board views) */}
-        {showNewTask && !isBoard && !showSectionsView && (
-          <div className="mb-4 flex items-center gap-2 p-3 bg-white/[0.04] rounded-xl border border-white/[0.08]">
-            <input
-              autoFocus
-              value={newTaskTitle}
-              onChange={(e) => setNewTaskTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') { handleAddTask(newTaskTitle); setNewTaskTitle(''); setShowNewTask(false); }
-                if (e.key === 'Escape') setShowNewTask(false);
-              }}
-              placeholder="Task title..."
-              className="flex-1 bg-transparent text-sm text-white placeholder-white/20 focus:outline-none"
-            />
-            <button
-              onClick={() => { handleAddTask(newTaskTitle); setNewTaskTitle(''); setShowNewTask(false); }}
-              className="px-3 py-1.5 bg-brand-600 text-white text-xs rounded-lg hover:bg-brand-500 transition-colors"
-            >
-              Add
-            </button>
-            <button onClick={() => setShowNewTask(false)} className="text-white/30 hover:text-white/60 text-xs">Cancel</button>
-          </div>
-        )}
+        <InlineCapture />
 
         {/* Task list / board */}
         {isBoard ? (
@@ -1004,12 +1046,6 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
                   </div>
                 </div>
               ))}
-              <button
-                onClick={() => setShowNewTask(true)}
-                className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-white/25 hover:text-white/50 transition-colors"
-              >
-                <Plus size={11} /> Add task
-              </button>
             </div>
           )
         ) : filteredTopLevel.length === 0 ? (
@@ -1046,12 +1082,6 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
                 showProject: true,
               });
             })}
-            <button
-              onClick={() => setShowNewTask(true)}
-              className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-white/25 hover:text-white/50 transition-colors"
-            >
-              <Plus size={11} /> Add task
-            </button>
           </div>
         )}
 
