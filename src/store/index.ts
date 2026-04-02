@@ -697,7 +697,12 @@ export const useStore = create<AppStore>()((set, get) => ({
     set((s) => ({ tasks: [...s.tasks, newTask] }));
     // Persist
     supabase.from('tasks').insert(taskToDb(newTask))
-      .then(({ error }) => { if (error) console.error('addTask error:', error); });
+      .then(({ error }) => {
+        if (error) {
+          console.error('addTask error:', error);
+          alert('Task save failed: ' + error.message + '\nCode: ' + error.code);
+        }
+      });
   },
 
   addComment: (taskId, body) => set((s) => {
