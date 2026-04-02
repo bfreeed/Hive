@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '../store';
-import { AlertTriangle, Clock, MessageSquare, CheckCircle, ArrowRight, Plus, X, Sun, Inbox, Calendar, Sparkles, ChevronRight, Send, Loader2 } from 'lucide-react';
+import { AlertTriangle, Clock, MessageSquare, CheckCircle, ArrowRight, Plus, X, Sun, Inbox, Calendar, Sparkles, ChevronRight, ChevronDown, Send, Loader2 } from 'lucide-react';
 import { isPast, addDays, isWithinInterval, startOfDay } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import TaskRow from '../components/TaskRow';
@@ -105,9 +105,12 @@ function Section({ title, icon, count, color = 'text-white/50', children }: {
 export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: string, id?: string) => void; onOpenTask: (id: string) => void }) {
   const { tasks, projects, meetings, messages, channels, addTask, userSettings, saveUserSettings, currentUser } = useStore();
   const [showCapture, setShowCapture] = useState(false);
+  const [captureExpanded, setCaptureExpanded] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [captureTitle, setCaptureTitle] = useState('');
   const [captureProject, setCaptureProject] = useState('');
+  const [capturePriority, setCapturePriority] = useState<'urgent' | 'high' | 'medium' | 'low'>('medium');
+  const [captureDueDate, setCaptureDueDate] = useState('');
   const captureRef = useRef<HTMLInputElement>(null);
 
   // Claude bar
@@ -266,12 +269,28 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
     addTask({
       title: captureTitle.trim(),
       projectIds: captureProject ? [captureProject] : [],
-      status: 'todo', priority: 'medium', assigneeIds: [currentUser.id],
+      status: 'todo',
+      priority: capturePriority,
+      assigneeIds: [currentUser.id],
+      dueDate: captureDueDate || undefined,
       flags: [], isPrivate: selectedProject?.isPrivate ?? false,
       linkedContactIds: [], linkedDocIds: [],
     });
     setCaptureTitle('');
+    setCaptureProject('');
+    setCapturePriority('medium');
+    setCaptureDueDate('');
+    setCaptureExpanded(false);
     setShowCapture(false);
+  };
+
+  const resetCapture = () => {
+    setShowCapture(false);
+    setCaptureTitle('');
+    setCaptureProject('');
+    setCapturePriority('medium');
+    setCaptureDueDate('');
+    setCaptureExpanded(false);
   };
 
   const now = new Date();
@@ -474,30 +493,71 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
 
         {/* Quick capture */}
         {showCapture ? (
-          <div className="mb-6 flex items-center gap-2 p-3 bg-white/[0.04] rounded-xl border border-brand-500/30">
-            <input
-              ref={captureRef}
-              value={captureTitle}
-              onChange={e => setCaptureTitle(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') handleCapture();
-                if (e.key === 'Escape') { setShowCapture(false); setCaptureTitle(''); }
-              }}
-              placeholder="What needs to be done?"
-              className="flex-1 bg-transparent text-sm text-white placeholder-white/20 focus:outline-none"
-            />
-            <select
-              value={captureProject}
-              onChange={e => setCaptureProject(e.target.value)}
-              className="text-xs bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-1.5 text-white/60 focus:outline-none"
-            >
-              <option value="">No project</option>
-              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-            <button onClick={handleCapture} className="px-3 py-1.5 bg-brand-600 text-white text-xs rounded-lg hover:bg-brand-500 transition-colors">Add</button>
-            <button onClick={() => { setShowCapture(false); setCaptureTitle(''); }} className="p-1.5 text-white/30 hover:text-white/60 transition-colors">
-              <X size={14} />
-            </button>
+          <div className="mb-6 bg-white/[0.04] rounded-xl border border-brand-500/30 overflow-hidden">
+            {/* Main input row */}
+            <div className="flex items-center gap-2 px-3 py-2.5">
+              <input
+                ref={captureRef}
+                value={captureTitle}
+                onChange={e => setCaptureTitle(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleCapture();
+                  if (e.key === 'Escape') resetCapture();
+                }}
+                placeholder="What needs to be done?"
+                className="flex-1 bg-transparent text-sm text-white placeholder-white/20 focus:outline-none"
+              />
+              <button
+                onClick={() => setCaptureExpanded(v => !v)}
+                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors ${captureExpanded ? 'bg-brand-500/20 text-brand-400' : 'text-white/30 hover:text-white/60 hover:bg-white/[0.06]'}`}
+              >
+                <ChevronDown size={12} className={`transition-transform ${captureExpanded ? 'rotate-180' : ''}`} />
+                More
+              </button>
+              <button onClick={handleCapture} className="px-3 py-1.5 bg-brand-600 text-white text-xs rounded-lg hover:bg-brand-500 transition-colors">Add</button>
+              <button onClick={resetCapture} className="p-1.5 text-white/30 hover:text-white/60 transition-colors">
+                <X size={14} />
+              </button>
+            </div>
+
+            {/* Expanded fields */}
+            {captureExpanded && (
+              <div className="flex items-center gap-2 px-3 py-2.5 border-t border-white/[0.06] flex-wrap">
+                {/* Project */}
+                <select
+                  value={captureProject}
+                  onChange={e => setCaptureProject(e.target.value)}
+                  className="text-xs bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-1.5 text-white/60 focus:outline-none"
+                >
+                  <option value="">No project</option>
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+
+                {/* Priority */}
+                <select
+                  value={capturePriority}
+                  onChange={e => setCapturePriority(e.target.value as any)}
+                  className="text-xs bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-1.5 focus:outline-none"
+                  style={{ color: capturePriority === 'urgent' ? '#f87171' : capturePriority === 'high' ? '#fb923c' : capturePriority === 'medium' ? '#facc15' : '#7dd3fc' }}
+                >
+                  <option value="urgent">Urgent</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+
+                {/* Due date */}
+                <div className="flex items-center gap-1.5 bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-1.5">
+                  <Calendar size={11} className="text-white/30" />
+                  <input
+                    type="date"
+                    value={captureDueDate}
+                    onChange={e => setCaptureDueDate(e.target.value)}
+                    className="text-xs bg-transparent text-white/60 focus:outline-none w-28"
+                  />
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <button
