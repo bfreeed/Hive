@@ -677,9 +677,11 @@ export const useStore = create<AppStore>()((set, get) => ({
       const { data: { session } } = await supabase.auth.getSession();
       realUid = session?.user?.id ?? realUid;
     }
-    const assigneeIds = task.assigneeIds.map(id =>
+    let assigneeIds = task.assigneeIds.map(id =>
       (id === 'lev' && realUid && realUid !== 'lev') ? realUid : id
     );
+    // Always ensure at least the current user is assigned so loadData can find the task
+    if (assigneeIds.length === 0 && realUid) assigneeIds = [realUid];
     const newTask: Task = {
       ...task,
       assigneeIds,
