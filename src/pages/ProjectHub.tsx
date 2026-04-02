@@ -562,7 +562,7 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                   )}
                 </div>
                 {/* Inline add-task */}
-                {taskViewTab !== 'today' && taskViewTab !== 'completed' && (
+                {taskViewTab !== 'today' && (
                   showAddTask ? (
                     <div className="flex items-center gap-2 px-3 py-2">
                       <div className="w-4 h-4 rounded border-2 border-white/20 flex-shrink-0" />

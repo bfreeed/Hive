@@ -377,7 +377,7 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
             </p>
             <div className="flex items-center gap-2 flex-shrink-0">
               <button
-                onClick={() => setShowCapture(true)}
+                onClick={() => {}}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-brand-500 text-white hover:bg-brand-600 active:scale-95 transition-all shadow-lg shadow-brand-500/25"
               >
                 <Plus size={15} /> New Task
@@ -443,7 +443,7 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
         ))}
 
         {/* All clear */}
-        {totalSignal === 0 && !showCapture && (
+        {totalSignal === 0 && (
           <div className="text-center py-16">
             <p className="text-white/20 text-lg">All clear.</p>
             <p className="text-white/10 text-sm mt-1">Nothing urgent today.</p>
