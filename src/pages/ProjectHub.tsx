@@ -11,6 +11,41 @@ import DriveFolderView from '../components/DriveFolderView';
 import { buildGroups, sortTasks } from '../utils/buildGroups';
 import type { BoardGroupBy, BoardSortBy, BoardSortOrder } from '../utils/buildGroups';
 import { GOOGLE_CLIENT_ID_KEY } from '../lib/storageKeys';
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, horizontalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+type TaskViewTab = 'status' | 'priority' | 'date' | 'assignee' | 'today' | 'completed';
+
+const ALL_TASK_VIEW_TABS = [
+  { id: 'status'    as TaskViewTab, label: 'By Status'   },
+  { id: 'priority'  as TaskViewTab, label: 'By Priority' },
+  { id: 'date'      as TaskViewTab, label: 'By Date'     },
+  { id: 'assignee'  as TaskViewTab, label: 'By Assignee' },
+  { id: 'today'     as TaskViewTab, label: 'Today'       },
+  { id: 'completed' as TaskViewTab, label: 'Completed'   },
+];
+
+function SortableProjectTab({ id, label, active, onClick }: { id: string; label: string; active: boolean; onClick: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1, touchAction: 'none' as const };
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') onClick(); }}
+      {...attributes}
+      {...listeners}
+      className={`px-2.5 py-1.5 text-xs transition-colors relative select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${active ? 'text-white/80 font-medium' : 'text-white/35 hover:text-white/60'}`}
+    >
+      {label}
+      {active && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500/70 rounded-full" />}
+    </div>
+  );
+}
 
 const PROJECT_COLORS = ['#6366f1','#10b981','#f59e0b','#ef4444','#3b82f6','#8b5cf6','#ec4899','#14b8a6'];
 
@@ -19,7 +54,22 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
   const [inviteEmail, setInviteEmail] = useState('');
   const inviteRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<'tasks' | 'workspace' | 'docs' | 'contacts' | 'members'>('tasks');
-  const [taskViewTab, setTaskViewTab] = useState<'status' | 'priority' | 'date' | 'assignee' | 'today' | 'completed'>('status');
+  const [taskViewTab, setTaskViewTab] = useState<TaskViewTab>('status');
+  const tabSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const [tabOrder, setTabOrder] = useState<TaskViewTab[]>(() => {
+    try {
+      const saved = localStorage.getItem('hive_project_tabOrder');
+      if (saved) {
+        const parsed: TaskViewTab[] = JSON.parse(saved);
+        const ids = ALL_TASK_VIEW_TABS.map(t => t.id);
+        const merged = parsed.filter(id => ids.includes(id));
+        ids.forEach(id => { if (!merged.includes(id)) merged.push(id); });
+        return merged;
+      }
+    } catch {}
+    return ALL_TASK_VIEW_TABS.map(t => t.id);
+  });
+  const orderedTabs = tabOrder.map(id => ALL_TASK_VIEW_TABS.find(t => t.id === id)!).filter(Boolean);
   const [viewType, setViewType] = useState<'list' | 'board'>('list');
   const [showSort, setShowSort] = useState(false);
   const [sortBy, setSortBy] = useState<BoardSortBy>('date');
@@ -445,23 +495,32 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
           <>
             {/* Task view sub-tabs */}
             <div className="flex items-center gap-0.5 border-b border-white/[0.06] mb-6">
-              {([
-                { id: 'status'    as const, label: 'By Status'    },
-                { id: 'priority'  as const, label: 'By Priority'  },
-                { id: 'date'      as const, label: 'By Date'      },
-                { id: 'assignee'  as const, label: 'By Assignee'  },
-                { id: 'today'     as const, label: 'Today'        },
-                { id: 'completed' as const, label: 'Completed'    },
-              ]).map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => setTaskViewTab(t.id)}
-                  className={`px-2.5 py-1.5 text-xs transition-colors relative ${taskViewTab === t.id ? 'text-white/80 font-medium' : 'text-white/35 hover:text-white/60'}`}
-                >
-                  {t.label}
-                  {taskViewTab === t.id && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500/70 rounded-full" />}
-                </button>
-              ))}
+              <DndContext
+                sensors={tabSensors}
+                collisionDetection={closestCenter}
+                onDragEnd={(event: DragEndEvent) => {
+                  const { active, over } = event;
+                  if (over && active.id !== over.id) {
+                    setTabOrder(prev => {
+                      const next = arrayMove(prev, prev.indexOf(active.id as TaskViewTab), prev.indexOf(over.id as TaskViewTab));
+                      localStorage.setItem('hive_project_tabOrder', JSON.stringify(next));
+                      return next;
+                    });
+                  }
+                }}
+              >
+                <SortableContext items={orderedTabs.map(t => t.id)} strategy={horizontalListSortingStrategy}>
+                  {orderedTabs.map(t => (
+                    <SortableProjectTab
+                      key={t.id}
+                      id={t.id}
+                      label={t.label}
+                      active={taskViewTab === t.id}
+                      onClick={() => setTaskViewTab(t.id)}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
               {/* List/Board + Sort */}
               {taskViewTab !== 'completed' && (
                 <div className="ml-auto flex items-center gap-1">
