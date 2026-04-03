@@ -202,6 +202,7 @@ function dbToNotification(row: any): Notification {
     body: row.body,
     taskId: row.task_id ?? undefined,
     projectId: row.project_id ?? undefined,
+    userId: row.user_id ?? undefined,
     read: row.read ?? false,
     createdAt: row.created_at,
   };
@@ -601,7 +602,9 @@ export const useStore = create<AppStore>()((set, get) => ({
   },
 
   updateChannel: (id, u) => {
+    const prev = get().channels.find(c => c.id === id);
     set((s) => ({ channels: s.channels.map(c => c.id === id ? { ...c, ...u } : c) }));
+    const updated = get().channels.find(c => c.id === id);
     const dbFields: Record<string, any> = {};
     if ('description' in u) dbFields.description = u.description ?? null;
     if ('pinnedMessageIds' in u) dbFields.pinned_message_ids = u.pinnedMessageIds ?? [];
@@ -612,6 +615,19 @@ export const useStore = create<AppStore>()((set, get) => ({
     if (Object.keys(dbFields).length > 0) {
       supabase.from('channels').update(dbFields).eq('id', id)
         .then(({ error }) => { if (error) console.error('updateChannel error:', error); });
+    }
+    // Fire notifications for newly added members
+    if (u.memberIds && prev) {
+      const newMemberIds = u.memberIds.filter(mid => !prev.memberIds.includes(mid));
+      const { addNotification } = get();
+      newMemberIds.forEach(mid => {
+        addNotification({
+          type: 'mention',
+          title: `You were added to #${updated?.name ?? 'a channel'}`,
+          body: 'You can now see messages in this channel.',
+          userId: mid,
+        });
+      });
     }
   },
 
@@ -824,11 +840,26 @@ export const useStore = create<AppStore>()((set, get) => ({
   },
 
   updateProject: (id, u) => {
+    const prev = get().projects.find(p => p.id === id);
     set((s) => ({ projects: s.projects.map((p) => p.id === id ? { ...p, ...u } : p) }));
     const updated = get().projects.find(p => p.id === id);
     if (updated) {
       supabase.from('projects').update(projectToDb(updated)).eq('id', id)
         .then(({ error }) => { if (error) console.error('updateProject error:', error); });
+    }
+    // Fire notifications for newly added members
+    if (u.memberIds && prev) {
+      const newMemberIds = u.memberIds.filter(mid => !prev.memberIds.includes(mid));
+      const { addNotification } = get();
+      newMemberIds.forEach(mid => {
+        addNotification({
+          type: 'assignment',
+          title: `You were added to ${updated?.name ?? 'a project'}`,
+          body: 'You now have access to this project and its tasks.',
+          userId: mid,
+          projectId: id,
+        });
+      });
     }
   },
 
@@ -894,6 +925,7 @@ export const useStore = create<AppStore>()((set, get) => ({
     supabase.from('notifications').insert({
       id: newN.id, type: newN.type, title: newN.title, body: newN.body,
       task_id: newN.taskId ?? null, project_id: newN.projectId ?? null,
+      user_id: newN.userId ?? null,
       read: false, created_at: newN.createdAt,
     }).then(({ error }) => { if (error) console.error('addNotification error:', error); });
   },

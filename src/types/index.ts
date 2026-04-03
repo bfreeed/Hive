@@ -211,6 +211,7 @@ export interface Notification {
   body: string;
   taskId?: string;
   projectId?: string;
+  userId?: string;
   read: boolean;
   createdAt: string;
 }
