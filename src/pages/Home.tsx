@@ -4,7 +4,7 @@ import { AlertTriangle, Clock, MessageSquare, CheckCircle, ArrowRight, Plus, X, 
 import { isPast, addDays, isWithinInterval, startOfDay } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import TaskRow from '../components/TaskRow';
-import InlineCapture from '../components/InlineCapture';
+import InlineCapture, { type InlineCaptureHandle } from '../components/InlineCapture';
 import { DEFAULT_HOME_SECTIONS, type HomeSection } from '../types';
 import { ANTHROPIC_API_KEY_KEY } from '../lib/storageKeys';
 
@@ -106,6 +106,7 @@ function Section({ title, icon, count, color = 'text-white/50', children }: {
 export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: string, id?: string) => void; onOpenTask: (id: string) => void }) {
   const { tasks, projects, meetings, messages, channels, userSettings, saveUserSettings, currentUser } = useStore();
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const captureRef = useRef<InlineCaptureHandle>(null);
 
   // Claude bar
   const [claudeInput, setClaudeInput] = useState('');
@@ -377,7 +378,7 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
             </p>
             <div className="flex items-center gap-2 flex-shrink-0">
               <button
-                onClick={() => {}}
+                onClick={() => captureRef.current?.open()}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-brand-500 text-white hover:bg-brand-600 active:scale-95 transition-all shadow-lg shadow-brand-500/25"
               >
                 <Plus size={15} /> New Task
@@ -433,7 +434,7 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
           )}
         </div>
 
-        <InlineCapture />
+        <InlineCapture ref={captureRef} />
 
         {/* Sections — rendered in user-defined order */}
         {sections.filter(s => s.enabled).map(s => (

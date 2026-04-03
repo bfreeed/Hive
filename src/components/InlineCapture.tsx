@@ -1,11 +1,19 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { Plus, X, Calendar } from 'lucide-react';
 import { useStore } from '../store';
 import { flattenProjects } from '../lib/projectUtils';
 
-export default function InlineCapture() {
+export interface InlineCaptureHandle {
+  open: () => void;
+}
+
+const InlineCapture = forwardRef<InlineCaptureHandle>(function InlineCapture(_, ref) {
   const { projects, users, currentUser, addTask } = useStore();
   const [show, setShow] = useState(false);
+
+  useImperativeHandle(ref, () => ({
+    open: () => setShow(true),
+  }));
   const [title, setTitle] = useState('');
   const [project, setProject] = useState('');
   const [priority, setPriority] = useState<'urgent' | 'high' | 'medium' | 'low'>('medium');
@@ -125,4 +133,6 @@ export default function InlineCapture() {
       </div>
     </div>
   );
-}
+});
+
+export default InlineCapture;
