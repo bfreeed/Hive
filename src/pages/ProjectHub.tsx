@@ -5,6 +5,7 @@ import type { Task } from '../types';
 import { isPast } from 'date-fns';
 import TaskRow from '../components/TaskRow';
 import BoardView from '../components/BoardView';
+import InlineCapture from '../components/InlineCapture';
 import DocEditor from '../components/DocEditor';
 import ProjectWorkspace from '../components/ProjectWorkspace';
 import DriveFolderView from '../components/DriveFolderView';
@@ -75,8 +76,6 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
   const [sortBy, setSortBy] = useState<BoardSortBy>('date');
   const [sortOrder, setSortOrder] = useState<BoardSortOrder>('asc');
   const [showAddTask, setShowAddTask] = useState(false);
-  const [newTaskTitle, setNewTaskTitle] = useState('');
-  const addTaskRef = useRef<HTMLInputElement>(null);
   const [showSharePopover, setShowSharePopover] = useState(false);
   const shareRef = useRef<HTMLDivElement>(null);
 
@@ -108,10 +107,6 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
     setShowAddSub(false);
   };
 
-  useEffect(() => {
-    if (showAddTask) addTaskRef.current?.focus();
-  }, [showAddTask]);
-
   // Close share popover on outside click
   useEffect(() => {
     if (!showSharePopover) return;
@@ -121,23 +116,6 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [showSharePopover]);
-
-  const handleAddTask = () => {
-    if (!newTaskTitle.trim()) { setShowAddTask(false); return; }
-    addTask({
-      title: newTaskTitle.trim(),
-      projectIds: [projectId],
-      status: 'todo',
-      priority: 'medium',
-      assigneeIds: [currentUser.id],
-      flags: [],
-      isPrivate: project?.isPrivate ?? false,
-      linkedContactIds: [],
-      linkedDocIds: [],
-    });
-    setNewTaskTitle('');
-    setShowAddTask(false);
-  };
 
   const project = projects.find((p) => p.id === projectId);
   if (!project) return <div className="flex-1 flex items-center justify-center text-white/30">Project not found</div>;
@@ -623,23 +601,12 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                 {/* Inline add-task */}
                 {taskViewTab !== 'today' && (
                   showAddTask ? (
-                    <div className="flex items-center gap-2 px-3 py-2">
-                      <div className="w-4 h-4 rounded border-2 border-white/20 flex-shrink-0" />
-                      <input
-                        ref={addTaskRef}
-                        value={newTaskTitle}
-                        onChange={(e) => setNewTaskTitle(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleAddTask();
-                          if (e.key === 'Escape') { setShowAddTask(false); setNewTaskTitle(''); }
-                        }}
-                        onBlur={() => { if (!newTaskTitle.trim()) setShowAddTask(false); }}
-                        placeholder="New task name..."
-                        className="flex-1 bg-transparent text-sm text-white/80 placeholder-white/20 focus:outline-none"
-                      />
-                      <button onClick={handleAddTask} className="px-2.5 py-1 bg-brand-600 text-white text-xs rounded-lg hover:bg-brand-500 transition-colors">Add</button>
-                      <button onClick={() => { setShowAddTask(false); setNewTaskTitle(''); }} className="p-1 text-white/20 hover:text-white/50 transition-colors"><X size={13} /></button>
-                    </div>
+                    <InlineCapture
+                      initialProjectId={projectId}
+                      showCollapsedButton={false}
+                      onCreated={() => setShowAddTask(false)}
+                      onCancel={() => setShowAddTask(false)}
+                    />
                   ) : (
                     <button
                       onClick={() => setShowAddTask(true)}

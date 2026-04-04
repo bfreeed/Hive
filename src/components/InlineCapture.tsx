@@ -7,18 +7,29 @@ export interface InlineCaptureHandle {
   open: () => void;
 }
 
-const InlineCapture = forwardRef<InlineCaptureHandle>(function InlineCapture(_, ref) {
+export interface InlineCaptureProps {
+  initialTitle?: string;
+  initialProjectId?: string;
+  initialAssigneeId?: string;
+  onCreated?: () => void;
+  onCancel?: () => void;
+  /** When false, the collapsed button is hidden and the form auto-opens. Default: true */
+  showCollapsedButton?: boolean;
+}
+
+const InlineCapture = forwardRef<InlineCaptureHandle, InlineCaptureProps>(function InlineCapture(props, ref) {
+  const { initialTitle, initialProjectId, initialAssigneeId, onCreated, onCancel, showCollapsedButton = true } = props;
   const { projects, users, currentUser, addTask } = useStore();
-  const [show, setShow] = useState(false);
+  const [show, setShow] = useState(!showCollapsedButton);
 
   useImperativeHandle(ref, () => ({
     open: () => setShow(true),
   }));
-  const [title, setTitle] = useState('');
-  const [project, setProject] = useState('');
+  const [title, setTitle] = useState(initialTitle ?? '');
+  const [project, setProject] = useState(initialProjectId ?? '');
   const [priority, setPriority] = useState<'urgent' | 'high' | 'medium' | 'low'>('medium');
   const [dueDate, setDueDate] = useState('');
-  const [assigneeId, setAssigneeId] = useState(currentUser.id);
+  const [assigneeId, setAssigneeId] = useState(initialAssigneeId ?? currentUser.id);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (show) inputRef.current?.focus(); }, [show]);
@@ -36,19 +47,26 @@ const InlineCapture = forwardRef<InlineCaptureHandle>(function InlineCapture(_, 
       flags: [], isPrivate: selectedProject?.isPrivate ?? false,
       linkedContactIds: [], linkedDocIds: [],
     });
-    reset();
+    onCreated?.();
+    resetFields();
   };
 
-  const reset = () => {
+  const resetFields = () => {
     setShow(false);
-    setTitle('');
-    setProject('');
+    setTitle(initialTitle ?? '');
+    setProject(initialProjectId ?? '');
     setPriority('medium');
     setDueDate('');
-    setAssigneeId(currentUser.id);
+    setAssigneeId(initialAssigneeId ?? currentUser.id);
+  };
+
+  const handleCancel = () => {
+    onCancel?.();
+    resetFields();
   };
 
   if (!show) {
+    if (!showCollapsedButton) return null;
     return (
       <button
         onClick={() => setShow(true)}
@@ -69,13 +87,13 @@ const InlineCapture = forwardRef<InlineCaptureHandle>(function InlineCapture(_, 
           onChange={e => setTitle(e.target.value)}
           onKeyDown={e => {
             if (e.key === 'Enter') handleCapture();
-            if (e.key === 'Escape') reset();
+            if (e.key === 'Escape') handleCancel();
           }}
           placeholder="What needs to be done?"
           className="flex-1 bg-transparent text-sm text-white placeholder-white/20 focus:outline-none"
         />
         <button onClick={handleCapture} className="px-3 py-1.5 bg-brand-600 text-white text-xs rounded-lg hover:bg-brand-500 transition-colors">Add</button>
-        <button onClick={reset} className="p-1.5 text-white/30 hover:text-white/60 transition-colors">
+        <button onClick={handleCancel} className="p-1.5 text-white/30 hover:text-white/60 transition-colors">
           <X size={14} />
         </button>
       </div>
