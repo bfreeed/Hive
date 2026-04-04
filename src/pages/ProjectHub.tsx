@@ -262,9 +262,9 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
 
                       {!project.isPrivate && (
                         <>
-                          <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1.5 px-0.5">Members</p>
-                          <div className="space-y-1 mb-2">
-                            {project.memberIds.map(mid => {
+                          <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1.5 px-0.5">Current members</p>
+                          <div className="space-y-1 mb-3">
+                            {[...new Set(project.memberIds)].map(mid => {
                               const u = users.find(u => u.id === mid);
                               if (!u) return null;
                               const isOwner = mid === currentUser.id;
@@ -279,6 +279,7 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                                     : <button
                                         onClick={() => updateProject(projectId, { memberIds: project.memberIds.filter(id => id !== mid) })}
                                         className="text-white/20 hover:text-red-400 transition-colors"
+                                        title="Remove"
                                       >
                                         <X size={12} />
                                       </button>
@@ -288,13 +289,15 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                             })}
                           </div>
 
-                          {/* Existing users not yet in project */}
+                          {/* Users not yet in project */}
                           {users.filter(u => !project.memberIds.includes(u.id)).length > 0 && (
+                            <>
+                              <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1.5 px-0.5">Add people</p>
                             <div className="space-y-1 mb-2">
                               {users.filter(u => !project.memberIds.includes(u.id)).map(u => (
                                 <button
                                   key={u.id}
-                                  onClick={() => updateProject(projectId, { memberIds: [...project.memberIds, u.id] })}
+                                  onClick={() => updateProject(projectId, { memberIds: [...new Set([...project.memberIds, u.id])] })}
                                   className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.06] transition-colors group"
                                 >
                                   <span className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white/40 flex-shrink-0">
@@ -306,6 +309,7 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                                 </button>
                               ))}
                             </div>
+                            </>
                           )}
 
                           {/* Invite by email */}
