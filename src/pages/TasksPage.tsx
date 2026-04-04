@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import type { Task, Priority, Section } from '../types';
 import TaskRow from '../components/TaskRow';
-import InlineCapture from '../components/InlineCapture';
+import InlineCapture, { type InlineCaptureHandle } from '../components/InlineCapture';
 import BoardView from '../components/BoardView';
 import { buildGroups, sortTasks } from '../utils/buildGroups';
 import type { BoardGroupBy, BoardSortBy, BoardSortOrder } from '../utils/buildGroups';
@@ -124,6 +124,7 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
     sections, addSection, updateSection, deleteSection,
   } = useStore();
 
+  const captureRef = useRef<InlineCaptureHandle>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -886,8 +887,14 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
               ? projects.find(p => p.id === filterProject)?.name ?? 'Project'
               : 'My Tasks'}
           </h1>
-          {/* Search + View toggle + Sort */}
+          {/* New Task + Search + View toggle + Sort */}
           <div className="flex items-center gap-4">
+            <button
+              onClick={() => captureRef.current?.open()}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-sm rounded-lg transition-colors"
+            >
+              <Plus size={14} /> New Task
+            </button>
             <div className="relative">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/30" />
               <input
@@ -1002,7 +1009,7 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
           </div>
         )}
 
-        <InlineCapture />
+        <InlineCapture ref={captureRef} />
 
         {/* Task list / board */}
         {isBoard ? (
