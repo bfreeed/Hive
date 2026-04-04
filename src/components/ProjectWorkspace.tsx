@@ -104,7 +104,7 @@ export default function ProjectWorkspace({ projectId }: { projectId: string }) {
           <span className="text-xs font-semibold text-white/40 uppercase tracking-widest">Spaces</span>
           <div className="flex items-center gap-0.5">
             <button
-              onClick={handleCreateFolder}
+              onClick={() => handleCreateFolder()}
               className="p-1 rounded-md text-white/30 hover:text-white/70 hover:bg-white/[0.06] transition-colors"
               title="New folder"
             ><FolderPlus size={14} /></button>
@@ -165,7 +165,7 @@ export default function ProjectWorkspace({ projectId }: { projectId: string }) {
               <Plus size={14} /> New space
             </button>
             <button
-              onClick={handleCreateFolder}
+              onClick={() => handleCreateFolder()}
               className="flex items-center gap-2 bg-white/[0.06] hover:bg-white/[0.1] text-white/60 hover:text-white/80 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
               <FolderPlus size={14} /> New folder
