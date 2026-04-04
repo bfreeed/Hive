@@ -230,7 +230,7 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                       <>
                         {/* Member avatar stack */}
                         <div className="flex -space-x-1">
-                          {project.memberIds.slice(0, 3).map(mid => {
+                          {[...new Set(project.memberIds)].slice(0, 3).map(mid => {
                             const u = users.find(u => u.id === mid);
                             return u ? (
                               <span key={mid} className="w-4 h-4 rounded-full bg-brand-600/60 border border-white/10 flex items-center justify-center text-[9px] font-semibold text-white/80">
@@ -240,8 +240,8 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                           })}
                         </div>
                         Shared
-                        {project.memberIds.length > 1 && (
-                          <span className="text-white/30">· {project.memberIds.length}</span>
+                        {[...new Set(project.memberIds)].length > 1 && (
+                          <span className="text-white/30">· {[...new Set(project.memberIds)].length}</span>
                         )}
                       </>
                     )}
@@ -688,10 +688,7 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
         {/* Workspace Tab */}
         {activeTab === 'workspace' && (
           <div className="-mx-6 -mb-6 h-[calc(100vh-220px)] flex flex-col">
-            <ProjectWorkspace
-              content={project.docContent ?? null}
-              onChange={(json) => updateProject(projectId, { docContent: json })}
-            />
+            <ProjectWorkspace projectId={projectId} />
           </div>
         )}
 
