@@ -947,6 +947,7 @@ export const useStore = create<AppStore>()((set, get) => ({
   // Messages
   // -------------------------------------------------------------------------
   sendMessage: (channelId, body, attachments, priority) => {
+    if (body.length > 10000) { console.warn('sendMessage: body too long, truncating'); body = body.slice(0, 10000); }
     const s = get();
     const newMsg: Message = {
       id: uid(),
@@ -973,6 +974,10 @@ export const useStore = create<AppStore>()((set, get) => ({
   },
 
   updateMessage: (id, body) => {
+    const { currentUser, messages } = get();
+    const msg = messages.find(m => m.id === id);
+    if (!msg || msg.authorId !== currentUser.id) return; // can only edit own messages
+    if (body.length > 10000) body = body.slice(0, 10000);
     const editedAt = new Date().toISOString();
     set((s) => ({
       messages: s.messages.map(m => m.id === id ? { ...m, body, editedAt } : m),
@@ -1314,18 +1319,26 @@ supabase.auth.onAuthStateChange((event) => {
 
 // ---------------------------------------------------------------------------
 // Real-time subscriptions — messages appear instantly for all users
+// Guard: only accept events for channels the current user is a member of.
+// RLS enforces this at the DB level too; this is defense-in-depth.
 // ---------------------------------------------------------------------------
 supabase
   .channel('messages-realtime')
   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
     const newMsg = dbToMessage(payload.new);
     const state = useStore.getState();
+    // Only accept messages from channels this user belongs to
+    const userChannelIds = new Set(state.channels.map(c => c.id));
+    if (!userChannelIds.has(newMsg.channelId)) return;
     // Skip if we already have this message (sent by current user, already in state)
     if (state.messages.some(m => m.id === newMsg.id)) return;
     useStore.setState((s) => ({ messages: [...s.messages, newMsg] }));
   })
   .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
     const updated = dbToMessage(payload.new);
+    const state = useStore.getState();
+    const userChannelIds = new Set(state.channels.map(c => c.id));
+    if (!userChannelIds.has(updated.channelId)) return;
     useStore.setState((s) => ({
       messages: s.messages.map(m => m.id === updated.id ? updated : m),
     }));
