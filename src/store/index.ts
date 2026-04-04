@@ -148,7 +148,7 @@ function dbToContact(row: any): Contact {
   };
 }
 
-function contactToDb(c: Contact) {
+function contactToDb(c: Contact, userId?: string) {
   return {
     id: c.id,
     name: c.name,
@@ -160,6 +160,7 @@ function contactToDb(c: Contact) {
     booking_link: c.bookingLink ?? null,
     meetings: c.meetings,
     linked_task_ids: c.linkedTaskIds,
+    ...(userId ? { user_id: userId } : {}),
   };
 }
 
@@ -459,7 +460,7 @@ export const useStore = create<AppStore>()((set, get) => ({
       ] = await Promise.allSettled([
         supabase.from('tasks').select('*').contains('assignee_ids', [uid]).order('created_at', { ascending: true }),
         supabase.from('projects').select('*').contains('member_ids', [uid]).order('created_at', { ascending: true }),
-        supabase.from('contacts').select('*'),
+        supabase.from('contacts').select('*').eq('user_id', uid),
         supabase.from('channels').select('*').contains('member_ids', [uid]),
         supabase.from('messages').select('*').order('created_at', { ascending: true }),
         supabase.from('notifications').select('*').order('created_at', { ascending: false }),
@@ -894,9 +895,10 @@ export const useStore = create<AppStore>()((set, get) => ({
   // Contacts
   // -------------------------------------------------------------------------
   addContact: (c) => {
+    const currentUserId = get().currentUser.id;
     const newContact: Contact = { ...c, id: uid(), meetings: [], linkedTaskIds: [] };
     set((s) => ({ contacts: [...s.contacts, newContact] }));
-    supabase.from('contacts').insert(contactToDb(newContact))
+    supabase.from('contacts').insert(contactToDb(newContact, currentUserId))
       .then(({ error }) => { if (error) console.error('addContact error:', error); });
   },
 
