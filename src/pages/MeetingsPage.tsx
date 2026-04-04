@@ -5,6 +5,7 @@ import { format, isToday, isYesterday, isThisWeek } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import { apiFetch } from '../lib/apiFetch';
 import type { Meeting, ActionItem } from '../types';
+import InlineCapture from '../components/InlineCapture';
 
 // ---------------------------------------------------------------------------
 // Unreviewed badge count (exported so sidebar can show it)
@@ -58,37 +59,8 @@ function ActionItemRow({
   meetingTitle?: string;
   isMe: boolean;
 }) {
-  const { updateMeeting, addTask, users, currentUser } = useStore();
-  const [showAssigneePicker, setShowAssigneePicker] = useState(false);
-
-  const handleAccept = () => {
-    if (users.length > 1) {
-      setShowAssigneePicker(true);
-    } else {
-      createTask(currentUser?.id ?? '');
-    }
-  };
-
-  const createTask = (assigneeId: string) => {
-    addTask({
-      title: item.text,
-      projectIds: [],
-      status: 'todo',
-      priority: 'medium',
-      assigneeIds: [assigneeId],
-      flags: [],
-      isPrivate: false,
-      linkedContactIds: [],
-      linkedDocIds: [],
-    });
-    const meeting = useStore.getState().meetings.find(m => m.id === meetingId);
-    updateMeeting(meetingId, {
-      actionItems: (meeting?.actionItems ?? []).map(a =>
-        a.id === item.id ? { ...a, accepted: true } : a
-      ),
-    });
-    setShowAssigneePicker(false);
-  };
+  const { updateMeeting } = useStore();
+  const [showCapture, setShowCapture] = useState(false);
 
   const handleDismiss = () => {
     const meeting = useStore.getState().meetings.find(m => m.id === meetingId);
@@ -99,9 +71,19 @@ function ActionItemRow({
     });
   };
 
+  const handleCreated = () => {
+    const meeting = useStore.getState().meetings.find(m => m.id === meetingId);
+    updateMeeting(meetingId, {
+      actionItems: (meeting?.actionItems ?? []).map(a =>
+        a.id === item.id ? { ...a, accepted: true } : a
+      ),
+    });
+    setShowCapture(false);
+  };
+
   return (
     <div className="group">
-      <div className="flex items-start gap-2 py-2 px-3 rounded-lg hover:bg-white/[0.03] transition-colors">
+      <div className="flex items-start gap-2 py-3 px-4 rounded-lg hover:bg-white/[0.03] transition-colors">
         <div className="flex-1 min-w-0">
           {showMeetingTitle && meetingTitle && (
             <p className="text-[10px] text-white/30 mb-0.5 truncate">{meetingTitle}</p>
@@ -113,9 +95,9 @@ function ActionItemRow({
             </p>
           )}
         </div>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5">
+        <div className="flex items-center gap-1 opacity-30 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5">
           <button
-            onClick={handleAccept}
+            onClick={() => setShowCapture(true)}
             className="p-1 text-emerald-400 hover:text-emerald-300 transition-colors"
             title="Create task"
           >
@@ -131,24 +113,14 @@ function ActionItemRow({
         </div>
       </div>
 
-      {/* Assignee picker */}
-      {showAssigneePicker && (
-        <div className="mx-3 mb-2 p-3 bg-white/[0.06] rounded-xl border border-white/[0.10] space-y-2">
-          <p className="text-xs text-white/40 mb-2">Assign to:</p>
-          <div className="flex flex-wrap gap-2">
-            {users.map(u => (
-              <button
-                key={u.id}
-                onClick={() => createTask(u.id)}
-                className="px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-brand-500/20 border border-white/[0.08] hover:border-brand-500/30 text-sm text-white/70 hover:text-brand-300 transition-colors"
-              >
-                {u.name}
-              </button>
-            ))}
-          </div>
-          <button onClick={() => setShowAssigneePicker(false)} className="text-xs text-white/30 hover:text-white/50 transition-colors">
-            Cancel
-          </button>
+      {showCapture && (
+        <div className="mx-3 mb-2">
+          <InlineCapture
+            initialTitle={item.text}
+            showCollapsedButton={false}
+            onCreated={handleCreated}
+            onCancel={() => setShowCapture(false)}
+          />
         </div>
       )}
     </div>
@@ -205,7 +177,7 @@ function MeetingChat({ meeting }: { meeting?: Meeting }) {
   };
 
   return (
-    <div className="border-t border-white/[0.06] p-4 flex-shrink-0">
+    <div className="border-t border-white/[0.06] p-5 flex-shrink-0 bg-white/[0.01]">
       {(answer || loading) && (
         <div className="mb-3">
           {loading ? (
@@ -213,7 +185,7 @@ function MeetingChat({ meeting }: { meeting?: Meeting }) {
               <Loader2 size={13} className="animate-spin" /> Thinking...
             </div>
           ) : (
-            <div className="p-3 bg-brand-500/10 border border-brand-500/20 rounded-xl text-sm text-white/80 leading-relaxed max-h-48 overflow-y-auto scrollbar-hide">
+            <div className="p-4 bg-brand-500/10 border border-brand-500/20 rounded-2xl text-sm text-white/80 leading-relaxed max-h-48 overflow-y-auto scrollbar-hide">
               {answer}
             </div>
           )}
@@ -226,12 +198,12 @@ function MeetingChat({ meeting }: { meeting?: Meeting }) {
           onChange={e => setQuery(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleAsk(query)}
           placeholder={meeting ? 'Ask about this meeting…' : 'Ask your meetings…'}
-          className="flex-1 px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-xl text-sm text-white/70 placeholder-white/20 focus:outline-none focus:border-brand-500/40"
+          className="flex-1 px-4 py-2.5 bg-white/[0.04] border border-white/[0.08] rounded-2xl text-sm text-white/70 placeholder-white/20 focus:outline-none focus:border-brand-500/40"
         />
         <button
           onClick={() => handleAsk(query)}
           disabled={!query.trim() || loading}
-          className="px-3 py-2 rounded-xl bg-brand-500 text-white disabled:opacity-30 hover:bg-brand-600 transition-colors"
+          className="px-3 py-2.5 rounded-2xl bg-brand-500 text-white disabled:opacity-30 hover:bg-brand-600 transition-colors"
         >
           <Send size={13} />
         </button>
@@ -272,12 +244,12 @@ function MeetingDetail({ meeting }: { meeting: Meeting }) {
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div className="flex-1 overflow-y-auto scrollbar-hide">
-        <div className="px-8 py-8">
+        <div className="px-10 py-10 max-w-3xl">
           {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-xl font-semibold text-white mb-2">{meeting.title}</h1>
-            <div className="flex items-center gap-3 text-sm text-white/40 flex-wrap">
-              <span className="flex items-center gap-1.5">
+          <div className="mb-10">
+            <h1 className="text-2xl font-bold text-white leading-tight mb-4">{meeting.title}</h1>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.05] text-sm text-white/50">
                 <Clock size={12} />
                 {format(new Date(meeting.date), 'EEEE, MMMM d · h:mm a')}
               </span>
@@ -287,29 +259,24 @@ function MeetingDetail({ meeting }: { meeting: Meeting }) {
                   href={`https://notes.granola.ai/t/${meeting.externalId}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-xs text-emerald-400/70 hover:text-emerald-400 transition-colors"
+                  className="flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-500/10 text-xs text-emerald-400/70 hover:text-emerald-400 transition-colors"
                 >
                   <ExternalLink size={11} /> Open in Granola
                 </a>
               )}
+              {(meeting.participantNames ?? []).map((name, i) => (
+                <span key={i} className="px-3 py-1 rounded-full bg-white/[0.05] text-sm text-white/50">
+                  {name}
+                </span>
+              ))}
             </div>
-            {(meeting.participantNames ?? []).length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-3">
-                {(meeting.participantNames ?? []).map((name, i) => (
-                  <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-white/[0.05] text-white/40">
-                    {name}
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
 
           {/* Action Items */}
           {pendingItems.length > 0 && (
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xs font-semibold text-white/30 uppercase tracking-wider">Action Items</h3>
-                {/* Email buttons for participants with items */}
+            <div className="mb-10 bg-white/[0.02] rounded-2xl border border-white/[0.06] p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider border-l-2 border-brand-500/40 pl-3">Action Items</h3>
                 {participantsWithItems.length > 0 && (
                   <div className="flex items-center gap-2">
                     {participantsWithItems.map(p => (
@@ -325,7 +292,7 @@ function MeetingDetail({ meeting }: { meeting: Meeting }) {
                   </div>
                 )}
               </div>
-              <div className="space-y-0.5">
+              <div className="space-y-1">
                 {pendingItems.map(item => (
                   <ActionItemRow
                     key={item.id}
@@ -340,16 +307,17 @@ function MeetingDetail({ meeting }: { meeting: Meeting }) {
 
           {/* Accepted items */}
           {acceptedItems.length > 0 && (
-            <div className="mb-6">
-              <h3 className="text-xs font-semibold text-white/30 uppercase tracking-wider mb-2">Tasks Created</h3>
-              <div className="space-y-1">
+            <div className="mb-10 bg-white/[0.02] rounded-2xl border border-white/[0.06] p-6">
+              <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider border-l-2 border-emerald-500/40 pl-3 mb-4">Tasks Created</h3>
+              <div className="space-y-1.5">
                 {acceptedItems.map(item => (
-                  <div key={item.id} className="flex items-center gap-2 px-3 py-1.5 text-sm text-white/35">
-                    <div className="w-3.5 h-3.5 rounded-full border border-emerald-500/50 flex items-center justify-center flex-shrink-0">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    </div>
-                    {item.text}
-                    {item.assignee && <span className="text-xs text-white/25 ml-auto">{item.assignee}</span>}
+                  <div key={item.id} className="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-emerald-500/[0.03] text-sm text-white/45">
+                    <svg className="w-4 h-4 text-emerald-400 flex-shrink-0" viewBox="0 0 16 16" fill="none">
+                      <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+                      <path d="M5 8l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span className="flex-1">{item.text}</span>
+                    {item.assignee && <span className="text-xs text-white/25">{item.assignee}</span>}
                   </div>
                 ))}
               </div>
@@ -358,14 +326,19 @@ function MeetingDetail({ meeting }: { meeting: Meeting }) {
 
           {/* Summary / Notes */}
           {meeting.notes && (
-            <div>
-              <h3 className="text-xs font-semibold text-white/30 uppercase tracking-wider mb-3">Summary</h3>
-              <div className="prose prose-invert prose-sm max-w-none text-white/65 leading-relaxed
-                prose-headings:text-white/70 prose-headings:font-semibold prose-headings:text-sm
-                prose-p:text-white/65 prose-p:leading-relaxed
-                prose-li:text-white/65
+            <div className="mb-10">
+              <h3 className="text-xs font-semibold text-white/40 uppercase tracking-wider border-l-2 border-brand-500/40 pl-3 mb-6">Summary</h3>
+              <div className="prose prose-invert max-w-none text-white/65
+                prose-headings:text-white/80 prose-headings:font-semibold
+                prose-h2:text-base prose-h2:border-l-2 prose-h2:border-brand-500/50 prose-h2:pl-3 prose-h2:mt-8 prose-h2:mb-3
+                prose-h3:text-sm prose-h3:border-l-2 prose-h3:border-white/10 prose-h3:pl-3 prose-h3:mt-6 prose-h3:mb-2
+                prose-p:text-white/65 prose-p:leading-[1.8] prose-p:mb-4
+                prose-li:text-white/65 prose-li:leading-[1.8]
                 prose-strong:text-white/80 prose-strong:font-semibold
-                prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5">
+                prose-ul:my-3 prose-ol:my-3 prose-li:my-1
+                [&_ul]:list-disc [&_ul]:marker:text-brand-400/70
+                [&_ul_ul]:list-[circle] [&_ul_ul]:marker:text-white/30
+                [&_ul]:pl-5 [&_ol]:pl-5">
                 <ReactMarkdown>{meeting.notes}</ReactMarkdown>
               </div>
             </div>
