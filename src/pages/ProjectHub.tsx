@@ -266,14 +266,13 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                           <div className="space-y-1 mb-3">
                             {[...new Set(project.memberIds)].map(mid => {
                               const u = users.find(u => u.id === mid);
-                              if (!u) return null;
                               const isOwner = mid === currentUser.id;
                               return (
                                 <div key={mid} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.04]">
                                   <span className="w-6 h-6 rounded-full bg-brand-600/40 flex items-center justify-center text-xs font-semibold text-white/70 flex-shrink-0">
-                                    {u.name[0]}
+                                    {u ? u.name[0] : '?'}
                                   </span>
-                                  <span className="flex-1 text-sm text-white/70 truncate">{u.name}</span>
+                                  <span className="flex-1 text-sm text-white/70 truncate">{u ? u.name : <span className="text-white/30 italic">Invited user</span>}</span>
                                   {isOwner
                                     ? <span className="text-[10px] text-white/20">Owner</span>
                                     : <button

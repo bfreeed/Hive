@@ -304,6 +304,7 @@ function dbToPage(row: any): HivePage {
     projectId: row.project_id ?? undefined,
     templateId: row.template_id ?? undefined,
     isTemplate: row.is_template ?? false,
+    type: row.type ?? 'space',
     sortOrder: row.sort_order ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -876,6 +877,16 @@ export const useStore = create<AppStore>()((set, get) => ({
       newUser = { id: uid(), name: derivedName, email: email.toLowerCase(), role: 'collaborator', flags: DEFAULT_FLAGS };
       return { users: [...s.users, newUser] };
     });
+    // Persist to profiles so the UUID survives a page reload
+    if (newUser) {
+      supabase.from('profiles').upsert({
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+      }, { onConflict: 'id' })
+        .then(({ error }) => { if (error) console.error('addUser profile upsert error:', error); });
+    }
     return (existing || newUser)!;
   },
 
@@ -1206,6 +1217,7 @@ export const useStore = create<AppStore>()((set, get) => ({
       project_id: p.projectId ?? null,
       template_id: p.templateId ?? null,
       is_template: p.isTemplate ?? false,
+      type: p.type ?? 'space',
       sort_order: p.sortOrder ?? 0,
       created_at: now,
       updated_at: now,
@@ -1226,6 +1238,7 @@ export const useStore = create<AppStore>()((set, get) => ({
     if ('parentId' in u) row.parent_id = u.parentId ?? null;
     if ('projectId' in u) row.project_id = u.projectId ?? null;
     if ('sortOrder' in u) row.sort_order = u.sortOrder;
+    if ('type' in u) row.type = u.type;
     set((s) => ({
       pages: s.pages.map((pg) => pg.id === id ? { ...pg, ...u, updatedAt: now } : pg),
     }));
