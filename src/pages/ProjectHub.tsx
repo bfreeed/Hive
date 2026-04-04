@@ -112,15 +112,31 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
     if (showAddTask) addTaskRef.current?.focus();
   }, [showAddTask]);
 
-  // Close share popover on outside click
+  // Close share popover on outside click or Escape
   useEffect(() => {
     if (!showSharePopover) return;
-    const handler = (e: MouseEvent) => {
+    const handleMouse = (e: MouseEvent) => {
       if (shareRef.current && !shareRef.current.contains(e.target as Node)) setShowSharePopover(false);
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowSharePopover(false); };
+    document.addEventListener('mousedown', handleMouse);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleMouse);
+      document.removeEventListener('keydown', handleKey);
+    };
   }, [showSharePopover]);
+
+  // Auto-clean orphaned memberIds (IDs with no matching user profile) when popover opens
+  useEffect(() => {
+    if (!showSharePopover || !project) return;
+    const validIds = [...new Set(project.memberIds)].filter(mid =>
+      mid === currentUser.id || users.some(u => u.id === mid)
+    );
+    if (validIds.length !== [...new Set(project.memberIds)].length) {
+      updateProject(projectId, { memberIds: validIds });
+    }
+  }, [showSharePopover]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAddTask = () => {
     if (!newTaskTitle.trim()) { setShowAddTask(false); return; }
