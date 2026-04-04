@@ -41,6 +41,33 @@
       .pb-nav { padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px)); }
       /* Positions element just above the bottom nav bar */
       .bottom-nav-bar { bottom: calc(4rem + env(safe-area-inset-bottom, 0px)); }
+      /* Landscape phone override: max-height 500px catches phones but not tablets */
+      @media (orientation: landscape) and (max-height: 500px) {
+        /* Hide desktop sidebar in landscape phone */
+        .hidden.md\:flex.h-full { display: none !important; }
+        /* Show mobile bottom nav in landscape phone */
+        nav.md\:hidden { display: flex !important; }
+        /* Force task detail to full-screen (not 600px side panel) */
+        .md\:w-\[600px\] {
+          width: 100% !important;
+          inset: 0 !important;
+          border-left: none !important;
+        }
+        /* Safe-area insets for landscape notch */
+        .md\:w-\[600px\] {
+          padding-left: env(safe-area-inset-left, 0px);
+          padding-right: env(safe-area-inset-right, 0px);
+        }
+        /* Keep compact mobile padding in landscape */
+        .md\:px-6 { padding-left: 1rem !important; padding-right: 1rem !important; }
+        .md\:py-4 { padding-top: 0.75rem !important; padding-bottom: 0.75rem !important; }
+        .md\:text-2xl { font-size: 1.25rem !important; }
+        .md\:w-32 { width: 5rem !important; }
+        /* Keep bottom padding for nav bar */
+        .md\:pb-5 { padding-bottom: 5rem !important; }
+        /* Force main content to take full width */
+        .md\:ml-0 { margin-left: 0 !important; }
+      }
     </style>
   </head>
   <body>

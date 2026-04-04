@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useStore } from '../store';
 import { Home, CheckSquare, Users, Bell, Settings, FolderOpen, Search, MessageSquare, ArrowRight, Sparkles, Loader2, Calendar } from 'lucide-react';
 import { DEFAULT_HOME_SECTIONS } from '../types';
+import { apiFetch } from '../lib/apiFetch';
 
 interface Command {
   id: string;
@@ -152,11 +153,7 @@ export default function CommandPalette({ onClose, onNavigate, onOpenTask, onAICa
         projects: projects.map(p => ({ id: p.id, name: p.name })),
         today: todayStr,
       };
-      const res = await fetch('/api/hive-query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      const res = await apiFetch('/api/hive-query', payload);
       const data = await res.json() as { answer?: string; error?: string };
       setAiAnswer(data.answer ?? data.error ?? 'No response.');
     } catch {
@@ -171,11 +168,7 @@ export default function CommandPalette({ onClose, onNavigate, onOpenTask, onAICa
     setAiAnswer('');
     const currentSections = userSettings?.homeSections ?? DEFAULT_HOME_SECTIONS;
     try {
-      const res = await fetch('/api/layout-command', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command: q, sections: currentSections }),
-      });
+      const res = await apiFetch('/api/layout-command', { command: q, sections: currentSections });
       const data = await res.json() as { sections?: typeof currentSections; message?: string; error?: string };
       if (data.sections) {
         await saveUserSettings({ homeSections: data.sections });

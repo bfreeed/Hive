@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useStore } from '../store';
 import { getPushoverKey, getHealthNotifKey, getBriefingKey } from '../lib/storageKeys';
+import { apiFetch } from '../lib/apiFetch';
 
 // Notification types fired by the health sweep
 type SweepType = 'overdue' | 'due_tomorrow' | 'within72hrs' | 'snooze_wake' | 'wait_expired';
@@ -33,11 +34,7 @@ async function sendPush(
       body.url = `${window.location.origin}/?task=${taskId}`;
       body.urlTitle = 'Open task';
     }
-    const resp = await fetch('/api/send-notification', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+    const resp = await apiFetch('/api/send-notification', body);
     return resp.ok;
   } catch {
     return false;

@@ -107,15 +107,31 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
     setShowAddSub(false);
   };
 
-  // Close share popover on outside click
+  // Close share popover on outside click or Escape
   useEffect(() => {
     if (!showSharePopover) return;
-    const handler = (e: MouseEvent) => {
+    const handleMouse = (e: MouseEvent) => {
       if (shareRef.current && !shareRef.current.contains(e.target as Node)) setShowSharePopover(false);
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowSharePopover(false); };
+    document.addEventListener('mousedown', handleMouse);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleMouse);
+      document.removeEventListener('keydown', handleKey);
+    };
   }, [showSharePopover]);
+
+  // Auto-clean orphaned memberIds (IDs with no matching user profile) when popover opens
+  useEffect(() => {
+    if (!showSharePopover || !project) return;
+    const validIds = [...new Set(project.memberIds)].filter(mid =>
+      mid === currentUser.id || users.some(u => u.id === mid)
+    );
+    if (validIds.length !== [...new Set(project.memberIds)].length) {
+      updateProject(projectId, { memberIds: validIds });
+    }
+  }, [showSharePopover]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const project = projects.find((p) => p.id === projectId);
   if (!project) return <div className="flex-1 flex items-center justify-center text-white/30">Project not found</div>;
@@ -208,7 +224,7 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                       <>
                         {/* Member avatar stack */}
                         <div className="flex -space-x-1">
-                          {project.memberIds.slice(0, 3).map(mid => {
+                          {[...new Set(project.memberIds)].slice(0, 3).map(mid => {
                             const u = users.find(u => u.id === mid);
                             return u ? (
                               <span key={mid} className="w-4 h-4 rounded-full bg-brand-600/60 border border-white/10 flex items-center justify-center text-[9px] font-semibold text-white/80">
@@ -218,8 +234,8 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                           })}
                         </div>
                         Shared
-                        {project.memberIds.length > 1 && (
-                          <span className="text-white/30">· {project.memberIds.length}</span>
+                        {[...new Set(project.memberIds)].length > 1 && (
+                          <span className="text-white/30">· {[...new Set(project.memberIds)].length}</span>
                         )}
                       </>
                     )}
@@ -240,23 +256,23 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
 
                       {!project.isPrivate && (
                         <>
-                          <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1.5 px-0.5">Members</p>
-                          <div className="space-y-1 mb-2">
-                            {project.memberIds.map(mid => {
+                          <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1.5 px-0.5">Current members</p>
+                          <div className="space-y-1 mb-3">
+                            {[...new Set(project.memberIds)].map(mid => {
                               const u = users.find(u => u.id === mid);
-                              if (!u) return null;
                               const isOwner = mid === currentUser.id;
                               return (
                                 <div key={mid} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.04]">
                                   <span className="w-6 h-6 rounded-full bg-brand-600/40 flex items-center justify-center text-xs font-semibold text-white/70 flex-shrink-0">
-                                    {u.name[0]}
+                                    {u ? u.name[0] : '?'}
                                   </span>
-                                  <span className="flex-1 text-sm text-white/70 truncate">{u.name}</span>
+                                  <span className="flex-1 text-sm text-white/70 truncate">{u ? u.name : <span className="text-white/30 italic">Invited user</span>}</span>
                                   {isOwner
                                     ? <span className="text-[10px] text-white/20">Owner</span>
                                     : <button
                                         onClick={() => updateProject(projectId, { memberIds: project.memberIds.filter(id => id !== mid) })}
                                         className="text-white/20 hover:text-red-400 transition-colors"
+                                        title="Remove"
                                       >
                                         <X size={12} />
                                       </button>
@@ -266,13 +282,15 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                             })}
                           </div>
 
-                          {/* Existing users not yet in project */}
+                          {/* Users not yet in project */}
                           {users.filter(u => !project.memberIds.includes(u.id)).length > 0 && (
+                            <>
+                              <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1.5 px-0.5">Add people</p>
                             <div className="space-y-1 mb-2">
                               {users.filter(u => !project.memberIds.includes(u.id)).map(u => (
                                 <button
                                   key={u.id}
-                                  onClick={() => updateProject(projectId, { memberIds: [...project.memberIds, u.id] })}
+                                  onClick={() => updateProject(projectId, { memberIds: [...new Set([...project.memberIds, u.id])] })}
                                   className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.06] transition-colors group"
                                 >
                                   <span className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white/40 flex-shrink-0">
@@ -284,6 +302,7 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                                 </button>
                               ))}
                             </div>
+                            </>
                           )}
 
                           {/* Invite by email */}
@@ -651,10 +670,7 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
         {/* Workspace Tab */}
         {activeTab === 'workspace' && (
           <div className="-mx-6 -mb-6 h-[calc(100vh-220px)] flex flex-col">
-            <ProjectWorkspace
-              content={project.docContent ?? null}
-              onChange={(json) => updateProject(projectId, { docContent: json })}
-            />
+            <ProjectWorkspace projectId={projectId} />
           </div>
         )}
 

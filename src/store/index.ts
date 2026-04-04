@@ -148,7 +148,7 @@ function dbToContact(row: any): Contact {
   };
 }
 
-function contactToDb(c: Contact) {
+function contactToDb(c: Contact, userId?: string) {
   return {
     id: c.id,
     name: c.name,
@@ -160,6 +160,7 @@ function contactToDb(c: Contact) {
     booking_link: c.bookingLink ?? null,
     meetings: c.meetings,
     linked_task_ids: c.linkedTaskIds,
+    ...(userId ? { user_id: userId } : {}),
   };
 }
 
@@ -291,7 +292,7 @@ function dbToUserSettings(row: any): UserSettings {
 // ---------------------------------------------------------------------------
 // uid helper
 // ---------------------------------------------------------------------------
-const uid = () => Math.random().toString(36).slice(2, 9);
+const uid = () => crypto.randomUUID();
 
 function dbToPage(row: any): HivePage {
   return {
@@ -304,6 +305,7 @@ function dbToPage(row: any): HivePage {
     projectId: row.project_id ?? undefined,
     templateId: row.template_id ?? undefined,
     isTemplate: row.is_template ?? false,
+    type: row.type ?? 'space',
     sortOrder: row.sort_order ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -458,7 +460,7 @@ export const useStore = create<AppStore>()((set, get) => ({
       ] = await Promise.allSettled([
         supabase.from('tasks').select('*').contains('assignee_ids', [uid]).order('created_at', { ascending: true }),
         supabase.from('projects').select('*').contains('member_ids', [uid]).order('created_at', { ascending: true }),
-        supabase.from('contacts').select('*'),
+        supabase.from('contacts').select('*').eq('user_id', uid),
         supabase.from('channels').select('*').contains('member_ids', [uid]),
         supabase.from('messages').select('*').order('created_at', { ascending: true }),
         supabase.from('notifications').select('*').order('created_at', { ascending: false }),
@@ -876,6 +878,16 @@ export const useStore = create<AppStore>()((set, get) => ({
       newUser = { id: uid(), name: derivedName, email: email.toLowerCase(), role: 'collaborator', flags: DEFAULT_FLAGS };
       return { users: [...s.users, newUser] };
     });
+    // Persist to profiles so the UUID survives a page reload
+    if (newUser) {
+      supabase.from('profiles').upsert({
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+      }, { onConflict: 'id' })
+        .then(({ error }) => { if (error) console.error('addUser profile upsert error:', error); });
+    }
     return (existing || newUser)!;
   },
 
@@ -883,9 +895,10 @@ export const useStore = create<AppStore>()((set, get) => ({
   // Contacts
   // -------------------------------------------------------------------------
   addContact: (c) => {
+    const currentUserId = get().currentUser.id;
     const newContact: Contact = { ...c, id: uid(), meetings: [], linkedTaskIds: [] };
     set((s) => ({ contacts: [...s.contacts, newContact] }));
-    supabase.from('contacts').insert(contactToDb(newContact))
+    supabase.from('contacts').insert(contactToDb(newContact, currentUserId))
       .then(({ error }) => { if (error) console.error('addContact error:', error); });
   },
 
@@ -934,6 +947,7 @@ export const useStore = create<AppStore>()((set, get) => ({
   // Messages
   // -------------------------------------------------------------------------
   sendMessage: (channelId, body, attachments, priority) => {
+    if (body.length > 10000) { console.warn('sendMessage: body too long, truncating'); body = body.slice(0, 10000); }
     const s = get();
     const newMsg: Message = {
       id: uid(),
@@ -960,6 +974,10 @@ export const useStore = create<AppStore>()((set, get) => ({
   },
 
   updateMessage: (id, body) => {
+    const { currentUser, messages } = get();
+    const msg = messages.find(m => m.id === id);
+    if (!msg || msg.authorId !== currentUser.id) return; // can only edit own messages
+    if (body.length > 10000) body = body.slice(0, 10000);
     const editedAt = new Date().toISOString();
     set((s) => ({
       messages: s.messages.map(m => m.id === id ? { ...m, body, editedAt } : m),
@@ -1206,6 +1224,7 @@ export const useStore = create<AppStore>()((set, get) => ({
       project_id: p.projectId ?? null,
       template_id: p.templateId ?? null,
       is_template: p.isTemplate ?? false,
+      type: p.type ?? 'space',
       sort_order: p.sortOrder ?? 0,
       created_at: now,
       updated_at: now,
@@ -1226,6 +1245,7 @@ export const useStore = create<AppStore>()((set, get) => ({
     if ('parentId' in u) row.parent_id = u.parentId ?? null;
     if ('projectId' in u) row.project_id = u.projectId ?? null;
     if ('sortOrder' in u) row.sort_order = u.sortOrder;
+    if ('type' in u) row.type = u.type;
     set((s) => ({
       pages: s.pages.map((pg) => pg.id === id ? { ...pg, ...u, updatedAt: now } : pg),
     }));
@@ -1299,18 +1319,26 @@ supabase.auth.onAuthStateChange((event) => {
 
 // ---------------------------------------------------------------------------
 // Real-time subscriptions — messages appear instantly for all users
+// Guard: only accept events for channels the current user is a member of.
+// RLS enforces this at the DB level too; this is defense-in-depth.
 // ---------------------------------------------------------------------------
 supabase
   .channel('messages-realtime')
   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
     const newMsg = dbToMessage(payload.new);
     const state = useStore.getState();
+    // Only accept messages from channels this user belongs to
+    const userChannelIds = new Set(state.channels.map(c => c.id));
+    if (!userChannelIds.has(newMsg.channelId)) return;
     // Skip if we already have this message (sent by current user, already in state)
     if (state.messages.some(m => m.id === newMsg.id)) return;
     useStore.setState((s) => ({ messages: [...s.messages, newMsg] }));
   })
   .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
     const updated = dbToMessage(payload.new);
+    const state = useStore.getState();
+    const userChannelIds = new Set(state.channels.map(c => c.id));
+    if (!userChannelIds.has(updated.channelId)) return;
     useStore.setState((s) => ({
       messages: s.messages.map(m => m.id === updated.id ? updated : m),
     }));

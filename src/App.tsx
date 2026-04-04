@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from './store';
 import { DEFAULT_HOME_SECTIONS } from './types';
 import { useAuth } from './hooks/useAuth';
+import { apiFetch } from './lib/apiFetch';
 import { Home as HomeIcon, CheckSquare, MessageSquare, Users, MoreHorizontal, Calendar, FolderOpen } from 'lucide-react';
 import LoginPage from './pages/LoginPage';
 import Sidebar from './components/Sidebar';
@@ -145,11 +146,7 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
     if (!apiKey || syncing) return;
     setSyncing(true);
     try {
-      const res = await fetch('/api/sync-granola', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey, since: null, limit: 30 }),
-      });
+      const res = await apiFetch('/api/sync-granola', { since: null, limit: 30 });
       if (!res.ok) { setSyncing(false); return; }
       const { notes } = await res.json() as { notes: any[]; count: number };
       const { upsertMeeting, updateMeeting, meetings: currentMeetings, contacts, projects } = useStore.getState();
@@ -159,11 +156,7 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
         const isNew = !existingIds.has(`${note.provider}:${note.externalId}`);
         const hasNoItems = !meeting.actionItems || meeting.actionItems.length === 0;
         if ((isNew || hasNoItems) && note.notes) {
-          fetch('/api/link-meeting', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ meetingId: meeting.id, title: note.title, notes: note.notes, transcript: note.transcript, projects: projects.map((p: any) => ({ id: p.id, name: p.name })) }),
-          }).then(r => r.json()).then((linked: any) => {
+          apiFetch('/api/link-meeting', { meetingId: meeting.id, title: note.title, notes: note.notes, transcript: note.transcript, projects: projects.map((p: any) => ({ id: p.id, name: p.name })) }).then(r => r.json()).then((linked: any) => {
             updateMeeting(meeting.id, { linkedProjectIds: linked.linkedProjectIds ?? [], suggestedProjectIds: linked.suggestedProjectIds ?? [], actionItems: linked.actionItems ?? [], hasProjectLinks: (linked.linkedProjectIds?.length ?? 0) > 0 });
           }).catch(() => {});
         }

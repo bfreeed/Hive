@@ -13,6 +13,7 @@
 import { useEffect } from 'react';
 import { useStore } from '../store';
 import type { Meeting, Contact } from '../types';
+import { apiFetch } from '../lib/apiFetch';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -122,14 +123,9 @@ export function useGranolaSync() {
 
       try {
         // --- 1. Fetch from Granola ---
-        const syncRes = await fetch('/api/sync-granola', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            apiKey,
-            since: userSettings?.granolaLastSyncedAt ?? null,
-            limit: 30,
-          }),
+        const syncRes = await apiFetch('/api/sync-granola', {
+          since: userSettings?.granolaLastSyncedAt ?? null,
+          limit: 30,
         });
 
         if (!syncRes.ok) {
@@ -171,16 +167,12 @@ export function useGranolaSync() {
           const isNew = !existingIds.has(`${note.provider}:${note.externalId}`);
           const hasNoActionItems = !meeting.actionItems || meeting.actionItems.length === 0;
           if ((isNew || hasNoActionItems) && (note.notes || note.transcript)) {
-            fetch('/api/link-meeting', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                meetingId: meeting.id,
-                title: note.title,
-                notes: note.notes,
-                transcript: note.transcript,
-                projects: projectsForAI,
-              }),
+            apiFetch('/api/link-meeting', {
+              meetingId: meeting.id,
+              title: note.title,
+              notes: note.notes,
+              transcript: note.transcript,
+              projects: projectsForAI,
             })
               .then(r => r.json())
               .then((linked: { linkedProjectIds?: string[]; suggestedProjectIds?: string[]; actionItems?: Meeting['actionItems'] }) => {

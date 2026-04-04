@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, X, AlertCircle, Loader2 } from 'lucide-react';
 import { useStore } from '../store';
 import { format } from 'date-fns';
+import { apiFetch } from '../lib/apiFetch';
 
 interface ParsedTask {
   title: string;
@@ -77,15 +78,11 @@ export default function QuickCapture({ initialText, onClose }: Props) {
     setParsed(null);
     try {
       const today = format(new Date(), 'yyyy-MM-dd');
-      const resp = await fetch('/api/parse-task', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text,
-          projects: projects.map((p) => ({ id: p.id, name: p.name })),
-          users: users.map((u) => ({ id: u.id, name: u.name })),
-          today,
-        }),
+      const resp = await apiFetch('/api/parse-task', {
+        text,
+        projects: projects.map((p) => ({ id: p.id, name: p.name })),
+        users: users.map((u) => ({ id: u.id, name: u.name })),
+        today,
       });
       const data = await resp.json();
       if (!resp.ok) { setError(data.error || 'Parse failed'); return; }
