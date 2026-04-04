@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useStore } from '../store';
 import { getPushoverKey, getReminderLockKey } from '../lib/storageKeys';
+import { apiFetch } from '../lib/apiFetch';
 
 export const FIRE_WINDOW_MS = 5 * 60 * 1000; // 5-minute window to catch reminders if app was briefly closed
 export const TAB_LOCK_TTL_MS = FIRE_WINDOW_MS; // Multi-tab dedup: lock held for the full fire window
@@ -18,11 +19,7 @@ export function getRecipientIds(assigneeIds: string[], currentUserId: string): s
 
 async function sendReminder(userKey: string, title: string, message: string, url: string): Promise<boolean> {
   try {
-    const resp = await fetch('/api/send-notification', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userKey, title, message, url, urlTitle: 'Open task' }),
-    });
+    const resp = await apiFetch('/api/send-notification', { userKey, title, message, url, urlTitle: 'Open task' });
     if (resp.ok) return true;
     const err = await resp.json().catch(() => ({}));
     console.error('Pushover notification failed:', err);

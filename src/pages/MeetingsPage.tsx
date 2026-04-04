@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { Calendar, Search, X, Clock, ExternalLink, Sparkles, Send, Loader2, Plus, ChevronRight, Mail } from 'lucide-react';
 import { format, isToday, isYesterday, isThisWeek } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
+import { apiFetch } from '../lib/apiFetch';
 import type { Meeting, ActionItem } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -189,14 +190,10 @@ function MeetingChat({ meeting }: { meeting?: Meeting }) {
     }));
 
     try {
-      const res = await fetch('/api/meeting-intelligence', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          question,
-          meetings: meetingSummary,
-          users: users.map(u => u.name).join(', '),
-        }),
+      const res = await apiFetch('/api/meeting-intelligence', {
+        question,
+        meetings: meetingSummary,
+        users: users.map(u => u.name).join(', '),
       });
       const data = await res.json() as { answer?: string; error?: string };
       setAnswer(data.answer ?? data.error ?? 'No response.');

@@ -60,7 +60,7 @@ const STATUS_DOT: Record<string, string> = { online: 'bg-emerald-400', away: 'bg
 
 export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
   const store = useStore();
-  const { projects, tasks, users, notifications, channels, messages, darkMode, toggleDarkMode, toggleVoice, sidebarOpen, toggleSidebar, addProject, currentUser, isLoading, userStatuses, setUserStatus } = store;
+  const { projects, tasks, users, notifications, channels, messages, darkMode, toggleDarkMode, toggleVoice, sidebarOpen, toggleSidebar, addProject, updateProject, currentUser, isLoading, userStatuses, setUserStatus } = store;
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -292,26 +292,22 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
                         hasSubProjects={subs.length > 0}
                         subProjectsExpanded={subsExpanded}
                         onToggleSubProjects={() => setExpandedSubs(prev => ({ ...prev, [project.id]: !subsExpanded }))}
+                        onRename={(name) => updateProject(project.id, { name })}
                       />
 
                       {/* Sub-projects */}
                       {sidebarOpen && (subsExpanded || subs.some(s => activePage === `project-${s.id}`)) && subs.length > 0 && (
                         <div className="ml-5 border-l border-white/[0.06] pl-2 space-y-0.5 mb-0.5">
-                          {subs.map(sub => {
-                            const subCount = tasks.filter(t => (t.projectIds ?? []).includes(sub.id) && t.status !== 'done').length;
-                            const subActive = activePage === `project-${sub.id}`;
-                            return (
-                              <button
-                                key={sub.id}
-                                onClick={() => onNavigate('project', sub.id)}
-                                className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-xs transition-colors ${subActive ? 'bg-white/[0.08] text-white' : 'text-white/50 hover:text-white hover:bg-white/[0.04]'}`}
-                              >
-                                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: sub.color }} />
-                                <span className="truncate flex-1 text-left">{sub.name}</span>
-                                {subCount > 0 && <span className="text-[10px] text-white/30">{subCount}</span>}
-                              </button>
-                            );
-                          })}
+                          {subs.map(sub => (
+                            <SubProjectBtn
+                              key={sub.id}
+                              sub={sub}
+                              taskCount={tasks.filter(t => (t.projectIds ?? []).includes(sub.id) && t.status !== 'done').length}
+                              active={activePage === `project-${sub.id}`}
+                              onClick={() => onNavigate('project', sub.id)}
+                              onRename={(name) => updateProject(sub.id, { name })}
+                            />
+                          ))}
 
                           {/* Inline new sub-project form for this parent */}
                           {newSubParentId === project.id ? (
@@ -577,13 +573,77 @@ function SortableNavBtn({ icon, label, id, active, expanded, onClick, badge }: {
   );
 }
 
-function SortableProjectBtn({ project, taskCount, active, expanded, onClick, hasSubProjects, subProjectsExpanded, onToggleSubProjects }: {
+function SubProjectBtn({ sub, taskCount, active, onClick, onRename }: {
+  sub: { id: string; name: string; color: string }; taskCount: number; active: boolean;
+  onClick: () => void; onRename?: (name: string) => void;
+}) {
+  const [editing, setEditing] = React.useState(false);
+  const [editName, setEditName] = React.useState(sub.name);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => { setEditName(sub.name); }, [sub.name]);
+  React.useEffect(() => {
+    if (editing) { inputRef.current?.focus(); inputRef.current?.select(); }
+  }, [editing]);
+
+  const commitRename = () => {
+    setEditing(false);
+    const trimmed = editName.trim();
+    if (trimmed && trimmed !== sub.name) onRename?.(trimmed);
+    else setEditName(sub.name);
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-xs transition-colors ${active ? 'bg-white/[0.08] text-white' : 'text-white/50 hover:text-white hover:bg-white/[0.04]'}`}
+    >
+      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: sub.color }} />
+      {editing ? (
+        <input
+          ref={inputRef}
+          value={editName}
+          onChange={e => setEditName(e.target.value)}
+          onBlur={commitRename}
+          onKeyDown={e => {
+            if (e.key === 'Enter') { e.preventDefault(); commitRename(); }
+            if (e.key === 'Escape') { e.preventDefault(); setEditName(sub.name); setEditing(false); }
+            e.stopPropagation();
+          }}
+          onClick={e => e.stopPropagation()}
+          className="truncate flex-1 text-left bg-white/[0.08] border border-white/20 rounded px-1 py-0 text-xs text-white focus:outline-none focus:border-brand-500/50 min-w-0"
+        />
+      ) : (
+        <span className="truncate flex-1 text-left" onDoubleClick={e => { e.stopPropagation(); setEditing(true); }}>{sub.name}</span>
+      )}
+      {!editing && taskCount > 0 && <span className="text-[10px] text-white/30">{taskCount}</span>}
+    </button>
+  );
+}
+
+function SortableProjectBtn({ project, taskCount, active, expanded, onClick, hasSubProjects, subProjectsExpanded, onToggleSubProjects, onRename }: {
   project: { id: string; name: string; color: string; isPrivate?: boolean };
   taskCount: number; active: boolean; expanded: boolean; onClick: () => void;
   hasSubProjects?: boolean; subProjectsExpanded?: boolean; onToggleSubProjects?: () => void;
+  onRename?: (name: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: project.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  const [editing, setEditing] = React.useState(false);
+  const [editName, setEditName] = React.useState(project.name);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => { setEditName(project.name); }, [project.name]);
+  React.useEffect(() => {
+    if (editing) { inputRef.current?.focus(); inputRef.current?.select(); }
+  }, [editing]);
+
+  const commitRename = () => {
+    setEditing(false);
+    const trimmed = editName.trim();
+    if (trimmed && trimmed !== project.name) onRename?.(trimmed);
+    else setEditName(project.name);
+  };
 
   return (
     <div ref={setNodeRef} style={style} className="flex items-center group/proj">
@@ -603,9 +663,25 @@ function SortableProjectBtn({ project, taskCount, active, expanded, onClick, has
         <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: project.color }} />
         {expanded && (
           <>
-            <span className="truncate flex-1 text-left">{project.name}</span>
-            {project.isPrivate && <Lock size={10} className="text-amber-400/50 flex-shrink-0" />}
-            {taskCount > 0 && (
+            {editing ? (
+              <input
+                ref={inputRef}
+                value={editName}
+                onChange={e => setEditName(e.target.value)}
+                onBlur={commitRename}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') { e.preventDefault(); commitRename(); }
+                  if (e.key === 'Escape') { e.preventDefault(); setEditName(project.name); setEditing(false); }
+                  e.stopPropagation();
+                }}
+                onClick={e => e.stopPropagation()}
+                className="truncate flex-1 text-left bg-white/[0.08] border border-white/20 rounded px-1 py-0 text-sm text-white focus:outline-none focus:border-brand-500/50 min-w-0"
+              />
+            ) : (
+              <span className="truncate flex-1 text-left" onDoubleClick={e => { e.stopPropagation(); setEditing(true); }}>{project.name}</span>
+            )}
+            {!editing && project.isPrivate && <Lock size={10} className="text-amber-400/50 flex-shrink-0" />}
+            {!editing && taskCount > 0 && (
               <span className="text-xs text-white/30 group-hover:text-white/50">{taskCount}</span>
             )}
           </>

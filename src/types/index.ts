@@ -256,6 +256,7 @@ export interface HivePage {
   projectId?: string;
   templateId?: string;
   isTemplate: boolean;
+  type?: 'space' | 'folder';
   sortOrder: number;
   createdAt: string;
   updatedAt: string;

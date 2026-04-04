@@ -292,7 +292,7 @@ function dbToUserSettings(row: any): UserSettings {
 // ---------------------------------------------------------------------------
 // uid helper
 // ---------------------------------------------------------------------------
-const uid = () => Math.random().toString(36).slice(2, 9);
+const uid = () => crypto.randomUUID();
 
 function dbToPage(row: any): HivePage {
   return {
