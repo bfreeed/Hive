@@ -25,7 +25,7 @@ const PRIORITY_OPTIONS: { value: Priority; label: string; dot: string; active: s
 function PropRow({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-start min-h-[32px] group/prop">
-      <div className="flex items-center gap-2 w-32 flex-shrink-0 text-white/30 text-sm py-1 mt-0.5">
+      <div className="flex items-center gap-2 w-20 md:w-32 flex-shrink-0 text-white/30 text-sm py-1 mt-0.5">
         <span className="flex-shrink-0">{icon}</span>
         <span className="text-xs">{label}</span>
       </div>
@@ -39,6 +39,12 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
   const task = tasks.find(t => t.id === taskId);
   const [commentText, setCommentText] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
   const [showSubtasks, setShowSubtasks] = useState(true);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [showNewSubtask, setShowNewSubtask] = useState(false);
@@ -166,10 +172,10 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
       <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
       {/* Slide-over panel */}
-      <div className="fixed right-0 top-0 bottom-0 z-50 w-[600px] bg-[#111113] border-l border-white/[0.08] flex flex-col shadow-2xl">
+      <div className="fixed inset-0 md:inset-auto md:right-0 md:top-0 md:bottom-0 z-50 w-full md:w-[600px] bg-[#111113] md:border-l border-white/[0.08] flex flex-col shadow-2xl">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06] flex-shrink-0">
+        <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-white/[0.06] flex-shrink-0 pt-safe">
           <div className="flex items-center gap-2">
             {taskProjects.map(p => (
               <span key={p.id} className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: p.color + '22', color: p.color }}>
@@ -198,11 +204,11 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto scrollbar-hide">
-          <div className="px-6 py-5">
+          <div className="px-4 md:px-6 py-4 md:py-5 pb-20 md:pb-5">
 
             {/* Title */}
             <textarea
-              className="w-full bg-transparent text-2xl font-semibold text-white resize-none focus:outline-none placeholder-white/20 leading-snug mt-2 mb-1"
+              className="w-full bg-transparent text-xl md:text-2xl font-semibold text-white resize-none focus:outline-none placeholder-white/20 leading-snug mt-2 mb-1"
               value={task.title}
               onChange={(e) => update('title', e.target.value)}
               rows={task.title.length > 55 ? 2 : 1}
