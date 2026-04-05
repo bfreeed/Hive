@@ -680,10 +680,10 @@ export default function MeetingsPage() {
   });
   const [draggingTab, setDraggingTab] = useState<string | null>(null);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
-  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
+  const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set());
 
   const toggleMonth = (label: string) => {
-    setExpandedMonths(prev => {
+    setCollapsedMonths(prev => {
       const next = new Set(prev);
       if (next.has(label)) next.delete(label); else next.add(label);
       return next;
@@ -856,7 +856,7 @@ export default function MeetingsPage() {
                 </div>
               )}
               {groups.map(([label, items]) => {
-                const isExpanded = expandedMonths.has(label);
+                const isExpanded = !collapsedMonths.has(label);
                 return (
                   <div key={label}>
                     <button
