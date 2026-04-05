@@ -291,6 +291,64 @@ function MessageBubble({ msg, prevMsg, userNames, users, replyCount, isPinned, o
                 {PRIORITY_CONFIG[effectivePriority].label}
               </span>
             )}
+            {/* Inline hover action toolbar */}
+            {!editing && (
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0 bg-[#1c1c1f] border border-white/[0.08] rounded-lg px-0.5 py-0 shadow-lg ml-1">
+                <div className="relative">
+                  <button onClick={() => setShowEmoji(v => !v)} className="p-1 rounded-md hover:bg-white/[0.08] text-white/30 hover:text-white/60 transition-colors"><Smile size={13} /></button>
+                  {showEmoji && (
+                    <div className="absolute left-0 bottom-full mb-1 flex gap-1 p-1.5 bg-[#1c1c1f] border border-white/[0.08] rounded-xl shadow-xl z-20">
+                      {EMOJIS.map(e => (<button key={e} onClick={() => { onReact(msg.id, e); setShowEmoji(false); }} className="text-lg hover:scale-125 transition-transform p-0.5">{e}</button>))}
+                    </div>
+                  )}
+                </div>
+                {!isThread && (<button onClick={() => onOpenThread(msg.id)} className="p-1 rounded-md hover:bg-white/[0.08] text-white/30 hover:text-white/60 transition-colors" title="Reply in thread"><MessageSquare size={13} /></button>)}
+                <button onClick={() => onEdit(msg.id)} className="p-1 rounded-md hover:bg-white/[0.08] text-white/30 hover:text-white/60 transition-colors" title="Edit"><Pencil size={13} /></button>
+                <button onClick={() => onPin(msg.id)} className={`p-1 rounded-md hover:bg-white/[0.08] transition-colors ${isPinned ? 'text-amber-400' : 'text-white/30 hover:text-white/60'}`} title={isPinned ? 'Unpin' : 'Pin'}><Pin size={13} /></button>
+                <button onClick={() => onCopyLink(msg.id)} className="p-1 rounded-md hover:bg-white/[0.08] text-white/30 hover:text-white/60 transition-colors" title="Copy link"><Copy size={13} /></button>
+                {onSave && (<button onClick={() => onSave(msg.id)} className={`p-1 rounded-md hover:bg-white/[0.08] transition-colors ${isSaved ? 'text-amber-400' : 'text-white/30 hover:text-white/60'}`} title={isSaved ? 'Remove bookmark' : 'Save'}><Bookmark size={13} /></button>)}
+                {onSetPriority && (
+                  <div className="relative">
+                    <button onClick={() => setShowPriorityPicker(v => !v)} className={`p-1 rounded-md hover:bg-white/[0.08] transition-colors ${effectivePriority ? PRIORITY_CONFIG[effectivePriority].text : 'text-white/30 hover:text-white/60'}`} title="Set priority"><Flag size={13} /></button>
+                    {showPriorityPicker && (
+                      <div className="absolute left-0 bottom-full mb-1 p-1.5 bg-[#1c1c1f] border border-white/[0.08] rounded-xl shadow-xl z-20 flex flex-col gap-0.5 min-w-[110px]">
+                        {(Object.entries(PRIORITY_CONFIG) as [MessagePriority, typeof PRIORITY_CONFIG[MessagePriority]][]).map(([p, cfg]) => (
+                          <button key={p} onClick={() => { onSetPriority(msg.id, p, true); setShowPriorityPicker(false); }} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors hover:bg-white/[0.08] ${effectivePriority === p ? cfg.text + ' font-semibold' : 'text-white/60'}`}>
+                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot}`} />{cfg.label}
+                          </button>
+                        ))}
+                        {effectivePriority && (
+                          <button onClick={() => { onSetPriority(msg.id, null, true); setShowPriorityPicker(false); }} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-white/30 hover:text-white/60 hover:bg-white/[0.08] transition-colors border-t border-white/[0.06] mt-0.5 pt-2">
+                            <X size={10} /> Clear
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {onMove && allChannels && (
+                  <div className="relative">
+                    <button onClick={() => setShowMovePicker(v => !v)} className="p-1 rounded-md hover:bg-white/[0.08] text-white/30 hover:text-white/60 transition-colors" title="Move to channel"><ArrowRight size={13} /></button>
+                    {showMovePicker && (
+                      <div className="absolute left-0 bottom-full mb-1 p-1.5 bg-[#1c1c1f] border border-white/[0.08] rounded-xl shadow-xl z-20 flex flex-col gap-0.5 min-w-[170px] max-h-64 overflow-y-auto">
+                        <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-2 py-1">Move to...</p>
+                        {allChannels.filter(c => c.id !== msg.channelId && !c.deletedAt).map(c => {
+                          const isDm = c.type === 'dm';
+                          const dmName = isDm ? c.memberIds.filter(id => id !== msg.authorId).map(id => users.find(u => u.id === id)?.name ?? 'Unknown').join(', ') : null;
+                          return (
+                            <button key={c.id} onClick={() => { onMove(msg.id, c.id); setShowMovePicker(false); }} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-white/60 hover:bg-white/[0.08] hover:text-white/80 transition-colors">
+                              {isDm ? <span className="w-2 h-2 rounded-full bg-white/20 flex-shrink-0" /> : <Hash size={11} className="flex-shrink-0 text-white/30" />}
+                              <span className="truncate">{isDm ? dmName : c.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <button onClick={() => onDelete(msg.id)} className="p-1 rounded-md hover:bg-white/[0.08] text-red-400/50 hover:text-red-400 transition-colors" title="Delete"><Trash2 size={13} /></button>
+              </div>
+            )}
           </div>
         )}
 
@@ -387,147 +445,7 @@ function MessageBubble({ msg, prevMsg, userNames, users, replyCount, isPinned, o
         )}
       </div>
 
-      {/* Hover action toolbar */}
-      {!editing && (
-        <div className="absolute left-[220px] top-0 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0 bg-[#1c1c1f] border border-white/[0.08] rounded-lg px-0.5 py-0 shadow-lg z-10">
-          <div className="relative">
-            <button
-              onClick={() => setShowEmoji(v => !v)}
-              className="p-1.5 rounded-md hover:bg-white/[0.08] text-white/30 hover:text-white/60 transition-colors"
-            >
-              <Smile size={14} />
-            </button>
-            {showEmoji && (
-              <div className="absolute right-0 bottom-full mb-1 flex gap-1 p-1.5 bg-[#1c1c1f] border border-white/[0.08] rounded-xl shadow-xl z-20">
-                {EMOJIS.map(e => (
-                  <button
-                    key={e}
-                    onClick={() => { onReact(msg.id, e); setShowEmoji(false); }}
-                    className="text-lg hover:scale-125 transition-transform p-0.5"
-                  >
-                    {e}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          {!isThread && (
-            <button
-              onClick={() => onOpenThread(msg.id)}
-              className="p-1.5 rounded-md hover:bg-white/[0.08] text-white/30 hover:text-white/60 transition-colors"
-              title="Reply in thread"
-            >
-              <MessageSquare size={14} />
-            </button>
-          )}
-          <button
-            onClick={() => onEdit(msg.id)}
-            className="p-1.5 rounded-md hover:bg-white/[0.08] text-white/30 hover:text-white/60 transition-colors"
-            title="Edit"
-          >
-            <Pencil size={14} />
-          </button>
-          <button
-            onClick={() => onPin(msg.id)}
-            className={`p-1.5 rounded-md hover:bg-white/[0.08] transition-colors ${isPinned ? 'text-amber-400' : 'text-white/30 hover:text-white/60'}`}
-            title={isPinned ? 'Unpin' : 'Pin message'}
-          >
-            <Pin size={14} />
-          </button>
-          <button
-            onClick={() => onCopyLink(msg.id)}
-            className="p-1.5 rounded-md hover:bg-white/[0.08] text-white/30 hover:text-white/60 transition-colors"
-            title="Copy link"
-          >
-            <Copy size={14} />
-          </button>
-          {onSave && (
-            <button
-              onClick={() => onSave(msg.id)}
-              className={`p-1.5 rounded-md hover:bg-white/[0.08] transition-colors ${isSaved ? 'text-amber-400' : 'text-white/30 hover:text-white/60'}`}
-              title={isSaved ? 'Remove bookmark' : 'Save message'}
-            >
-              <Bookmark size={14} />
-            </button>
-          )}
-          {onSetPriority && (
-            <div className="relative">
-              <button
-                onClick={() => setShowPriorityPicker(v => !v)}
-                className={`p-1.5 rounded-md hover:bg-white/[0.08] transition-colors ${effectivePriority ? PRIORITY_CONFIG[effectivePriority].text : 'text-white/30 hover:text-white/60'}`}
-                title="Set priority"
-              >
-                <Flag size={14} />
-              </button>
-              {showPriorityPicker && (
-                <div className="absolute right-0 bottom-full mb-1 p-1.5 bg-[#1c1c1f] border border-white/[0.08] rounded-xl shadow-xl z-20 flex flex-col gap-0.5 min-w-[110px]">
-                  {(Object.entries(PRIORITY_CONFIG) as [MessagePriority, typeof PRIORITY_CONFIG[MessagePriority]][]).map(([p, cfg]) => (
-                    <button
-                      key={p}
-                      onClick={() => { onSetPriority(msg.id, p, true); setShowPriorityPicker(false); }}
-                      className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors hover:bg-white/[0.08] ${effectivePriority === p ? cfg.text + ' font-semibold' : 'text-white/60'}`}
-                    >
-                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot}`} />
-                      {cfg.label}
-                    </button>
-                  ))}
-                  {effectivePriority && (
-                    <button
-                      onClick={() => { onSetPriority(msg.id, null, true); setShowPriorityPicker(false); }}
-                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-white/30 hover:text-white/60 hover:bg-white/[0.08] transition-colors border-t border-white/[0.06] mt-0.5 pt-2"
-                    >
-                      <X size={10} /> Clear
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-          {onMove && allChannels && (
-            <div className="relative">
-              <button
-                onClick={() => setShowMovePicker(v => !v)}
-                className="p-1.5 rounded-md hover:bg-white/[0.08] text-white/30 hover:text-white/60 transition-colors"
-                title="Move to channel"
-              >
-                <ArrowRight size={14} />
-              </button>
-              {showMovePicker && (
-                <div className="absolute right-0 bottom-full mb-1 p-1.5 bg-[#1c1c1f] border border-white/[0.08] rounded-xl shadow-xl z-20 flex flex-col gap-0.5 min-w-[170px] max-h-64 overflow-y-auto">
-                  <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-2 py-1">Move to...</p>
-                  {allChannels.filter(c => c.id !== msg.channelId && !c.deletedAt).map(c => {
-                    const isDm = c.type === 'dm';
-                    const dmName = isDm
-                      ? c.memberIds.filter(id => id !== msg.authorId).map(id => users.find(u => u.id === id)?.name ?? 'Unknown').join(', ')
-                      : null;
-                    return (
-                      <button
-                        key={c.id}
-                        onClick={() => { onMove(msg.id, c.id); setShowMovePicker(false); }}
-                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-white/60 hover:text-white/90 hover:bg-white/[0.08] transition-colors text-left"
-                      >
-                        {isDm ? (
-                          <span className="w-2 h-2 rounded-full bg-white/20 flex-shrink-0" />
-                        ) : (
-                          <Hash size={11} className="flex-shrink-0 text-white/30" />
-                        )}
-                        <span className="truncate">{isDm ? dmName : c.name}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-          <button
-            onClick={() => onDelete(msg.id)}
-            className="p-1.5 rounded-md hover:bg-white/[0.08] text-red-400/50 hover:text-red-400 transition-colors"
-            title="Delete"
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
-      )}
+      {/* Toolbar is now inline in the name/date row above */}
     </div>
     </>
   );
