@@ -1028,7 +1028,7 @@ export default function MessagesPage() {
       const isFirstUnread = !isThread && msg.id === firstUnreadId;
       if (!isThread && (!prev || !isSameDay(prev.createdAt, msg.createdAt))) {
         items.push(
-          <div key={`divider-${msg.id}`} className="flex items-center gap-3 px-4 my-4">
+          <div key={`divider-${msg.id}`} className="flex items-center gap-3 px-4 my-1.5">
             <div className="flex-1 h-px bg-white/[0.06]" />
             <span className="text-xs text-white/30 font-medium">{formatDivider(msg.createdAt)}</span>
             <div className="flex-1 h-px bg-white/[0.06]" />
