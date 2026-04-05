@@ -57,11 +57,11 @@ function SortableMainTab({ id, label, active, onClick }: {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1, touchAction: 'none' as const };
   return (
-    <div ref={setNodeRef} style={style} className={`relative flex-shrink-0 select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`} {...attributes}>
+    <div ref={setNodeRef} style={style} className="relative flex-shrink-0 select-none" {...attributes}>
       <button
         onClick={onClick}
         {...listeners}
-        className={`px-3 py-2 text-sm transition-colors relative ${active ? 'text-white font-medium' : 'text-white/40 hover:text-white/70'}`}
+        className={`px-3 py-2 text-sm transition-colors relative ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${active ? 'text-white font-medium' : 'text-white/40 hover:text-white/70'}`}
       >
         {label}
         {active && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500 rounded-full" />}
