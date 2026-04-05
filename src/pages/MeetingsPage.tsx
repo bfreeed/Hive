@@ -607,27 +607,28 @@ export default function MeetingsPage() {
   const selected = meetings.find(m => m.id === selectedId) ?? null;
 
   // Helper to render a meeting row in the sidebar
-  const renderMeetingRow = (m: Meeting, indent = false) => {
+  const renderMeetingRow = (m: Meeting, indent = false, idx = 0) => {
     const pendingCount = (m.actionItems ?? []).filter(a => !a.accepted && !a.dismissed).length;
+    const isSelected = selectedId === m.id;
+    const isOdd = idx % 2 === 1;
     return (
       <button
         key={m.id}
         onClick={() => setSelectedId(m.id)}
-        className={`w-full flex items-start gap-2 ${indent ? 'pl-9 pr-4' : 'px-4'} py-2.5 text-left transition-colors ${
-          selectedId === m.id ? 'bg-white/[0.08]' : 'hover:bg-white/[0.04]'
+        className={`w-full flex items-start gap-2 ${indent ? 'pl-9 pr-4' : 'px-4'} py-1.5 text-left transition-colors border-l-2 ${
+          isSelected
+            ? 'bg-white/[0.08] border-brand-500'
+            : `${isOdd ? 'bg-white/[0.02]' : ''} border-transparent hover:border-brand-500/40`
         }`}
       >
         <div className="flex-1 min-w-0">
-          <p className="text-sm text-white/70 truncate">{m.title}</p>
-          <p className="text-xs text-white/25 mt-0.5">{format(new Date(m.date), 'h:mm a')}</p>
+          <p className="text-[13px] text-white/70 truncate leading-snug">{m.title}</p>
+          <p className="text-[10px] text-white/25 mt-0.5">{format(new Date(m.date), 'MMM d · h:mm a')}</p>
         </div>
         {pendingCount > 0 && (
           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-semibold flex-shrink-0 mt-0.5">
             {pendingCount}
           </span>
-        )}
-        {selectedId === m.id && (
-          <ChevronRight size={12} className="text-white/30 flex-shrink-0 mt-1" />
         )}
       </button>
     );
@@ -692,7 +693,7 @@ export default function MeetingsPage() {
                   <p className="text-[10px] font-semibold text-white/20 uppercase tracking-wider px-4 py-2">
                     {label}
                   </p>
-                  {items.map(m => renderMeetingRow(m))}
+                  {items.map((m, i) => renderMeetingRow(m, false, i))}
                 </div>
               ))}
             </>
@@ -726,7 +727,7 @@ export default function MeetingsPage() {
                         {pMeetings.length}
                       </span>
                     </button>
-                    {isExpanded && pMeetings.map(m => renderMeetingRow(m, true))}
+                    {isExpanded && pMeetings.map((m, i) => renderMeetingRow(m, true, i))}
                   </div>
                 );
               })}
