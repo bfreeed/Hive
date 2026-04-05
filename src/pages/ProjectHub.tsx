@@ -48,7 +48,7 @@ function SortableProjectTab({ id, label, active, onClick }: { id: string; label:
   );
 }
 
-const DEFAULT_MAIN_TABS = ['tasks', 'workspace', 'docs', 'contacts', 'members'] as const;
+const DEFAULT_MAIN_TABS = ['tasks', 'workspace', 'docs', 'contacts'] as const;
 type MainTab = typeof DEFAULT_MAIN_TABS[number];
 
 function SortableMainTab({ id, label, active, onClick }: {
