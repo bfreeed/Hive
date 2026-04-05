@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
-import type { Task, Project, Contact, User, UserFlag, Notification, Channel, Message, Section, Meeting, UserSettings, HivePage } from '../types';
+import type { Task, Project, Contact, User, UserFlag, Notification, Channel, Message, Section, Meeting, UserSettings, HivePage, Invitation } from '../types';
+import { apiFetch } from '../lib/apiFetch';
 
 // ---------------------------------------------------------------------------
 // Fallback seed data (shown while Supabase loads or if it fails)
@@ -204,7 +205,22 @@ function dbToNotification(row: any): Notification {
     taskId: row.task_id ?? undefined,
     projectId: row.project_id ?? undefined,
     userId: row.user_id ?? undefined,
+    invitationId: row.invitation_id ?? undefined,
     read: row.read ?? false,
+    createdAt: row.created_at,
+  };
+}
+
+function dbToInvitation(row: any): Invitation {
+  return {
+    id: row.id,
+    type: row.type,
+    resourceId: row.resource_id,
+    resourceName: row.resource_name,
+    invitedByUserId: row.invited_by_user_id,
+    invitedByName: row.invited_by_name ?? '',
+    invitedUserId: row.invited_user_id,
+    status: row.status,
     createdAt: row.created_at,
   };
 }
@@ -396,6 +412,11 @@ interface AppStore {
   addPage: (p: Partial<HivePage>) => Promise<HivePage>;
   updatePage: (id: string, u: Partial<HivePage>) => Promise<void>;
   deletePage: (id: string) => Promise<void>;
+
+  // Invitations
+  invitations: Invitation[];
+  sendInvitation: (type: 'project' | 'channel', resourceId: string, resourceName: string, invitedUserId: string) => Promise<void>;
+  respondToInvitation: (invitationId: string, accept: boolean) => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -409,6 +430,7 @@ export const useStore = create<AppStore>()((set, get) => ({
   tasks: TASKS,
   contacts: CONTACTS,
   notifications: [],
+  invitations: [],
   channels: CHANNELS,
   messages: MESSAGES,
   sections: SECTIONS,
@@ -457,6 +479,7 @@ export const useStore = create<AppStore>()((set, get) => ({
         meetingsRes,
         settingsRes,
         pagesRes,
+        invitationsRes,
       ] = await Promise.allSettled([
         supabase.from('tasks').select('*').contains('assignee_ids', [uid]).order('created_at', { ascending: true }),
         supabase.from('projects').select('*').contains('member_ids', [uid]).order('created_at', { ascending: true }),
@@ -469,6 +492,7 @@ export const useStore = create<AppStore>()((set, get) => ({
         supabase.from('meetings').select('*').eq('user_id', uid).order('date', { ascending: false }),
         supabase.from('user_settings').select('*').eq('user_id', uid).maybeSingle(),
         supabase.from('pages').select('*').eq('user_id', uid).order('updated_at', { ascending: false }),
+        supabase.from('invitations').select('*').eq('invited_user_id', uid).eq('status', 'pending'),
       ]).then(results => results.map((r, i) => {
         if (r.status === 'rejected') { console.error(`loadData query ${i} failed:`, r.reason); return { data: null, error: r.reason }; }
         return r.value;
@@ -552,6 +576,7 @@ export const useStore = create<AppStore>()((set, get) => ({
       }
 
       updates.pages = (pagesRes.data ?? []).map(dbToPage);
+      updates.invitations = (invitationsRes.data ?? []).map(dbToInvitation);
 
       set(updates);
     } catch (err) {
@@ -941,6 +966,59 @@ export const useStore = create<AppStore>()((set, get) => ({
       user_id: newN.userId ?? null,
       read: false, created_at: newN.createdAt,
     }).then(({ error }) => { if (error) console.error('addNotification error:', error); });
+  },
+
+  // -------------------------------------------------------------------------
+  // Invitations
+  // -------------------------------------------------------------------------
+  sendInvitation: async (type, resourceId, resourceName, invitedUserId) => {
+    const res = await apiFetch('/api/send-invitation', { type, resourceId, resourceName, invitedUserId });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error('sendInvitation error:', err);
+    }
+  },
+
+  respondToInvitation: async (invitationId, accept) => {
+    const invitation = get().invitations.find(i => i.id === invitationId);
+    if (!invitation) return;
+
+    const status = accept ? 'accepted' : 'declined';
+
+    // Remove from local state
+    set(s => ({ invitations: s.invitations.filter(i => i.id !== invitationId) }));
+
+    // Update DB
+    await supabase.from('invitations').update({ status }).eq('id', invitationId);
+
+    // Mark linked notification as read
+    set(s => ({
+      notifications: s.notifications.map(n =>
+        n.invitationId === invitationId ? { ...n, read: true } : n
+      ),
+    }));
+    supabase.from('notifications').update({ read: true }).eq('invitation_id', invitationId);
+
+    if (accept) {
+      const s = get();
+      if (invitation.type === 'project') {
+        const project = s.projects.find(p => p.id === invitation.resourceId);
+        if (project) {
+          get().updateProject(invitation.resourceId, {
+            memberIds: [...new Set([...project.memberIds, s.currentUser.id])],
+          });
+        }
+      } else {
+        const channel = s.channels.find(c => c.id === invitation.resourceId);
+        if (channel) {
+          get().updateChannel(invitation.resourceId, {
+            memberIds: [...new Set([...channel.memberIds, s.currentUser.id])],
+          });
+        }
+      }
+      // Reload so the newly joined project/channel appears in sidebar
+      get().loadData();
+    }
   },
 
   // -------------------------------------------------------------------------

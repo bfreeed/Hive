@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '../store';
-import { AlertTriangle, Clock, MessageSquare, CheckCircle, ArrowRight, Plus, X, Sun, Calendar, Sparkles, ChevronRight, ChevronDown, Send, Loader2 } from 'lucide-react';
+import { AlertTriangle, Clock, MessageSquare, CheckCircle, ArrowRight, Plus, X, Sun, Calendar, Sparkles, ChevronRight, ChevronDown, Send, Loader2, UserPlus, Check, FolderOpen, Hash } from 'lucide-react';
 import { isPast, addDays, isWithinInterval, startOfDay } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import TaskRow from '../components/TaskRow';
@@ -104,7 +104,7 @@ function Section({ title, icon, count, color = 'text-white/50', children }: {
 }
 
 export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: string, id?: string) => void; onOpenTask: (id: string) => void }) {
-  const { tasks, projects, meetings, messages, channels, userSettings, saveUserSettings, currentUser } = useStore();
+  const { tasks, projects, meetings, messages, channels, userSettings, saveUserSettings, currentUser, invitations, respondToInvitation } = useStore();
   const [isSpeaking, setIsSpeaking] = useState(false);
   const captureRef = useRef<InlineCaptureHandle>(null);
 
@@ -433,6 +433,37 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
             </div>
           )}
         </div>
+
+        {/* Pending invitations */}
+        {invitations.length > 0 && (
+          <div className="mb-6 space-y-2">
+            {invitations.map(inv => (
+              <div key={inv.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-brand-500/25 bg-brand-500/[0.05]">
+                <span className="flex-shrink-0 text-brand-400">
+                  {inv.type === 'channel' ? <Hash size={14} /> : <FolderOpen size={14} />}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-white/80 font-medium truncate">{inv.resourceName}</p>
+                  <p className="text-xs text-white/35">{inv.invitedByName} invited you to join this {inv.type}</p>
+                </div>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <button
+                    onClick={() => respondToInvitation(inv.id, true)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-xs font-medium transition-colors"
+                  >
+                    <Check size={11} /> Accept
+                  </button>
+                  <button
+                    onClick={() => respondToInvitation(inv.id, false)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-white/50 hover:text-white/80 text-xs font-medium transition-colors"
+                  >
+                    <X size={11} /> Decline
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         <InlineCapture ref={captureRef} />
 

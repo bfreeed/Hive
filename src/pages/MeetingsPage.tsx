@@ -377,46 +377,48 @@ function AllActionItemsView() {
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div className="flex-1 overflow-y-auto scrollbar-hide px-8 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-sm font-semibold text-white/80">Action Items</h2>
-          <div className="flex items-center gap-1 p-0.5 bg-white/[0.05] rounded-lg">
-            <button
-              onClick={() => setShowAll(false)}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${!showAll ? 'bg-white/[0.08] text-white/80' : 'text-white/35 hover:text-white/60'}`}
-            >
-              Mine
-            </button>
-            <button
-              onClick={() => setShowAll(true)}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${showAll ? 'bg-white/[0.08] text-white/80' : 'text-white/35 hover:text-white/60'}`}
-            >
-              All
-            </button>
+        <div className="max-w-2xl">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-sm font-semibold text-white/80">Action Items</h2>
+            <div className="flex items-center gap-1 p-0.5 bg-white/[0.05] rounded-lg">
+              <button
+                onClick={() => setShowAll(false)}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${!showAll ? 'bg-white/[0.08] text-white/80' : 'text-white/35 hover:text-white/60'}`}
+              >
+                Mine
+              </button>
+              <button
+                onClick={() => setShowAll(true)}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${showAll ? 'bg-white/[0.08] text-white/80' : 'text-white/35 hover:text-white/60'}`}
+              >
+                All
+              </button>
+            </div>
           </div>
-        </div>
 
-        {filtered.length === 0 ? (
-          <div className="text-center py-12">
-            <Calendar size={28} className="text-white/10 mx-auto mb-3" />
-            <p className="text-sm text-white/30">
-              {showAll ? 'No pending action items' : 'No action items for you'}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-0.5">
-            {filtered.map(({ item, meeting, isMe }) => (
-              <ActionItemRow
-                key={`${meeting.id}-${item.id}`}
-                item={item}
-                meetingId={meeting.id}
-                showMeetingTitle
-                meetingTitle={meeting.title}
-                isMe={isMe}
-              />
-            ))}
-          </div>
-        )}
+          {filtered.length === 0 ? (
+            <div className="text-center py-12">
+              <Calendar size={28} className="text-white/10 mx-auto mb-3" />
+              <p className="text-sm text-white/30">
+                {showAll ? 'No pending action items' : 'No action items for you'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-0.5">
+              {filtered.map(({ item, meeting, isMe }) => (
+                <ActionItemRow
+                  key={`${meeting.id}-${item.id}`}
+                  item={item}
+                  meetingId={meeting.id}
+                  showMeetingTitle
+                  meetingTitle={meeting.title}
+                  isMe={isMe}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Chat bar */}

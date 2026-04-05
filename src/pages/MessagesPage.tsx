@@ -734,8 +734,8 @@ export default function MessagesPage() {
 
   const isUnread = (ch: typeof channels[0]) => {
     const lastRead = ch.lastReadAt;
-    if (!lastRead) return messages.some(m => m.channelId === ch.id);
-    return messages.some(m => m.channelId === ch.id && m.createdAt > lastRead);
+    if (!lastRead) return messages.some(m => m.channelId === ch.id && m.authorId !== currentUser.id);
+    return messages.some(m => m.channelId === ch.id && m.createdAt > lastRead && m.authorId !== currentUser.id);
   };
 
   const handleSend = () => {
@@ -982,11 +982,15 @@ export default function MessagesPage() {
     // Check if a profile with this email already exists
     const { data } = await supabase.from('profiles').select('id').eq('email', email).maybeSingle();
     if (data?.id) {
-      // User exists — add directly if not already a member
-      if (!channel.memberIds.includes(data.id)) {
-        updateChannel(channel.id, { memberIds: [...channel.memberIds, data.id] });
+      if (channel.memberIds.includes(data.id)) {
+        setAddMemberStatus('added');
+        setAddMemberEmail('');
+        return;
       }
-      setAddMemberStatus('added');
+      // Send invitation instead of directly adding
+      const { sendInvitation } = useStore.getState();
+      await sendInvitation('channel', channel.id, channel.name || 'channel', data.id);
+      setAddMemberStatus('invited');
       setAddMemberEmail('');
     } else {
       setAddMemberStatus('notfound');
@@ -1721,8 +1725,11 @@ export default function MessagesPage() {
                       <UserPlus size={12} />
                     </button>
                   </div>
+                  {addMemberStatus === 'invited' && (
+                    <p className="text-[11px] text-emerald-400 px-0.5">Invitation sent — they'll see it in Notifications.</p>
+                  )}
                   {addMemberStatus === 'added' && (
-                    <p className="text-[11px] text-emerald-400 px-0.5">Added to channel.</p>
+                    <p className="text-[11px] text-white/40 px-0.5">Already a member.</p>
                   )}
                   {addMemberStatus === 'notfound' && (
                     <div className="space-y-1">

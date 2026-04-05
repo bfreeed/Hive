@@ -21,9 +21,14 @@ const InlineCapture = forwardRef<InlineCaptureHandle, InlineCaptureProps>(functi
   const { initialTitle, initialProjectId, initialAssigneeId, onCreated, onCancel, showCollapsedButton = true } = props;
   const { projects, users, currentUser, addTask } = useStore();
   const [show, setShow] = useState(!showCollapsedButton);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useImperativeHandle(ref, () => ({
-    open: () => setShow(true),
+    open: () => {
+      setShow(true);
+      // Scroll into view after state update
+      setTimeout(() => containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
+    },
   }));
   const [title, setTitle] = useState(initialTitle ?? '');
   const [project, setProject] = useState(initialProjectId ?? '');
@@ -78,7 +83,7 @@ const InlineCapture = forwardRef<InlineCaptureHandle, InlineCaptureProps>(functi
   }
 
   return (
-    <div className="mb-6 bg-white/[0.04] rounded-xl border border-brand-500/30 overflow-hidden">
+    <div ref={containerRef} className="mb-6 bg-white/[0.04] rounded-xl border border-brand-500/30 overflow-hidden">
       {/* Title input */}
       <div className="flex items-center gap-2 px-3 py-2.5">
         <input

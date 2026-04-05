@@ -212,7 +212,20 @@ export interface Notification {
   taskId?: string;
   projectId?: string;
   userId?: string;
+  invitationId?: string;
   read: boolean;
+  createdAt: string;
+}
+
+export interface Invitation {
+  id: string;
+  type: 'project' | 'channel';
+  resourceId: string;
+  resourceName: string;
+  invitedByUserId: string;
+  invitedByName: string;
+  invitedUserId: string;
+  status: 'pending' | 'accepted' | 'declined';
   createdAt: string;
 }
 

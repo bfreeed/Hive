@@ -48,13 +48,49 @@ function SortableProjectTab({ id, label, active, onClick }: { id: string; label:
   );
 }
 
+const DEFAULT_MAIN_TABS = ['tasks', 'workspace', 'docs', 'contacts', 'members'] as const;
+type MainTab = typeof DEFAULT_MAIN_TABS[number];
+
+function SortableMainTab({ id, label, active, onClick }: {
+  id: string; label: string; active: boolean; onClick: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1, touchAction: 'none' as const };
+  return (
+    <div ref={setNodeRef} style={style} className={`relative flex-shrink-0 select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`} {...attributes}>
+      <button
+        onClick={onClick}
+        {...listeners}
+        className={`px-3 py-2 text-sm transition-colors relative ${active ? 'text-white font-medium' : 'text-white/40 hover:text-white/70'}`}
+      >
+        {label}
+        {active && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500 rounded-full" />}
+      </button>
+    </div>
+  );
+}
+
 const PROJECT_COLORS = ['#6366f1','#10b981','#f59e0b','#ef4444','#3b82f6','#8b5cf6','#ec4899','#14b8a6'];
 
 export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { projectId: string; onNavigate: (page: string, id?: string) => void; onOpenTask: (id: string) => void }) {
-  const { projects, tasks, users, contacts, addTask, updateProject, addUser, addProject, userSettings, currentUser } = useStore();
+  const { projects, tasks, users, contacts, addTask, updateProject, addUser, addProject, userSettings, currentUser, sendInvitation } = useStore();
   const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteStatus, setInviteStatus] = useState<'idle' | 'loading' | 'sent' | 'notfound' | 'already'>('idle');
   const inviteRef = useRef<HTMLInputElement>(null);
-  const [activeTab, setActiveTab] = useState<'tasks' | 'workspace' | 'docs' | 'contacts' | 'members'>('tasks');
+  const [activeTab, setActiveTab] = useState<MainTab>('tasks');
+  const [mainTabOrder, setMainTabOrder] = useState<MainTab[]>(() => {
+    try {
+      const saved = localStorage.getItem('hive_main_tabOrder');
+      if (saved) {
+        const parsed: MainTab[] = JSON.parse(saved);
+        const merged = parsed.filter(id => (DEFAULT_MAIN_TABS as readonly string[]).includes(id)) as MainTab[];
+        DEFAULT_MAIN_TABS.forEach(id => { if (!merged.includes(id)) merged.push(id); });
+        return merged;
+      }
+    } catch {}
+    return [...DEFAULT_MAIN_TABS];
+  });
+  const getMainTabLabel = (id: MainTab) => id.charAt(0).toUpperCase() + id.slice(1);
   const [taskViewTab, setTaskViewTab] = useState<TaskViewTab>('status');
   const tabSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const [tabOrder, setTabOrder] = useState<TaskViewTab[]>(() => {
@@ -91,6 +127,27 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
   useEffect(() => {
     if (showAddSub) newSubRef.current?.focus();
   }, [showAddSub]);
+
+  const handleInvite = async () => {
+    const email = inviteEmail.trim().toLowerCase();
+    if (!email || !project) return;
+    setInviteStatus('loading');
+    // Look up profile by email
+    const { supabase } = await import('../lib/supabase');
+    const { data } = await supabase.from('profiles').select('id').eq('email', email).maybeSingle();
+    if (!data?.id) {
+      setInviteStatus('notfound');
+      return;
+    }
+    if (project.memberIds.includes(data.id)) {
+      setInviteStatus('already');
+      setInviteEmail('');
+      return;
+    }
+    await sendInvitation('project', project.id, project.name, data.id);
+    setInviteStatus('sent');
+    setInviteEmail('');
+  };
 
   const handleAddSubProject = () => {
     if (!newSubName.trim()) { setShowAddSub(false); return; }
@@ -312,33 +369,22 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                               ref={inviteRef}
                               type="email"
                               value={inviteEmail}
-                              onChange={e => setInviteEmail(e.target.value)}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter' && inviteEmail.trim()) {
-                                  const user = addUser(inviteEmail.trim());
-                                  if (!project.memberIds.includes(user.id)) {
-                                    updateProject(projectId, { memberIds: [...project.memberIds, user.id] });
-                                  }
-                                  setInviteEmail('');
-                                }
-                              }}
+                              onChange={e => { setInviteEmail(e.target.value); setInviteStatus('idle'); }}
+                              onKeyDown={e => { if (e.key === 'Enter') handleInvite(); }}
                               placeholder="name@example.com"
                               className="flex-1 min-w-0 px-2.5 py-1.5 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/70 placeholder-white/20 focus:outline-none focus:border-brand-500/40"
                             />
                             <button
-                              onClick={() => {
-                                if (!inviteEmail.trim()) return;
-                                const user = addUser(inviteEmail.trim());
-                                if (!project.memberIds.includes(user.id)) {
-                                  updateProject(projectId, { memberIds: [...project.memberIds, user.id] });
-                                }
-                                setInviteEmail('');
-                              }}
-                              className="px-2.5 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs rounded-lg transition-colors flex-shrink-0"
+                              onClick={handleInvite}
+                              disabled={!inviteEmail.trim() || inviteStatus === 'loading'}
+                              className="px-2.5 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs rounded-lg transition-colors flex-shrink-0 disabled:opacity-50"
                             >
-                              Add
+                              {inviteStatus === 'loading' ? '…' : 'Invite'}
                             </button>
                           </div>
+                          {inviteStatus === 'sent' && <p className="text-[11px] text-emerald-400 mt-1 px-0.5">Invitation sent.</p>}
+                          {inviteStatus === 'notfound' && <p className="text-[11px] text-white/40 mt-1 px-0.5">No Hive account found for that email.</p>}
+                          {inviteStatus === 'already' && <p className="text-[11px] text-white/40 mt-1 px-0.5">Already a member.</p>}
                         </>
                       )}
                     </div>
@@ -473,18 +519,32 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
 
         {/* Main tabs */}
         <div className="flex items-center border-b border-white/[0.06] mb-0">
-          {(['tasks', 'workspace', 'docs', 'contacts', 'members'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-3 py-2 text-sm transition-colors relative capitalize ${activeTab === tab ? 'text-white font-medium' : 'text-white/40 hover:text-white/70'}`}
-            >
-              {tab}
-              {activeTab === tab && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500 rounded-full" />
-              )}
-            </button>
-          ))}
+          <DndContext
+            sensors={tabSensors}
+            collisionDetection={closestCenter}
+            onDragEnd={(event: DragEndEvent) => {
+              const { active, over } = event;
+              if (over && active.id !== over.id) {
+                setMainTabOrder(prev => {
+                  const next = arrayMove(prev, prev.indexOf(active.id as MainTab), prev.indexOf(over.id as MainTab));
+                  localStorage.setItem('hive_main_tabOrder', JSON.stringify(next));
+                  return next;
+                });
+              }
+            }}
+          >
+            <SortableContext items={mainTabOrder} strategy={horizontalListSortingStrategy}>
+              {mainTabOrder.map(tab => (
+                <SortableMainTab
+                  key={tab}
+                  id={tab}
+                  label={getMainTabLabel(tab)}
+                  active={activeTab === tab}
+                  onClick={() => setActiveTab(tab)}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
         </div>
 
         {/* Task Tab */}

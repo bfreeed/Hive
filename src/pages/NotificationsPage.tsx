@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useStore } from '../store';
 import {
   MessageSquare, HelpCircle, Bell, UserPlus, ArrowRight,
-  Zap, Users, Calendar, Mic, Paperclip, CheckCheck, List, LayoutGrid, ArrowUpDown, X,
+  Zap, Users, Calendar, Mic, Paperclip, CheckCheck, List, LayoutGrid, ArrowUpDown, X, Check, FolderOpen, Hash,
 } from 'lucide-react';
 import type { Notification } from '../types';
 
@@ -16,6 +16,7 @@ const TYPE_CONFIG: Record<string, { icon: React.ReactNode; colorClass: string; g
   comment:         { icon: <MessageSquare size={14} />, colorClass: 'text-emerald-400', group: "Sarah's Activity" },
   questions:       { icon: <HelpCircle size={14} />,    colorClass: 'text-amber-400',   group: "Sarah's Activity" },
   checkin:         { icon: <Bell size={14} />,           colorClass: 'text-amber-400',   group: "Sarah's Activity" },
+  invitation:      { icon: <UserPlus size={14} />,       colorClass: 'text-brand-400',   group: 'Invitations' },
   assignment:      { icon: <UserPlus size={14} />,       colorClass: 'text-purple-400',  group: "Sarah's Activity" },
   status_change:   { icon: <ArrowRight size={14} />,    colorClass: 'text-white/50',    group: "Sarah's Activity" },
   priority_change: { icon: <Zap size={14} />,            colorClass: 'text-orange-400',  group: "Sarah's Activity" },
@@ -36,6 +37,56 @@ function formatTime(iso: string): string {
   if (mins < 60) return `${mins}m ago`;
   if (hours < 24) return `${hours}h ago`;
   return `${days}d ago`;
+}
+
+function InvitationCard({ n, onDelete }: { n: Notification; onDelete: (e: React.MouseEvent) => void }) {
+  const { respondToInvitation, invitations, deleteNotification } = useStore();
+  const invitation = invitations.find(i => i.id === n.invitationId);
+  const [responding, setResponding] = useState(false);
+
+  const handle = async (accept: boolean) => {
+    if (!n.invitationId) return;
+    setResponding(true);
+    await respondToInvitation(n.invitationId, accept);
+    deleteNotification(n.id);
+  };
+
+  return (
+    <div className="px-3 py-3 rounded-xl border border-brand-500/20 bg-brand-500/[0.04] mb-2">
+      <div className="flex items-start gap-2.5">
+        <span className="flex-shrink-0 text-brand-400 mt-0.5">
+          {invitation?.type === 'channel' ? <Hash size={14} /> : <FolderOpen size={14} />}
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-white/80 font-medium">{n.title}</p>
+          <p className="text-xs text-white/40 mt-0.5">{n.body}</p>
+          <div className="flex items-center gap-2 mt-2.5">
+            <button
+              onClick={() => handle(true)}
+              disabled={responding}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-xs font-medium transition-colors disabled:opacity-50"
+            >
+              <Check size={11} /> Accept
+            </button>
+            <button
+              onClick={() => handle(false)}
+              disabled={responding}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-white/50 hover:text-white/80 text-xs font-medium transition-colors disabled:opacity-50"
+            >
+              <X size={11} /> Decline
+            </button>
+          </div>
+        </div>
+        <button
+          onClick={onDelete}
+          className="flex-shrink-0 p-1 rounded text-white/20 hover:text-red-400 transition-colors"
+          title="Dismiss"
+        >
+          <X size={13} />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function NotifCard({ n, config, onClick, onMarkRead, onDelete }: {
@@ -80,7 +131,7 @@ function NotifCard({ n, config, onClick, onMarkRead, onDelete }: {
 }
 
 export default function NotificationsPage({ onNavigate, onOpenTask }: NotificationsPageProps) {
-  const { notifications, tasks, projects, markNotificationRead, markAllNotificationsRead, deleteNotification } = useStore();
+  const { notifications, tasks, projects, markNotificationRead, markAllNotificationsRead, deleteNotification, respondToInvitation, invitations } = useStore();
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [viewType, setViewType] = useState<'list' | 'board'>('list');
   const [groupBy, setGroupBy] = useState<'date' | 'project'>('date');
@@ -307,7 +358,13 @@ export default function NotificationsPage({ onNavigate, onOpenTask }: Notificati
                   <span className="text-xs text-white/20">{group.items.length}</span>
                 </div>
                 <div>
-                  {group.items.map(n => (
+                  {group.items.map(n => n.type === 'invitation' ? (
+                    <InvitationCard
+                      key={n.id}
+                      n={n}
+                      onDelete={(e) => { e.stopPropagation(); deleteNotification(n.id); }}
+                    />
+                  ) : (
                     <NotifCard
                       key={n.id}
                       n={n}
@@ -345,47 +402,55 @@ export default function NotificationsPage({ onNavigate, onOpenTask }: Notificati
 
                 {/* Cards */}
                 <div className="flex-1 overflow-y-auto scrollbar-hide p-2 space-y-1.5">
-                  {col.items.map(n => {
-                    const config = TYPE_CONFIG[n.type];
-                    return (
-                      <div key={n.id} className="group/card relative">
-                        <button
-                          onClick={() => handleCardClick(n)}
-                          className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
-                            n.read
-                              ? 'border-white/[0.04] bg-white/[0.02] hover:bg-white/[0.05]'
-                              : 'border-brand-500/20 bg-brand-600/5 hover:bg-brand-600/10'
-                          }`}
-                        >
-                          <div className="flex items-start gap-2 mb-1">
-                            {!n.read && (
-                              <span
-                                onClick={(e) => { e.stopPropagation(); markNotificationRead(n.id); }}
-                                className="w-1.5 h-1.5 rounded-full bg-brand-400 flex-shrink-0 mt-1.5 cursor-pointer"
-                              />
+                  {col.items.map(n => n.type === 'invitation' ? (
+                    <InvitationCard
+                      key={n.id}
+                      n={n}
+                      onDelete={(e) => { e.stopPropagation(); deleteNotification(n.id); }}
+                    />
+                  ) : (
+                    (() => {
+                      const config = TYPE_CONFIG[n.type];
+                      return (
+                        <div key={n.id} className="group/card relative">
+                          <button
+                            onClick={() => handleCardClick(n)}
+                            className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
+                              n.read
+                                ? 'border-white/[0.04] bg-white/[0.02] hover:bg-white/[0.05]'
+                                : 'border-brand-500/20 bg-brand-600/5 hover:bg-brand-600/10'
+                            }`}
+                          >
+                            <div className="flex items-start gap-2 mb-1">
+                              {!n.read && (
+                                <span
+                                  onClick={(e) => { e.stopPropagation(); markNotificationRead(n.id); }}
+                                  className="w-1.5 h-1.5 rounded-full bg-brand-400 flex-shrink-0 mt-1.5 cursor-pointer"
+                                />
+                              )}
+                              {config && (
+                                <span className={`flex-shrink-0 mt-0.5 ${config.colorClass}`}>{config.icon}</span>
+                              )}
+                              <p className={`text-xs leading-snug flex-1 min-w-0 pr-4 ${n.read ? 'text-white/50' : 'text-white/85 font-medium'}`}>
+                                {n.title}
+                              </p>
+                            </div>
+                            {n.body && (
+                              <p className="text-[11px] text-white/35 truncate ml-6 mb-0.5">{n.body}</p>
                             )}
-                            {config && (
-                              <span className={`flex-shrink-0 mt-0.5 ${config.colorClass}`}>{config.icon}</span>
-                            )}
-                            <p className={`text-xs leading-snug flex-1 min-w-0 pr-4 ${n.read ? 'text-white/50' : 'text-white/85 font-medium'}`}>
-                              {n.title}
-                            </p>
-                          </div>
-                          {n.body && (
-                            <p className="text-[11px] text-white/35 truncate ml-6 mb-0.5">{n.body}</p>
-                          )}
-                          <p className="text-[10px] text-white/20 ml-6">{formatTime(n.createdAt)}</p>
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); deleteNotification(n.id); }}
-                          className="absolute top-2 right-2 opacity-0 group-hover/card:opacity-100 p-0.5 rounded text-white/20 hover:text-red-400 transition-all"
-                          title="Delete"
-                        >
-                          <X size={12} />
-                        </button>
-                      </div>
-                    );
-                  })}
+                            <p className="text-[10px] text-white/20 ml-6">{formatTime(n.createdAt)}</p>
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); deleteNotification(n.id); }}
+                            className="absolute top-2 right-2 opacity-0 group-hover/card:opacity-100 p-0.5 rounded text-white/20 hover:text-red-400 transition-all"
+                            title="Delete"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      );
+                    })()
+                  ))}
                 </div>
               </div>
             ))}
