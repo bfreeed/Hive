@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { useStore } from '../store';
-import { Calendar, Search, X, Clock, ExternalLink, Sparkles, Send, Loader2, Plus, ChevronRight, Mail } from 'lucide-react';
+import { Calendar, Search, X, Clock, ExternalLink, Sparkles, Send, Loader2, Plus, ChevronRight, Mail, FolderOpen, Check } from 'lucide-react';
 import { format, isToday, isYesterday, isThisWeek } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import { apiFetch } from '../lib/apiFetch';
@@ -226,8 +226,9 @@ function buildMailto(participantName: string, participantEmail: string, meetingT
 // Meeting Detail
 // ---------------------------------------------------------------------------
 function MeetingDetail({ meeting }: { meeting: Meeting }) {
-  const { currentUser } = useStore();
+  const { currentUser, projects, updateMeeting } = useStore();
   const myName = currentUser?.name?.toLowerCase() ?? '';
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
 
   const pendingItems = (meeting.actionItems ?? []).filter(a => !a.accepted && !a.dismissed);
   const acceptedItems = (meeting.actionItems ?? []).filter(a => a.accepted);
@@ -269,8 +270,115 @@ function MeetingDetail({ meeting }: { meeting: Meeting }) {
                   {name}
                 </span>
               ))}
+
+              {/* Project pills */}
+              {(meeting.linkedProjectIds ?? []).map(pid => {
+                const proj = projects.find(p => p.id === pid);
+                if (!proj) return null;
+                return (
+                  <span
+                    key={pid}
+                    className="group/pill flex items-center gap-1.5 px-3 py-1 rounded-full text-sm"
+                    style={{ backgroundColor: (proj.color ?? '#6366f1') + '15', color: proj.color ?? '#6366f1' }}
+                  >
+                    <FolderOpen size={11} />
+                    {proj.name}
+                    <button
+                      onClick={() => updateMeeting(meeting.id, {
+                        linkedProjectIds: (meeting.linkedProjectIds ?? []).filter(id => id !== pid),
+                      })}
+                      className="opacity-0 group-hover/pill:opacity-100 transition-opacity ml-0.5 hover:text-white"
+                    >
+                      <X size={10} />
+                    </button>
+                  </span>
+                );
+              })}
+
+              {/* Add project button */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowProjectDropdown(!showProjectDropdown)}
+                  className="px-2 py-1 rounded-full bg-white/[0.05] text-white/30 hover:text-white/50 transition-colors"
+                  title="Link project"
+                >
+                  <Plus size={12} />
+                </button>
+                {showProjectDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowProjectDropdown(false)} />
+                    <div className="absolute left-0 top-full mt-1 bg-[#1a1a1f] border border-white/[0.08] rounded-xl shadow-xl p-1 min-w-[200px] z-50 max-h-60 overflow-y-auto">
+                      {projects
+                        .filter(p => !(meeting.linkedProjectIds ?? []).includes(p.id))
+                        .map(p => (
+                          <button
+                            key={p.id}
+                            onClick={() => {
+                              updateMeeting(meeting.id, {
+                                linkedProjectIds: [...(meeting.linkedProjectIds ?? []), p.id],
+                              });
+                              setShowProjectDropdown(false);
+                            }}
+                            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-white/60 hover:bg-white/[0.06] hover:text-white/80 transition-colors"
+                          >
+                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: p.color ?? '#6366f1' }} />
+                            {p.name}
+                          </button>
+                        ))}
+                      {projects.filter(p => !(meeting.linkedProjectIds ?? []).includes(p.id)).length === 0 && (
+                        <p className="px-3 py-2 text-xs text-white/30">All projects linked</p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
+
+          {/* Suggested Projects */}
+          {(meeting.suggestedProjectIds ?? []).filter(id => projects.some(p => p.id === id)).length > 0 && (
+            <div className="mb-8 bg-brand-500/[0.03] rounded-2xl border border-brand-500/20 p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles size={14} className="text-brand-400" />
+                <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Suggested Projects</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {(meeting.suggestedProjectIds ?? []).map(pid => {
+                  const proj = projects.find(p => p.id === pid);
+                  if (!proj) return null;
+                  return (
+                    <span
+                      key={pid}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm"
+                      style={{ backgroundColor: (proj.color ?? '#6366f1') + '10', color: proj.color ?? '#6366f1' }}
+                    >
+                      <FolderOpen size={11} />
+                      {proj.name}
+                      <button
+                        onClick={() => updateMeeting(meeting.id, {
+                          linkedProjectIds: [...(meeting.linkedProjectIds ?? []), pid],
+                          suggestedProjectIds: (meeting.suggestedProjectIds ?? []).filter(id => id !== pid),
+                        })}
+                        className="p-0.5 rounded-full bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors"
+                        title="Accept"
+                      >
+                        <Check size={10} />
+                      </button>
+                      <button
+                        onClick={() => updateMeeting(meeting.id, {
+                          suggestedProjectIds: (meeting.suggestedProjectIds ?? []).filter(id => id !== pid),
+                        })}
+                        className="p-0.5 rounded-full bg-white/[0.06] text-white/30 hover:text-white/50 transition-colors"
+                        title="Dismiss"
+                      >
+                        <X size={10} />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Action Items */}
           {pendingItems.length > 0 && (
@@ -431,9 +539,19 @@ function AllActionItemsView() {
 // Main Page
 // ---------------------------------------------------------------------------
 export default function MeetingsPage() {
-  const { meetings } = useStore();
+  const { meetings, projects } = useStore();
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [sidebarTab, setSidebarTab] = useState<'all' | 'byProject'>('all');
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+
+  const toggleExpanded = (id: string) => {
+    setExpandedProjects(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   const filtered = useMemo(() => {
     let list = [...meetings].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -458,14 +576,86 @@ export default function MeetingsPage() {
     return Array.from(map.entries());
   }, [filtered]);
 
+  const projectGroups = useMemo(() => {
+    const buckets = new Map<string, Meeting[]>();
+    const noProject: Meeting[] = [];
+    for (const m of filtered) {
+      const pids = (m.linkedProjectIds ?? []).filter(id => projects.some(p => p.id === id));
+      if (pids.length === 0) {
+        noProject.push(m);
+      } else {
+        for (const pid of pids) {
+          if (!buckets.has(pid)) buckets.set(pid, []);
+          buckets.get(pid)!.push(m);
+        }
+      }
+    }
+    const result: Array<{ projectId: string | null; projectName: string; projectColor?: string; meetings: Meeting[] }> = [];
+    for (const p of projects) {
+      const ms = buckets.get(p.id);
+      if (ms && ms.length > 0) {
+        result.push({ projectId: p.id, projectName: p.name, projectColor: p.color, meetings: ms });
+      }
+    }
+    result.sort((a, b) => a.projectName.localeCompare(b.projectName));
+    if (noProject.length > 0) {
+      result.push({ projectId: null, projectName: 'No Project', meetings: noProject });
+    }
+    return result;
+  }, [filtered, projects]);
+
   const selected = meetings.find(m => m.id === selectedId) ?? null;
+
+  // Helper to render a meeting row in the sidebar
+  const renderMeetingRow = (m: Meeting, indent = false) => {
+    const pendingCount = (m.actionItems ?? []).filter(a => !a.accepted && !a.dismissed).length;
+    return (
+      <button
+        key={m.id}
+        onClick={() => setSelectedId(m.id)}
+        className={`w-full flex items-start gap-2 ${indent ? 'pl-9 pr-4' : 'px-4'} py-2.5 text-left transition-colors ${
+          selectedId === m.id ? 'bg-white/[0.08]' : 'hover:bg-white/[0.04]'
+        }`}
+      >
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-white/70 truncate">{m.title}</p>
+          <p className="text-xs text-white/25 mt-0.5">{format(new Date(m.date), 'h:mm a')}</p>
+        </div>
+        {pendingCount > 0 && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-semibold flex-shrink-0 mt-0.5">
+            {pendingCount}
+          </span>
+        )}
+        {selectedId === m.id && (
+          <ChevronRight size={12} className="text-white/30 flex-shrink-0 mt-1" />
+        )}
+      </button>
+    );
+  };
 
   return (
     <div className="flex flex-1 min-h-0 overflow-hidden">
       {/* Sidebar */}
       <div className="w-64 flex-shrink-0 border-r border-white/[0.06] flex flex-col">
         <div className="px-4 pt-6 pb-3 flex-shrink-0">
-          <h2 className="text-sm font-semibold text-white/80 mb-4">Meetings</h2>
+          <h2 className="text-sm font-semibold text-white/80 mb-3">Meetings</h2>
+
+          {/* Sidebar tabs */}
+          <div className="flex items-center gap-1 p-0.5 bg-white/[0.05] rounded-lg mb-3">
+            <button
+              onClick={() => setSidebarTab('all')}
+              className={`flex-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${sidebarTab === 'all' ? 'bg-white/[0.08] text-white/80' : 'text-white/35 hover:text-white/60'}`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setSidebarTab('byProject')}
+              className={`flex-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${sidebarTab === 'byProject' ? 'bg-white/[0.08] text-white/80' : 'text-white/35 hover:text-white/60'}`}
+            >
+              By Project
+            </button>
+          </div>
+
           <div className="relative">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25" />
             <input
@@ -490,43 +680,58 @@ export default function MeetingsPage() {
 
         {/* Meeting list */}
         <div className="flex-1 overflow-y-auto scrollbar-hide pb-4">
-          {groups.length === 0 && (
-            <div className="px-4 py-8 text-center">
-              <p className="text-white/20 text-xs">No meetings yet</p>
-            </div>
-          )}
-          {groups.map(([label, items]) => (
-            <div key={label}>
-              <p className="text-[10px] font-semibold text-white/20 uppercase tracking-wider px-4 py-2">
-                {label}
-              </p>
-              {items.map(m => {
-                const pendingCount = (m.actionItems ?? []).filter(a => !a.accepted && !a.dismissed).length;
+          {sidebarTab === 'all' ? (
+            <>
+              {groups.length === 0 && (
+                <div className="px-4 py-8 text-center">
+                  <p className="text-white/20 text-xs">No meetings yet</p>
+                </div>
+              )}
+              {groups.map(([label, items]) => (
+                <div key={label}>
+                  <p className="text-[10px] font-semibold text-white/20 uppercase tracking-wider px-4 py-2">
+                    {label}
+                  </p>
+                  {items.map(m => renderMeetingRow(m))}
+                </div>
+              ))}
+            </>
+          ) : (
+            <>
+              {projectGroups.length === 0 && (
+                <div className="px-4 py-8 text-center">
+                  <p className="text-white/20 text-xs">No meetings yet</p>
+                </div>
+              )}
+              {projectGroups.map(({ projectId, projectName, projectColor, meetings: pMeetings }) => {
+                const key = projectId ?? '__none';
+                const isExpanded = expandedProjects.has(key);
                 return (
-                  <button
-                    key={m.id}
-                    onClick={() => setSelectedId(m.id)}
-                    className={`w-full flex items-start gap-2 px-4 py-2.5 text-left transition-colors ${
-                      selectedId === m.id ? 'bg-white/[0.08]' : 'hover:bg-white/[0.04]'
-                    }`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white/70 truncate">{m.title}</p>
-                      <p className="text-xs text-white/25 mt-0.5">{format(new Date(m.date), 'h:mm a')}</p>
-                    </div>
-                    {pendingCount > 0 && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-semibold flex-shrink-0 mt-0.5">
-                        {pendingCount}
+                  <div key={key}>
+                    <button
+                      onClick={() => toggleExpanded(key)}
+                      className="w-full flex items-center gap-2 px-4 py-2 hover:bg-white/[0.04] transition-colors"
+                    >
+                      <ChevronRight
+                        size={12}
+                        className={`text-white/25 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
+                      />
+                      <FolderOpen
+                        size={14}
+                        className="flex-shrink-0"
+                        style={{ color: projectColor ?? 'rgba(255,255,255,0.2)' }}
+                      />
+                      <span className="text-sm text-white/70 truncate flex-1 text-left">{projectName}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/[0.06] text-white/30 flex-shrink-0">
+                        {pMeetings.length}
                       </span>
-                    )}
-                    {selectedId === m.id && (
-                      <ChevronRight size={12} className="text-white/30 flex-shrink-0 mt-1" />
-                    )}
-                  </button>
+                    </button>
+                    {isExpanded && pMeetings.map(m => renderMeetingRow(m, true))}
+                  </div>
                 );
               })}
-            </div>
-          ))}
+            </>
+          )}
         </div>
       </div>
 
