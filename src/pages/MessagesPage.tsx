@@ -389,7 +389,7 @@ function MessageBubble({ msg, prevMsg, userNames, users, replyCount, isPinned, o
 
       {/* Hover action toolbar */}
       {!editing && (
-        <div className="absolute left-[280px] -top-2 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0 bg-[#1c1c1f] border border-white/[0.08] rounded-lg px-0.5 py-0 shadow-lg z-10">
+        <div className="absolute left-[180px] top-0 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0 bg-[#1c1c1f] border border-white/[0.08] rounded-lg px-0.5 py-0 shadow-lg z-10">
           <div className="relative">
             <button
               onClick={() => setShowEmoji(v => !v)}
