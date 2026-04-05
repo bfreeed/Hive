@@ -546,7 +546,14 @@ export default function MessagesPage() {
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
-  const [openThreadId, setOpenThreadId] = useState<string | null>(null);
+  const [openThreadId, _setOpenThreadId] = useState<string | null>(() =>
+    localStorage.getItem('hive_messages_openThreadId')
+  );
+  const setOpenThreadId = (id: string | null) => {
+    _setOpenThreadId(id);
+    if (id) localStorage.setItem('hive_messages_openThreadId', id);
+    else localStorage.removeItem('hive_messages_openThreadId');
+  };
   const [threadInput, setThreadInput] = useState('');
   const [channelMenuId, setChannelMenuId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);

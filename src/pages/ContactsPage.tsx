@@ -4,7 +4,14 @@ import { Plus, Mail, Phone, ExternalLink, Calendar, CheckSquare, X } from 'lucid
 
 export default function ContactsPage() {
   const { contacts, projects, tasks, addContact } = useStore();
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, _setSelected] = useState<string | null>(() =>
+    localStorage.getItem('hive_contacts_selectedId')
+  );
+  const setSelected = (id: string | null) => {
+    _setSelected(id);
+    if (id) localStorage.setItem('hive_contacts_selectedId', id);
+    else localStorage.removeItem('hive_contacts_selectedId');
+  };
   const [search, setSearch] = useState('');
   const [showNew, setShowNew] = useState(false);
   const [newName, setNewName] = useState('');
