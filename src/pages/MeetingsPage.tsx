@@ -666,8 +666,35 @@ export default function MeetingsPage() {
   const { meetings, projects } = useStore();
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [sidebarTab, setSidebarTab] = useState<'all' | 'byProject'>('all');
+  const [sidebarTab, setSidebarTab] = useState<'byDate' | 'byProject'>(() =>
+    (localStorage.getItem('hive_meetings_tab') as 'byDate' | 'byProject') || 'byDate'
+  );
+  const [tabOrder, setTabOrder] = useState<['byDate' | 'byProject', 'byDate' | 'byProject']>(() => {
+    const saved = localStorage.getItem('hive_meetings_tabOrder');
+    if (saved) try { return JSON.parse(saved); } catch {}
+    return ['byDate', 'byProject'];
+  });
+  const [draggingTab, setDraggingTab] = useState<string | null>(null);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+
+  const handleTabChange = (tab: 'byDate' | 'byProject') => {
+    setSidebarTab(tab);
+    localStorage.setItem('hive_meetings_tab', tab);
+  };
+
+  const handleTabDragStart = (tab: string) => setDraggingTab(tab);
+  const handleTabDragOver = (e: React.DragEvent) => e.preventDefault();
+  const handleTabDrop = (targetTab: string) => {
+    if (draggingTab && draggingTab !== targetTab) {
+      const newOrder: ['byDate' | 'byProject', 'byDate' | 'byProject'] =
+        draggingTab === 'byDate' ? ['byDate', 'byProject'] : ['byProject', 'byDate'];
+      setTabOrder(newOrder);
+      localStorage.setItem('hive_meetings_tabOrder', JSON.stringify(newOrder));
+    }
+    setDraggingTab(null);
+  };
+
+  const tabLabels: Record<string, string> = { byDate: 'By Date', byProject: 'By Project' };
 
   const toggleExpanded = (id: string) => {
     setExpandedProjects(prev => {
@@ -767,18 +794,21 @@ export default function MeetingsPage() {
 
           {/* Sidebar tabs */}
           <div className="flex items-center gap-1 p-0.5 bg-white/[0.05] rounded-lg mb-3">
-            <button
-              onClick={() => setSidebarTab('all')}
-              className={`flex-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${sidebarTab === 'all' ? 'bg-white/[0.08] text-white/80' : 'text-white/35 hover:text-white/60'}`}
-            >
-              All
-            </button>
-            <button
-              onClick={() => setSidebarTab('byProject')}
-              className={`flex-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${sidebarTab === 'byProject' ? 'bg-white/[0.08] text-white/80' : 'text-white/35 hover:text-white/60'}`}
-            >
-              By Project
-            </button>
+            {tabOrder.map(tab => (
+              <button
+                key={tab}
+                draggable
+                onDragStart={() => handleTabDragStart(tab)}
+                onDragOver={handleTabDragOver}
+                onDrop={() => handleTabDrop(tab)}
+                onClick={() => handleTabChange(tab)}
+                className={`flex-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-grab active:cursor-grabbing ${
+                  sidebarTab === tab ? 'bg-white/[0.08] text-white/80' : 'text-white/35 hover:text-white/60'
+                } ${draggingTab === tab ? 'opacity-50' : ''}`}
+              >
+                {tabLabels[tab]}
+              </button>
+            ))}
           </div>
 
           <div className="relative">
@@ -805,7 +835,7 @@ export default function MeetingsPage() {
 
         {/* Meeting list */}
         <div className="flex-1 overflow-y-auto scrollbar-hide pb-4">
-          {sidebarTab === 'all' ? (
+          {sidebarTab === 'byDate' ? (
             <>
               {groups.length === 0 && (
                 <div className="px-4 py-8 text-center">
