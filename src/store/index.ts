@@ -1233,6 +1233,8 @@ export const useStore = create<AppStore>()((set, get) => ({
     if ('hasProjectLinks' in u) dbFields.has_project_links = u.hasProjectLinks ?? false;
     if ('transcript' in u) dbFields.transcript = u.transcript ?? null;
     if ('summary' in u) dbFields.summary = u.summary ?? null;
+    if ('participantNames' in u) dbFields.participant_names = u.participantNames ?? [];
+    if ('participantEmails' in u) dbFields.participant_emails = u.participantEmails ?? [];
     const { error } = await supabase.from('meetings').update(dbFields).eq('id', id);
     if (error) console.error('updateMeeting error:', error);
   },

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { useStore } from '../store';
-import { Calendar, Search, X, Clock, ExternalLink, Sparkles, Send, Loader2, Plus, ChevronRight, Mail, FolderOpen, Check } from 'lucide-react';
+import { Calendar, Search, X, Clock, ExternalLink, Sparkles, Send, Loader2, Plus, ChevronRight, Mail, FolderOpen, Check, Pencil, UserPlus, Trash2 } from 'lucide-react';
 import { format, isToday, isYesterday, isThisWeek } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import { apiFetch } from '../lib/apiFetch';
@@ -226,9 +226,11 @@ function buildMailto(participantName: string, participantEmail: string, meetingT
 // Meeting Detail
 // ---------------------------------------------------------------------------
 function MeetingDetail({ meeting }: { meeting: Meeting }) {
-  const { currentUser, projects, updateMeeting } = useStore();
+  const { currentUser, projects, contacts, updateMeeting, addContact } = useStore();
   const myName = currentUser?.name?.toLowerCase() ?? '';
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [participantMenu, setParticipantMenu] = useState<number | null>(null);
+  const [editingParticipant, setEditingParticipant] = useState<{ index: number; value: string } | null>(null);
 
   const pendingItems = (meeting.actionItems ?? []).filter(a => !a.accepted && !a.dismissed);
   const acceptedItems = (meeting.actionItems ?? []).filter(a => a.accepted);
@@ -265,11 +267,94 @@ function MeetingDetail({ meeting }: { meeting: Meeting }) {
                   <ExternalLink size={11} /> Open in Granola
                 </a>
               )}
-              {(meeting.participantNames ?? []).map((name, i) => (
-                <span key={i} className="px-3 py-1 rounded-full bg-white/[0.05] text-sm text-white/50">
-                  {name}
-                </span>
-              ))}
+              {(meeting.participantNames ?? []).map((name, i) => {
+                const isEditing = editingParticipant?.index === i;
+                const isMenuOpen = participantMenu === i;
+                const alreadyContact = contacts.some(c =>
+                  c.name.toLowerCase() === name.toLowerCase() ||
+                  (meeting.participantEmails?.[i] && c.email && c.email.toLowerCase() === meeting.participantEmails[i].toLowerCase())
+                );
+                return (
+                  <div key={i} className="relative">
+                    {isEditing ? (
+                      <input
+                        autoFocus
+                        value={editingParticipant.value}
+                        onChange={e => setEditingParticipant({ index: i, value: e.target.value })}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && editingParticipant.value.trim()) {
+                            const names = [...(meeting.participantNames ?? [])];
+                            names[i] = editingParticipant.value.trim();
+                            updateMeeting(meeting.id, { participantNames: names });
+                            setEditingParticipant(null);
+                          }
+                          if (e.key === 'Escape') setEditingParticipant(null);
+                        }}
+                        onBlur={() => {
+                          if (editingParticipant.value.trim()) {
+                            const names = [...(meeting.participantNames ?? [])];
+                            names[i] = editingParticipant.value.trim();
+                            updateMeeting(meeting.id, { participantNames: names });
+                          }
+                          setEditingParticipant(null);
+                        }}
+                        className="px-3 py-1 rounded-full bg-white/[0.08] border border-brand-500/40 text-sm text-white/70 focus:outline-none w-40"
+                      />
+                    ) : (
+                      <button
+                        onClick={() => setParticipantMenu(isMenuOpen ? null : i)}
+                        className="px-3 py-1 rounded-full bg-white/[0.05] text-sm text-white/50 hover:bg-white/[0.08] hover:text-white/70 transition-colors"
+                      >
+                        {name}
+                      </button>
+                    )}
+                    {isMenuOpen && !isEditing && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setParticipantMenu(null)} />
+                        <div className="absolute left-0 top-full mt-1 bg-[#1a1a1f] border border-white/[0.08] rounded-xl shadow-xl p-1 min-w-[160px] z-50">
+                          <button
+                            onClick={() => {
+                              setEditingParticipant({ index: i, value: name });
+                              setParticipantMenu(null);
+                            }}
+                            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-white/60 hover:bg-white/[0.06] hover:text-white/80 transition-colors"
+                          >
+                            <Pencil size={12} /> Edit name
+                          </button>
+                          {!alreadyContact && (
+                            <button
+                              onClick={() => {
+                                addContact({
+                                  name,
+                                  email: meeting.participantEmails?.[i] ?? undefined,
+                                  projectIds: [],
+                                });
+                                setParticipantMenu(null);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-white/60 hover:bg-white/[0.06] hover:text-white/80 transition-colors"
+                            >
+                              <UserPlus size={12} /> Add as contact
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              const names = [...(meeting.participantNames ?? [])];
+                              const emails = [...(meeting.participantEmails ?? [])];
+                              names.splice(i, 1);
+                              emails.splice(i, 1);
+                              updateMeeting(meeting.id, { participantNames: names, participantEmails: emails });
+                              setParticipantMenu(null);
+                            }}
+                            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-400/70 hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                          >
+                            <Trash2 size={12} /> Remove
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
 
               {/* Project pills */}
               {(meeting.linkedProjectIds ?? []).map(pid => {
