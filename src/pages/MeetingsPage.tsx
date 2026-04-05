@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { useStore } from '../store';
 import { Calendar, Search, X, Clock, ExternalLink, Sparkles, Send, Loader2, Plus, ChevronRight, Mail, FolderOpen, Check, Pencil, UserPlus, Trash2, MoreHorizontal } from 'lucide-react';
-import { format, isToday, isYesterday, isThisWeek } from 'date-fns';
+import { format } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import { apiFetch } from '../lib/apiFetch';
 import type { Meeting, ActionItem } from '../types';
@@ -19,11 +19,7 @@ export function useUnreviewedMeetingCount() {
 // Helpers
 // ---------------------------------------------------------------------------
 function groupLabel(dateStr: string): string {
-  const d = new Date(dateStr);
-  if (isToday(d)) return 'Today';
-  if (isYesterday(d)) return 'Yesterday';
-  if (isThisWeek(d)) return format(d, 'EEEE');
-  return format(d, 'MMMM yyyy');
+  return format(new Date(dateStr), 'MMMM yyyy');
 }
 
 function providerBadge(provider?: string) {
@@ -684,6 +680,15 @@ export default function MeetingsPage() {
   });
   const [draggingTab, setDraggingTab] = useState<string | null>(null);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
+
+  const toggleMonth = (label: string) => {
+    setExpandedMonths(prev => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label); else next.add(label);
+      return next;
+    });
+  };
 
   const handleTabChange = (tab: 'byDate' | 'byProject') => {
     setSidebarTab(tab);
@@ -850,14 +855,28 @@ export default function MeetingsPage() {
                   <p className="text-white/20 text-xs">No meetings yet</p>
                 </div>
               )}
-              {groups.map(([label, items]) => (
-                <div key={label}>
-                  <p className="text-[10px] font-semibold text-white/20 uppercase tracking-wider px-4 py-2">
-                    {label}
-                  </p>
-                  {items.map((m, i) => renderMeetingRow(m, false, i))}
-                </div>
-              ))}
+              {groups.map(([label, items]) => {
+                const isExpanded = expandedMonths.has(label);
+                return (
+                  <div key={label}>
+                    <button
+                      onClick={() => toggleMonth(label)}
+                      className="w-full flex items-center gap-2 px-4 py-2 hover:bg-white/[0.04] transition-colors"
+                    >
+                      <ChevronRight
+                        size={12}
+                        className={`text-white/25 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
+                      />
+                      <Calendar size={14} className="text-white/25 flex-shrink-0" />
+                      <span className="text-[11px] font-semibold text-white/40 uppercase tracking-wider flex-1 text-left">{label}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/[0.06] text-white/30 flex-shrink-0">
+                        {items.length}
+                      </span>
+                    </button>
+                    {isExpanded && items.map((m, i) => renderMeetingRow(m, true, i))}
+                  </div>
+                );
+              })}
             </>
           ) : (
             <>
