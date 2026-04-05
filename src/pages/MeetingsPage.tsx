@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { useStore } from '../store';
-import { Calendar, Search, X, Clock, ExternalLink, Sparkles, Send, Loader2, Plus, ChevronRight, Mail, FolderOpen, Check, Pencil, UserPlus, Trash2 } from 'lucide-react';
+import { Calendar, Search, X, Clock, ExternalLink, Sparkles, Send, Loader2, Plus, ChevronRight, Mail, FolderOpen, Check, Pencil, UserPlus, Trash2, MoreHorizontal } from 'lucide-react';
 import { format, isToday, isYesterday, isThisWeek } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import { apiFetch } from '../lib/apiFetch';
@@ -83,34 +83,32 @@ function ActionItemRow({
 
   return (
     <div className="group">
-      <div className="flex items-start gap-2 py-3 px-4 rounded-lg hover:bg-white/[0.03] transition-colors">
-        <div className="flex-1 min-w-0">
-          {showMeetingTitle && meetingTitle && (
-            <p className="text-[10px] text-white/30 mb-0.5 truncate">{meetingTitle}</p>
-          )}
-          <p className="text-sm text-white/80 leading-snug">{item.text}</p>
-          {item.assignee && (
-            <p className={`text-xs mt-0.5 ${isMe ? 'text-brand-400' : 'text-white/35'}`}>
-              {isMe ? 'You' : item.assignee}
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-1 opacity-30 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5">
+      <div className="py-2.5 px-4 rounded-lg hover:bg-white/[0.03] transition-colors">
+        {showMeetingTitle && meetingTitle && (
+          <p className="text-[10px] text-white/30 mb-0.5 truncate">{meetingTitle}</p>
+        )}
+        <span className="text-sm text-white/80 leading-snug">{item.text}</span>
+        <span className="inline-flex items-center gap-1 ml-2 opacity-30 group-hover:opacity-100 transition-opacity align-middle">
           <button
             onClick={() => setShowCapture(true)}
-            className="p-1 text-emerald-400 hover:text-emerald-300 transition-colors"
+            className="p-0.5 text-emerald-400 hover:text-emerald-300 transition-colors"
             title="Create task"
           >
-            <Plus size={13} />
+            <Plus size={12} />
           </button>
           <button
             onClick={handleDismiss}
-            className="p-1 text-white/25 hover:text-white/50 transition-colors"
+            className="p-0.5 text-white/25 hover:text-white/50 transition-colors"
             title="Dismiss"
           >
-            <X size={13} />
+            <X size={12} />
           </button>
-        </div>
+        </span>
+        {item.assignee && (
+          <p className={`text-xs mt-0.5 ${isMe ? 'text-brand-400' : 'text-white/35'}`}>
+            {isMe ? 'You' : item.assignee}
+          </p>
+        )}
       </div>
 
       {showCapture && (
@@ -268,6 +266,7 @@ function MeetingDetail({ meeting }: { meeting: Meeting }) {
                 </a>
               )}
               {(meeting.participantNames ?? []).map((name, i) => {
+                if (name.toLowerCase() === myName) return null;
                 const isEditing = editingParticipant?.index === i;
                 const isMenuOpen = participantMenu === i;
                 const alreadyContact = contacts.some(c =>
@@ -303,9 +302,10 @@ function MeetingDetail({ meeting }: { meeting: Meeting }) {
                     ) : (
                       <button
                         onClick={() => setParticipantMenu(isMenuOpen ? null : i)}
-                        className="px-3 py-1 rounded-full bg-white/[0.05] text-sm text-white/50 hover:bg-white/[0.08] hover:text-white/70 transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.05] text-sm text-white/50 hover:bg-white/[0.08] hover:text-white/70 transition-colors"
                       >
                         {name}
+                        <MoreHorizontal size={11} className="text-white/25" />
                       </button>
                     )}
                     {isMenuOpen && !isEditing && (
@@ -384,10 +384,9 @@ function MeetingDetail({ meeting }: { meeting: Meeting }) {
               <div className="relative">
                 <button
                   onClick={() => setShowProjectDropdown(!showProjectDropdown)}
-                  className="px-2 py-1 rounded-full bg-white/[0.05] text-white/30 hover:text-white/50 transition-colors"
-                  title="Link project"
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.05] text-xs text-white/30 hover:text-white/50 transition-colors"
                 >
-                  <Plus size={12} />
+                  <Plus size={11} /> Add to project
                 </button>
                 {showProjectDropdown && (
                   <>
