@@ -665,7 +665,15 @@ function AllActionItemsView() {
 export default function MeetingsPage() {
   const { meetings, projects } = useStore();
   const [search, setSearch] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(() =>
+    localStorage.getItem('hive_meetings_selectedId')
+  );
+
+  const selectMeeting = (id: string | null) => {
+    setSelectedId(id);
+    if (id) localStorage.setItem('hive_meetings_selectedId', id);
+    else localStorage.removeItem('hive_meetings_selectedId');
+  };
   const [sidebarTab, setSidebarTab] = useState<'byDate' | 'byProject'>(() =>
     (localStorage.getItem('hive_meetings_tab') as 'byDate' | 'byProject') || 'byDate'
   );
@@ -765,7 +773,7 @@ export default function MeetingsPage() {
     return (
       <button
         key={m.id}
-        onClick={() => setSelectedId(m.id)}
+        onClick={() => selectMeeting(m.id)}
         className={`w-full flex items-start gap-2 ${indent ? 'pl-9 pr-4' : 'px-4'} py-1.5 text-left transition-colors border-l-2 ${
           isSelected
             ? 'bg-white/[0.08] border-brand-500'
@@ -824,7 +832,7 @@ export default function MeetingsPage() {
 
         {/* Action items shortcut */}
         <button
-          onClick={() => setSelectedId(null)}
+          onClick={() => selectMeeting(null)}
           className={`mx-3 mb-1 flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
             selectedId === null ? 'bg-white/[0.08] text-white/80' : 'text-white/40 hover:bg-white/[0.04] hover:text-white/60'
           }`}
