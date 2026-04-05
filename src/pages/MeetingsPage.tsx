@@ -227,6 +227,7 @@ function MeetingDetail({ meeting }: { meeting: Meeting }) {
   const { currentUser, projects, contacts, updateMeeting, addContact } = useStore();
   const myName = currentUser?.name?.toLowerCase() ?? '';
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [showContactDropdown, setShowContactDropdown] = useState(false);
   const [participantMenu, setParticipantMenu] = useState<number | null>(null);
   const [editingParticipant, setEditingParticipant] = useState<{ index: number; value: string } | null>(null);
 
@@ -411,6 +412,45 @@ function MeetingDetail({ meeting }: { meeting: Meeting }) {
                         ))}
                       {projects.filter(p => !(meeting.linkedProjectIds ?? []).includes(p.id)).length === 0 && (
                         <p className="px-3 py-2 text-xs text-white/30">All projects linked</p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Add contact button */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowContactDropdown(!showContactDropdown)}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.05] text-xs text-white/30 hover:text-white/50 transition-colors"
+                >
+                  <UserPlus size={11} /> Add to contact
+                </button>
+                {showContactDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowContactDropdown(false)} />
+                    <div className="absolute left-0 top-full mt-1 bg-[#1a1a1f] border border-white/[0.08] rounded-xl shadow-xl p-1 min-w-[200px] z-50 max-h-60 overflow-y-auto">
+                      {contacts
+                        .filter(c => !(meeting.linkedContactIds ?? []).includes(c.id))
+                        .map(c => (
+                          <button
+                            key={c.id}
+                            onClick={() => {
+                              updateMeeting(meeting.id, {
+                                linkedContactIds: [...(meeting.linkedContactIds ?? []), c.id],
+                              });
+                              setShowContactDropdown(false);
+                            }}
+                            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-white/60 hover:bg-white/[0.06] hover:text-white/80 transition-colors"
+                          >
+                            <span className="w-5 h-5 rounded-full bg-white/[0.08] flex items-center justify-center text-[10px] text-white/40 flex-shrink-0">
+                              {c.name.charAt(0).toUpperCase()}
+                            </span>
+                            {c.name}
+                          </button>
+                        ))}
+                      {contacts.filter(c => !(meeting.linkedContactIds ?? []).includes(c.id)).length === 0 && (
+                        <p className="px-3 py-2 text-xs text-white/30">All contacts linked</p>
                       )}
                     </div>
                   </>
