@@ -155,14 +155,21 @@ export default function DriveFolderView({
   const [files, setFiles] = useState<DriveFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [needsAuth, setNeedsAuth] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(false);
   // Folder breadcrumb for drilling into sub-folders
   const [folderStack, setFolderStack] = useState<{ id: string; name: string }[]>([]);
   const currentFolder = folderStack.length > 0 ? folderStack[folderStack.length - 1] : (folderId ? { id: folderId, name: folderName ?? 'Drive folder' } : null);
 
-  const fetchFiles = useCallback(async (folder: { id: string; name: string }) => {
+  const fetchFiles = useCallback(async (folder: { id: string; name: string }, forceAuth = false) => {
     if (!clientId) { setError('Google Client ID not configured. Add it in Settings → Integrations.'); return; }
+    // If no cached token and not explicitly triggered by user click, show connect button instead
+    if (!getDriveToken() && !forceAuth) {
+      setNeedsAuth(true);
+      return;
+    }
     setLoading(true);
+    setNeedsAuth(false);
     setError(null);
     try {
       const token = await ensureDriveToken(clientId);
@@ -171,7 +178,7 @@ export default function DriveFolderView({
     } catch (err: any) {
       if (err.message?.includes('401') || err.message?.includes('token')) {
         clearDriveToken();
-        setError('Google session expired. Click refresh to reconnect.');
+        setNeedsAuth(true);
       } else {
         setError(err.message ?? 'Failed to load files');
       }
@@ -192,6 +199,7 @@ export default function DriveFolderView({
     if (!id || !clientId) return;
     setShowLinkModal(false);
     setLoading(true);
+    setNeedsAuth(false);
     try {
       const token = await ensureDriveToken(clientId);
       const meta = await getFolderMeta(id, token);
@@ -209,7 +217,7 @@ export default function DriveFolderView({
   const openSubFolder = (id: string, name: string) => {
     const next = { id, name };
     setFolderStack(s => [...s, next]);
-    fetchFiles(next);
+    fetchFiles(next, true);
   };
 
   const navigateBack = (index: number) => {
@@ -217,7 +225,7 @@ export default function DriveFolderView({
       ? { id: folderId!, name: folderName! }
       : folderStack[index];
     setFolderStack(s => s.slice(0, index + 1));
-    fetchFiles(target);
+    fetchFiles(target, true);
   };
 
   // ── No folder linked yet ──────────────────────────────────────
@@ -278,7 +286,7 @@ export default function DriveFolderView({
         {/* Actions */}
         <div className="flex items-center gap-2">
           <button
-            onClick={() => currentFolder && fetchFiles(currentFolder)}
+            onClick={() => currentFolder && fetchFiles(currentFolder, true)}
             disabled={loading}
             className="flex items-center gap-1.5 text-xs text-white/30 hover:text-white/60 transition-colors"
             title="Refresh"
@@ -310,13 +318,25 @@ export default function DriveFolderView({
         </div>
       )}
 
-      {error && !loading && (
+      {needsAuth && !loading && (
+        <div className="flex flex-col items-center py-10 gap-3 text-center">
+          <p className="text-sm text-white/40">Google Drive session expired or not connected.</p>
+          <button
+            onClick={() => currentFolder && fetchFiles(currentFolder, true)}
+            className="flex items-center gap-2 px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold rounded-lg transition-colors"
+          >
+            <RefreshCw size={14} /> Connect to Google Drive
+          </button>
+        </div>
+      )}
+
+      {error && !loading && !needsAuth && (
         <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
           <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
           <div>
             {error}
             <button
-              onClick={() => currentFolder && fetchFiles(currentFolder)}
+              onClick={() => currentFolder && fetchFiles(currentFolder, true)}
               className="ml-2 underline hover:no-underline"
             >Retry</button>
           </div>
