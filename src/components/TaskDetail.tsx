@@ -590,6 +590,9 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                         type="date"
                         value={task.snoozeDate ? task.snoozeDate.slice(0, 10) : ''}
                         onChange={(e) => update('snoozeDate', e.target.value ? new Date(e.target.value + 'T00:00:00').toISOString() : undefined)}
+                        autoComplete="off"
+                        data-1p-ignore
+                        data-lpignore="true"
                         className="px-2 py-1 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/60 focus:outline-none focus:border-brand-500/40"
                         style={{ colorScheme: 'dark' }}
                       />
@@ -604,6 +607,9 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                         type="date"
                         value={task.waitDate ? task.waitDate.slice(0, 10) : ''}
                         onChange={(e) => update('waitDate', e.target.value ? new Date(e.target.value + 'T00:00:00').toISOString() : undefined)}
+                        autoComplete="off"
+                        data-1p-ignore
+                        data-lpignore="true"
                         className="px-2 py-1 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/60 focus:outline-none focus:border-brand-500/40"
                         style={{ colorScheme: 'dark' }}
                       />

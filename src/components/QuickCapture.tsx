@@ -173,6 +173,9 @@ export default function QuickCapture({ initialText, onClose }: Props) {
                   type="date"
                   value={parsed.dueDate}
                   onChange={(e) => set('dueDate', e.target.value)}
+                  autoComplete="off"
+                  data-1p-ignore
+                  data-lpignore="true"
                   className={inputCls}
                 />
               </div>
@@ -182,6 +185,9 @@ export default function QuickCapture({ initialText, onClose }: Props) {
                   type="time"
                   value={parsed.dueTime}
                   onChange={(e) => set('dueTime', e.target.value)}
+                  autoComplete="off"
+                  data-1p-ignore
+                  data-lpignore="true"
                   className={inputCls}
                 />
               </div>

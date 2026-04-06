@@ -91,7 +91,7 @@ export default function NewContactModal({ onClose, onCreated }: Props) {
           <input value={business} onChange={e => setBusiness(e.target.value)}
             placeholder="Business" className={inputClass} />
           <input value={birthday} onChange={e => setBirthday(e.target.value)}
-            type="date" className={inputClass} />
+            type="date" autoComplete="off" data-1p-ignore data-lpignore="true" className={inputClass} />
           <input value={address} onChange={e => setAddress(e.target.value)}
             placeholder="Address" className={inputClass} />
 
