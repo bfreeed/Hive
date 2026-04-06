@@ -81,9 +81,13 @@ export async function requestDriveToken(clientId: string, silent = false): Promi
         setDriveToken(response.access_token, response.expires_in);
         resolve(response.access_token);
       },
+      error_callback: (err: any) => {
+        // Fires for init errors — e.g. origin not in authorized list, invalid client ID
+        reject(new Error(err?.message ?? err?.type ?? 'Google auth initialization failed. Check that your domain is in Authorized JavaScript origins in Google Cloud Console.'));
+      },
     });
     _tokenClient = client;
-    client.requestAccessToken({ prompt: silent ? '' : undefined });
+    client.requestAccessToken({ prompt: silent ? '' : 'consent' });
   });
 }
 
