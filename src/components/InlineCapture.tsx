@@ -37,6 +37,7 @@ const InlineCapture = forwardRef<InlineCaptureHandle, InlineCaptureProps>(functi
   const [dueDate, setDueDate] = useState('');
   const [assigneeId, setAssigneeId] = useState(initialAssigneeId ?? currentUser.id);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (show) inputRef.current?.focus(); }, [show]);
 
@@ -143,15 +144,20 @@ const InlineCapture = forwardRef<InlineCaptureHandle, InlineCaptureProps>(functi
           <option value="low">Low</option>
         </select>
 
-        <div className="bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-1.5">
+        <div
+          className="relative bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-1.5 cursor-pointer hover:border-white/[0.15] transition-colors"
+          onClick={() => dateInputRef.current?.showPicker()}
+        >
+          <span className="text-xs text-white/60">{dueDate ? new Date(dueDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Date'}</span>
           <input
+            ref={dateInputRef}
             type="date"
             value={dueDate}
             onChange={e => setDueDate(e.target.value)}
             autoComplete="off"
             data-1p-ignore
             data-lpignore="true"
-            className="text-xs bg-transparent text-white/60 focus:outline-none w-28"
+            className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
           />
         </div>
 

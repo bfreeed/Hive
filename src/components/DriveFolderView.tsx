@@ -4,7 +4,7 @@ import {
   FileText, AlertCircle, Loader2, ChevronRight,
 } from 'lucide-react';
 import {
-  listFolderFiles, getFolderMeta, ensureDriveToken, clearDriveToken, getDriveToken,
+  listFolderFiles, getFolderMeta, ensureDriveToken, clearDriveToken, getDriveToken, requestDriveToken,
   extractFolderIdFromUrl, mimeLabel, isFolder, formatBytes,
   type DriveFile,
 } from '../lib/googleDrive';
@@ -161,29 +161,46 @@ export default function DriveFolderView({
   const [folderStack, setFolderStack] = useState<{ id: string; name: string }[]>([]);
   const currentFolder = folderStack.length > 0 ? folderStack[folderStack.length - 1] : (folderId ? { id: folderId, name: folderName ?? 'Drive folder' } : null);
 
-  const fetchFiles = useCallback(async (folder: { id: string; name: string }, forceAuth = false) => {
+  // Called ONLY when we already have a valid token (no auth needed)
+  const fetchFiles = useCallback(async (folder: { id: string; name: string }) => {
     if (!clientId) { setError('Google Client ID not configured. Add it in Settings → Integrations.'); return; }
-    // If no cached token and not explicitly triggered by user click, show connect button instead
-    if (!getDriveToken() && !forceAuth) {
-      setNeedsAuth(true);
-      return;
-    }
+    if (!getDriveToken()) { setNeedsAuth(true); return; }
     setLoading(true);
-    setNeedsAuth(false);
     setError(null);
     try {
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Connection timed out. Try clicking Connect again.')), 15_000)
-      );
-      const token = await Promise.race([ensureDriveToken(clientId), timeout]);
+      const token = getDriveToken()!;
       const results = await listFolderFiles(folder.id, token);
       setFiles(results);
     } catch (err: any) {
-      if (err.message?.includes('401') || err.message?.includes('token') || err.message?.includes('access_denied') || err.message?.includes('popup_closed')) {
+      if (err.message?.includes('401') || err.message?.includes('403')) {
         clearDriveToken();
         setNeedsAuth(true);
       } else {
         setError(err.message ?? 'Failed to load files');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [clientId]);
+
+  // Called directly from a user click — opens Google auth popup immediately
+  const connectAndFetch = useCallback(async (folder: { id: string; name: string }) => {
+    if (!clientId) { setError('Google Client ID not configured. Add it in Settings → Integrations.'); return; }
+    setLoading(true);
+    setNeedsAuth(false);
+    setError(null);
+    try {
+      // requestDriveToken called as close to the user click as possible to avoid popup blocking
+      const token = await requestDriveToken(clientId);
+      const results = await listFolderFiles(folder.id, token);
+      setFiles(results);
+    } catch (err: any) {
+      clearDriveToken();
+      if (err.message?.includes('popup_closed') || err.message?.includes('access_denied')) {
+        setNeedsAuth(true);
+      } else {
+        setNeedsAuth(true);
+        setError('Google sign-in failed. Make sure your Vercel domain is added to authorized origins in Google Cloud Console (APIs & Services → Credentials → OAuth Client → Authorized JavaScript origins).');
       }
     } finally {
       setLoading(false);
@@ -201,26 +218,24 @@ export default function DriveFolderView({
     const id = extractFolderIdFromUrl(url);
     if (!id || !clientId) return;
     setShowLinkModal(false);
-    setLoading(true);
-    setNeedsAuth(false);
-    try {
-      const token = await ensureDriveToken(clientId);
-      const meta = await getFolderMeta(id, token);
-      onLink(meta.id, meta.name);
-      setFolderStack([]);
-      const results = await listFolderFiles(meta.id, token);
-      setFiles(results);
-    } catch (err: any) {
-      setError(err.message ?? 'Failed to connect folder');
-    } finally {
-      setLoading(false);
-    }
+    // handleLink is triggered by a user click on "Link folder" button
+    const folder = { id, name: '' };
+    await connectAndFetch(folder).then(async () => {
+      // After auth succeeds, get proper folder name
+      try {
+        const token = getDriveToken();
+        if (token) {
+          const meta = await getFolderMeta(id, token);
+          onLink(meta.id, meta.name);
+        }
+      } catch { /* ignore */ }
+    });
   };
 
   const openSubFolder = (id: string, name: string) => {
     const next = { id, name };
     setFolderStack(s => [...s, next]);
-    fetchFiles(next, true);
+    fetchFiles(next);
   };
 
   const navigateBack = (index: number) => {
@@ -228,7 +243,7 @@ export default function DriveFolderView({
       ? { id: folderId!, name: folderName! }
       : folderStack[index];
     setFolderStack(s => s.slice(0, index + 1));
-    fetchFiles(target, true);
+    fetchFiles(target);
   };
 
   // ── No folder linked yet ──────────────────────────────────────
@@ -289,7 +304,8 @@ export default function DriveFolderView({
         {/* Actions */}
         <div className="flex items-center gap-2">
           <button
-            onClick={() => currentFolder && fetchFiles(currentFolder, true)}
+            type="button"
+            onClick={() => currentFolder && (getDriveToken() ? fetchFiles(currentFolder) : connectAndFetch(currentFolder))}
             disabled={loading}
             className="flex items-center gap-1.5 text-xs text-white/30 hover:text-white/60 transition-colors"
             title="Refresh"
@@ -321,11 +337,12 @@ export default function DriveFolderView({
         </div>
       )}
 
-      {needsAuth && !loading && (
+      {needsAuth && !loading && !error && (
         <div className="flex flex-col items-center py-10 gap-3 text-center">
-          <p className="text-sm text-white/40">Google Drive session expired or not connected.</p>
+          <p className="text-sm text-white/40">Click to connect your Google Drive.</p>
           <button
-            onClick={() => currentFolder && fetchFiles(currentFolder, true)}
+            type="button"
+            onClick={() => currentFolder && connectAndFetch(currentFolder)}
             className="flex items-center gap-2 px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold rounded-lg transition-colors"
           >
             <RefreshCw size={14} /> Connect to Google Drive
@@ -333,15 +350,16 @@ export default function DriveFolderView({
         </div>
       )}
 
-      {error && !loading && !needsAuth && (
+      {error && !loading && (
         <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
           <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
-          <div>
-            {error}
+          <div className="space-y-2">
+            <p>{error}</p>
             <button
-              onClick={() => currentFolder && fetchFiles(currentFolder, true)}
-              className="ml-2 underline hover:no-underline"
-            >Retry</button>
+              type="button"
+              onClick={() => currentFolder && connectAndFetch(currentFolder)}
+              className="underline hover:no-underline"
+            >Try again</button>
           </div>
         </div>
       )}
