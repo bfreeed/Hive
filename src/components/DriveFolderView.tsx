@@ -192,6 +192,13 @@ export default function DriveFolderView({
     try {
       // requestDriveToken called as close to the user click as possible to avoid popup blocking
       const token = await requestDriveToken(clientId);
+      // If folder name was a placeholder, resolve real name now
+      if (folder.name === 'Drive folder' || folder.name === '') {
+        try {
+          const meta = await getFolderMeta(folder.id, token);
+          onLink(meta.id, meta.name);
+        } catch { /* ignore — name stays as placeholder */ }
+      }
       const results = await listFolderFiles(folder.id, token);
       setFiles(results);
     } catch (err: any) {
@@ -216,20 +223,19 @@ export default function DriveFolderView({
 
   const handleLink = async (url: string) => {
     const id = extractFolderIdFromUrl(url);
-    if (!id || !clientId) return;
+    if (!id) return;
     setShowLinkModal(false);
-    // handleLink is triggered by a user click on "Link folder" button
-    const folder = { id, name: '' };
-    await connectAndFetch(folder).then(async () => {
-      // After auth succeeds, get proper folder name
+    // Try to get folder name if we already have a token
+    const token = getDriveToken();
+    if (token) {
       try {
-        const token = getDriveToken();
-        if (token) {
-          const meta = await getFolderMeta(id, token);
-          onLink(meta.id, meta.name);
-        }
-      } catch { /* ignore */ }
-    });
+        const meta = await getFolderMeta(id, token);
+        onLink(meta.id, meta.name);
+        return;
+      } catch { /* fall through to save with placeholder */ }
+    }
+    // No token — save the folder ID with placeholder name, user connects separately
+    onLink(id, 'Drive folder');
   };
 
   const openSubFolder = (id: string, name: string) => {
