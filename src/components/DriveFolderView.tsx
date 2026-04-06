@@ -207,7 +207,7 @@ export default function DriveFolderView({
         setNeedsAuth(true);
       } else {
         setNeedsAuth(true);
-        setError('Google sign-in failed. Make sure your Vercel domain is added to authorized origins in Google Cloud Console (APIs & Services → Credentials → OAuth Client → Authorized JavaScript origins).');
+        setError(`Google sign-in failed. Add this exact URL to Authorized JavaScript origins in Google Cloud Console → APIs & Services → Credentials → your OAuth Client ID:\n\n${window.location.origin}`);
       }
     } finally {
       setLoading(false);
