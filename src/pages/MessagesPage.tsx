@@ -15,15 +15,22 @@ import { uploadToStorage } from '../lib/supabase';
 
 const EMOJIS = ['👍', '❤️', '😂', '🎉', '✅', '🔥'];
 
-const AVATAR_COLORS: Record<string, string> = {
-  lev: 'bg-brand-600',
-  sarah: 'bg-emerald-600',
-};
+const AVATAR_COLOR_POOL = [
+  'bg-brand-600', 'bg-emerald-600', 'bg-amber-600', 'bg-rose-600',
+  'bg-indigo-600', 'bg-teal-600', 'bg-fuchsia-600', 'bg-cyan-600',
+];
 
-const AVATAR_INITIALS: Record<string, string> = {
-  lev: 'L',
-  sarah: 'S',
-};
+function getAvatarColor(userId: string): string {
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) hash = ((hash << 5) - hash + userId.charCodeAt(i)) | 0;
+  return AVATAR_COLOR_POOL[Math.abs(hash) % AVATAR_COLOR_POOL.length];
+}
+
+function getInitial(userId: string, users: { id: string; name: string }[]): string {
+  const user = users.find(u => u.id === userId);
+  if (user?.name) return user.name.charAt(0).toUpperCase();
+  return '?';
+}
 
 const STATUS_DOT: Record<string, string> = {
   online: 'bg-emerald-400',
@@ -33,10 +40,11 @@ const STATUS_DOT: Record<string, string> = {
 };
 
 function Avatar({ userId, size = 8, status }: { userId: string; size?: number; status?: string }) {
+  const { users } = useStore();
   return (
     <div className="relative flex-shrink-0">
-      <div className={`w-${size} h-${size} rounded-full flex items-center justify-center text-white font-semibold text-xs ${AVATAR_COLORS[userId] || 'bg-white/20'}`}>
-        {AVATAR_INITIALS[userId] || '?'}
+      <div className={`w-${size} h-${size} rounded-full flex items-center justify-center text-white font-semibold text-xs ${getAvatarColor(userId)}`}>
+        {getInitial(userId, users)}
       </div>
       {status && (
         <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#0f0f10] ${STATUS_DOT[status] || 'bg-emerald-400'}`} />
@@ -1083,7 +1091,7 @@ export default function MessagesPage() {
                       {ch!.type === 'channel' ? (
                         <Hash size={10} className="text-white/30 flex-shrink-0" />
                       ) : (
-                        <div className={`w-3 h-3 rounded-full flex-shrink-0 ${AVATAR_COLORS[getDmUserId(ch!)] || 'bg-white/20'}`} />
+                        <div className={`w-3 h-3 rounded-full flex-shrink-0 ${getAvatarColor(getDmUserId(ch!)) || 'bg-white/20'}`} />
                       )}
                       <span className="text-[10px] text-white/30 truncate flex-1">
                         {ch!.type === 'channel' ? ch!.name : getDmName(ch!)}
@@ -1204,7 +1212,7 @@ export default function MessagesPage() {
                         }`}
                       >
                         <div className="relative flex-shrink-0">
-                          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold text-white ${AVATAR_COLORS[userId] || 'bg-white/20'}`}>
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold text-white ${getAvatarColor(userId) || 'bg-white/20'}`}>
                             {getDmName(c)[0]}
                           </div>
                           {userStatuses[userId] && (
@@ -1529,7 +1537,7 @@ export default function MessagesPage() {
           {channel?.type === 'channel' ? (
             <Hash size={16} className="text-white/40 flex-shrink-0" />
           ) : (
-            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold text-white flex-shrink-0 ${AVATAR_COLORS[getDmUserId(channel!)] || 'bg-white/20'}`}>
+            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold text-white flex-shrink-0 ${getAvatarColor(getDmUserId(channel!)) || 'bg-white/20'}`}>
               {channel ? getDmName(channel)[0] : '?'}
             </div>
           )}

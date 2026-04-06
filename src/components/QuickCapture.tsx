@@ -134,7 +134,7 @@ export default function QuickCapture({ initialText, onClose }: Props) {
             value={input}
             onChange={(e) => { setInput(e.target.value); setParsed(null); setError(null); }}
             onKeyDown={handleKeyDown}
-            placeholder="call Sarah Thursday at 4pm, remind me at 3:30…"
+            placeholder="schedule meeting Thursday at 4pm, remind me at 3:30…"
             className="flex-1 bg-transparent text-sm text-white placeholder-white/20 focus:outline-none"
           />
           {loading && <Loader2 size={14} className="text-white/30 animate-spin flex-shrink-0" />}

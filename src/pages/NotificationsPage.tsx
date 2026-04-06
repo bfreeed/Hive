@@ -13,20 +13,20 @@ interface NotificationsPageProps {
 
 const TYPE_CONFIG: Record<string, { icon: React.ReactNode; colorClass: string; group: string }> = {
   mention:         { icon: <MessageSquare size={14} />, colorClass: 'text-blue-400',    group: '@Mentions' },
-  comment:         { icon: <MessageSquare size={14} />, colorClass: 'text-emerald-400', group: "Sarah's Activity" },
-  questions:       { icon: <HelpCircle size={14} />,    colorClass: 'text-amber-400',   group: "Sarah's Activity" },
-  checkin:         { icon: <Bell size={14} />,           colorClass: 'text-amber-400',   group: "Sarah's Activity" },
+  comment:         { icon: <MessageSquare size={14} />, colorClass: 'text-emerald-400', group: "Team Activity" },
+  questions:       { icon: <HelpCircle size={14} />,    colorClass: 'text-amber-400',   group: "Team Activity" },
+  checkin:         { icon: <Bell size={14} />,           colorClass: 'text-amber-400',   group: "Team Activity" },
   invitation:      { icon: <UserPlus size={14} />,       colorClass: 'text-brand-400',   group: 'Invitations' },
-  assignment:      { icon: <UserPlus size={14} />,       colorClass: 'text-purple-400',  group: "Sarah's Activity" },
-  status_change:   { icon: <ArrowRight size={14} />,    colorClass: 'text-white/50',    group: "Sarah's Activity" },
-  priority_change: { icon: <Zap size={14} />,            colorClass: 'text-orange-400',  group: "Sarah's Activity" },
-  assignee_change: { icon: <Users size={14} />,          colorClass: 'text-white/50',    group: "Sarah's Activity" },
-  date_change:     { icon: <Calendar size={14} />,       colorClass: 'text-white/50',    group: "Sarah's Activity" },
-  note:            { icon: <Mic size={14} />,            colorClass: 'text-white/50',    group: "Sarah's Activity" },
-  attachment:      { icon: <Paperclip size={14} />,      colorClass: 'text-white/50',    group: "Sarah's Activity" },
+  assignment:      { icon: <UserPlus size={14} />,       colorClass: 'text-purple-400',  group: "Team Activity" },
+  status_change:   { icon: <ArrowRight size={14} />,    colorClass: 'text-white/50',    group: "Team Activity" },
+  priority_change: { icon: <Zap size={14} />,            colorClass: 'text-orange-400',  group: "Team Activity" },
+  assignee_change: { icon: <Users size={14} />,          colorClass: 'text-white/50',    group: "Team Activity" },
+  date_change:     { icon: <Calendar size={14} />,       colorClass: 'text-white/50',    group: "Team Activity" },
+  note:            { icon: <Mic size={14} />,            colorClass: 'text-white/50',    group: "Team Activity" },
+  attachment:      { icon: <Paperclip size={14} />,      colorClass: 'text-white/50',    group: "Team Activity" },
 };
 
-const GROUP_ORDER = ["Sarah's Activity", '@Mentions', 'Other'];
+const GROUP_ORDER = ["Team Activity", '@Mentions', 'Other'];
 
 function formatTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();

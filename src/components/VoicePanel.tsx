@@ -5,7 +5,7 @@ import { Mic, MicOff, X, Volume2 } from 'lucide-react';
 const SUGGESTIONS = [
   'Brief me on today',
   'What am I ignoring?',
-  "What does Sarah need from me?",
+  'Any questions for me?',
   "What's overdue?",
 ];
 
@@ -39,7 +39,7 @@ export default function VoicePanel() {
       const lines: string[] = [];
       if (within72.length) lines.push(`You have ${within72.length} task${within72.length > 1 ? 's' : ''} marked within 72 hours: ${within72.map((t) => t.title).join(', ')}.`);
       if (overdue.length) lines.push(`${overdue.length} task${overdue.length > 1 ? 's are' : ' is'} overdue: ${overdue.map((t) => t.title).join(', ')}.`);
-      if (questions.length) lines.push(`Sarah has ${questions.length} question${questions.length > 1 ? 's' : ''} for you.`);
+      if (questions.length) lines.push(`You have ${questions.length} question${questions.length > 1 ? 's' : ''} flagged for you.`);
       if (!within72.length && !overdue.length && !questions.length) lines.push(`All clear. Nothing urgent today.`);
       return lines.join(' ');
     }
@@ -54,9 +54,9 @@ export default function VoicePanel() {
       return `You have ${neglected.length} high-priority task${neglected.length > 1 ? 's' : ''} that haven\'t been touched in over 5 days: ${neglected.map((t) => t.title).join(', ')}.`;
     }
 
-    if (q.includes('sarah') || q.includes('questions')) {
-      if (questions.length === 0) return 'Sarah has no questions for you right now.';
-      return `Sarah has ${questions.length} question${questions.length > 1 ? 's' : ''} for you: ${questions.map((t) => t.title).join(', ')}.`;
+    if (q.includes('questions')) {
+      if (questions.length === 0) return 'No questions flagged for you right now.';
+      return `You have ${questions.length} question${questions.length > 1 ? 's' : ''} flagged: ${questions.map((t) => t.title).join(', ')}.`;
     }
 
     if (q.includes('overdue')) {

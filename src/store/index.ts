@@ -13,7 +13,8 @@ const DEFAULT_FLAGS: UserFlag[] = [
   { id: 'flag-checkin', name: 'Update at Checkin', color: '#10b981' },
 ];
 
-const LEV: User = { id: 'lev', name: 'Lev Freedman', email: 'lev@example.com', role: 'owner', flags: DEFAULT_FLAGS };
+/** Placeholder user shown while auth is loading — replaced by real profile from Supabase */
+const PLACEHOLDER_USER: User = { id: '__loading__', name: '', email: '', role: 'owner', flags: DEFAULT_FLAGS };
 
 const now = new Date().toISOString();
 
@@ -21,9 +22,7 @@ const PROJECTS: Project[] = [];
 const SECTIONS: Section[] = [];
 const TASKS: Task[] = [];
 const CONTACTS: Contact[] = [];
-const CHANNELS: Channel[] = [
-  { id: 'general', name: 'general', type: 'channel', memberIds: ['lev'], description: 'General updates and announcements' },
-];
+const CHANNELS: Channel[] = [];
 const MESSAGES: Message[] = [];
 
 // ---------------------------------------------------------------------------
@@ -357,7 +356,7 @@ interface AppStore {
   notifications: Notification[];
   channels: Channel[];
   messages: Message[];
-  activeChannelId: string;
+  activeChannelId: string | null;
   activeProjectId: string | null;
   sidebarOpen: boolean;
   darkMode: boolean;
@@ -447,8 +446,8 @@ interface AppStore {
 // ---------------------------------------------------------------------------
 
 export const useStore = create<AppStore>()((set, get) => ({
-  currentUser: LEV,
-  users: [LEV],
+  currentUser: PLACEHOLDER_USER,
+  users: [PLACEHOLDER_USER],
   projects: PROJECTS,
   trashedProjects: [],
   tasks: TASKS,
@@ -462,7 +461,7 @@ export const useStore = create<AppStore>()((set, get) => ({
   meetings: [],
   pages: [],
   userSettings: null,
-  activeChannelId: 'general',
+  activeChannelId: null,
   activeProjectId: null,
   sidebarOpen: true,
   darkMode: true,
@@ -471,7 +470,7 @@ export const useStore = create<AppStore>()((set, get) => ({
   isLoading: false,
   granolaManualSyncTrigger: 0,
   triggerGranolaSync: () => set(s => ({ granolaManualSyncTrigger: s.granolaManualSyncTrigger + 1 })),
-  userStatuses: { lev: 'online', sarah: 'online' },
+  userStatuses: {},
 
   // -------------------------------------------------------------------------
   // loadData — fetch everything from Supabase and replace local state
@@ -580,7 +579,7 @@ export const useStore = create<AppStore>()((set, get) => ({
       }
       let userChannels = channelsRes.data ?? [];
 
-      // If no channels returned, the general channel likely has old 'lev' member_ids — fix it
+      // If no channels returned, ensure a default general channel exists for this user
       if (userChannels.length === 0) {
         await supabase.from('channels').upsert({
           id: 'general',
@@ -596,7 +595,7 @@ export const useStore = create<AppStore>()((set, get) => ({
       // Reset activeChannelId if it points to a channel not in the list
       const channelIds = new Set(userChannels.map((c: any) => c.id));
       if (!channelIds.has(get().activeChannelId)) {
-        updates.activeChannelId = userChannels[0]?.id ?? 'general';
+        updates.activeChannelId = userChannels[0]?.id ?? null;
       }
 
       // Messages: filter to only channels this user is in
@@ -761,14 +760,14 @@ export const useStore = create<AppStore>()((set, get) => ({
   // Tasks
   // -------------------------------------------------------------------------
   addTask: async (task) => {
-    // Get the real auth UUID — don't trust currentUser.id if it's still the seed 'lev'
+    // Get the real auth UUID — don't trust currentUser.id if it's still the placeholder
     let realUid = get().currentUser?.id;
-    if (!realUid || realUid === 'lev') {
+    if (!realUid || realUid === '__loading__') {
       const { data: { session } } = await supabase.auth.getSession();
       realUid = session?.user?.id ?? realUid;
     }
     let assigneeIds = task.assigneeIds.map(id =>
-      (id === 'lev' && realUid && realUid !== 'lev') ? realUid : id
+      (id === '__loading__' && realUid && realUid !== '__loading__') ? realUid : id
     );
     // Always ensure at least the current user is assigned so loadData can find the task
     if (assigneeIds.length === 0 && realUid) assigneeIds = [realUid];
@@ -1539,8 +1538,8 @@ supabase.auth.onAuthStateChange((event) => {
       channels: CHANNELS,
       messages: MESSAGES,
       notifications: [],
-      users: [LEV],
-      currentUser: LEV,
+      users: [PLACEHOLDER_USER],
+      currentUser: PLACEHOLDER_USER,
       manualOrder: [],
       meetings: [],
       userSettings: null,

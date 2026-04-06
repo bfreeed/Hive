@@ -113,7 +113,7 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
     setImportPreview(null);
   };
 
-  const userId = currentUser?.id || 'lev';
+  const userId = currentUser?.id || '__loading__';
 
   const saveCredentials = async () => {
     const clientId = clientIdRef.current?.value.trim() ?? '';
@@ -683,8 +683,8 @@ function AuthenticatedApp() {
   const [quickCaptureText, setQuickCaptureText] = useState<string | null>(null);
 
   // Mount the SMS reminder checker + Granola sync
-  useReminderChecker(currentUser?.id || 'lev');
-  useHealthSweep(currentUser?.id || 'lev');
+  useReminderChecker(currentUser?.id || '__loading__');
+  useHealthSweep(currentUser?.id || '__loading__');
   useGranolaSync();
   const unreviewedMeetingCount = useUnreviewedMeetingCount();
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '../store';
-import { AlertTriangle, Clock, MessageSquare, CheckCircle, ArrowRight, Plus, X, Sun, Calendar, Sparkles, ChevronRight, ChevronDown, Send, Loader2, UserPlus, Check, FolderOpen, Hash } from 'lucide-react';
+import { AlertTriangle, Clock, MessageSquare, ArrowRight, Plus, X, Sun, Calendar, Sparkles, ChevronRight, ChevronDown, Send, Loader2, UserPlus, Check, FolderOpen, Hash } from 'lucide-react';
 import OnboardingChecklist from '../components/OnboardingChecklist';
 import { isPast, addDays, isWithinInterval, startOfDay } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
@@ -271,7 +271,6 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
     return isWithinInterval(d, { start: addDays(startOfDay(now), 1), end: addDays(startOfDay(now), 7) });
   });
   const questions = activeTasks.filter(t => t.flags?.some(f => f.flagId === 'flag-questions'));
-  const checkInUpdates = activeTasks.filter(t => t.flags?.some(f => f.flagId === 'flag-checkin'));
   const unreviewedMeetings = meetings.filter(m => m.reviewed === false && m.provider && m.provider !== 'manual');
 
   const sectionData: Record<string, { tasks?: typeof activeTasks; count: number; render: () => React.ReactNode }> = {
@@ -350,14 +349,6 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
       render: () => (
         <Section title="Questions for Me" icon={<MessageSquare size={13} />} count={questions.length} color="text-purple-400">
           {questions.map(t => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} showProject />)}
-        </Section>
-      ),
-    },
-    sarahs_updates: {
-      count: checkInUpdates.length,
-      render: () => (
-        <Section title="Check-in Updates" icon={<CheckCircle size={13} />} count={checkInUpdates.length} color="text-emerald-400">
-          {checkInUpdates.map(t => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} showProject />)}
         </Section>
       ),
     },
