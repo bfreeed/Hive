@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '../store';
 import { AlertTriangle, Clock, MessageSquare, CheckCircle, ArrowRight, Plus, X, Sun, Calendar, Sparkles, ChevronRight, ChevronDown, Send, Loader2, UserPlus, Check, FolderOpen, Hash } from 'lucide-react';
+import OnboardingChecklist from '../components/OnboardingChecklist';
 import { isPast, addDays, isWithinInterval, startOfDay } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import TaskRow from '../components/TaskRow';
@@ -396,6 +397,9 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
           </div>
         </div>
 
+        {/* Onboarding checklist */}
+        <OnboardingChecklist onNavigate={onNavigate} />
+
         {/* Claude bar */}
         <div className="mb-5">
           <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-colors ${claudeLoading ? 'border-brand-500/40 bg-brand-500/[0.04]' : 'border-white/[0.08] bg-white/[0.03] hover:border-white/[0.14]'}`}>
@@ -465,7 +469,7 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
           </div>
         )}
 
-        <InlineCapture ref={captureRef} />
+        <InlineCapture ref={captureRef} onOpenDetail={id => onOpenTask(id)} />
 
         {/* Sections — rendered in user-defined order */}
         {sections.filter(s => s.enabled).map(s => (

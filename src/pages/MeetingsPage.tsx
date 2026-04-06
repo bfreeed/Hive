@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { Calendar, Search, X, Clock, ExternalLink, Sparkles, Send, Loader2, Plus, ChevronRight, Mail, FolderOpen, Check, Pencil, UserPlus, Trash2, MoreHorizontal } from 'lucide-react';
 import { format } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
+import NewContactModal from '../components/NewContactModal';
 import { apiFetch } from '../lib/apiFetch';
 import type { Meeting, ActionItem } from '../types';
 import InlineCapture from '../components/InlineCapture';
@@ -48,12 +49,14 @@ function ActionItemRow({
   showMeetingTitle,
   meetingTitle,
   isMe,
+  onOpenTask,
 }: {
   item: ActionItem;
   meetingId: string;
   showMeetingTitle?: boolean;
   meetingTitle?: string;
   isMe: boolean;
+  onOpenTask?: (id: string) => void;
 }) {
   const { updateMeeting } = useStore();
   const [showCapture, setShowCapture] = useState(false);
@@ -108,12 +111,13 @@ function ActionItemRow({
       </div>
 
       {showCapture && (
-        <div className="mx-3 mb-2">
+        <div className="mx-3 mb-2 max-w-3xl">
           <InlineCapture
             initialTitle={item.text}
             showCollapsedButton={false}
             onCreated={handleCreated}
             onCancel={() => setShowCapture(false)}
+            onOpenDetail={onOpenTask ? id => { handleCreated(); onOpenTask(id); } : undefined}
           />
         </div>
       )}
@@ -219,11 +223,12 @@ function buildMailto(participantName: string, participantEmail: string, meetingT
 // ---------------------------------------------------------------------------
 // Meeting Detail
 // ---------------------------------------------------------------------------
-function MeetingDetail({ meeting }: { meeting: Meeting }) {
+function MeetingDetail({ meeting, onOpenTask }: { meeting: Meeting; onOpenTask?: (id: string) => void }) {
   const { currentUser, projects, contacts, updateMeeting, addContact } = useStore();
   const myName = currentUser?.name?.toLowerCase() ?? '';
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
   const [showContactDropdown, setShowContactDropdown] = useState(false);
+  const [showNewContactModal, setShowNewContactModal] = useState(false);
   const [participantMenu, setParticipantMenu] = useState<number | null>(null);
   const [editingParticipant, setEditingParticipant] = useState<{ index: number; value: string } | null>(null);
 
@@ -425,7 +430,7 @@ function MeetingDetail({ meeting }: { meeting: Meeting }) {
                 {showContactDropdown && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setShowContactDropdown(false)} />
-                    <div className="absolute left-0 top-full mt-1 bg-[#1a1a1f] border border-white/[0.08] rounded-xl shadow-xl p-1 min-w-[200px] z-50 max-h-60 overflow-y-auto">
+                    <div className="absolute left-0 top-full mt-1 bg-[#1a1a1f] border border-white/[0.08] rounded-xl shadow-xl p-1 min-w-[220px] z-50 max-h-72 overflow-y-auto">
                       {contacts
                         .filter(c => !(meeting.linkedContactIds ?? []).includes(c.id))
                         .map(c => (
@@ -448,6 +453,14 @@ function MeetingDetail({ meeting }: { meeting: Meeting }) {
                       {contacts.filter(c => !(meeting.linkedContactIds ?? []).includes(c.id)).length === 0 && (
                         <p className="px-3 py-2 text-xs text-white/30">All contacts linked</p>
                       )}
+                      <div className="border-t border-white/[0.06] mt-1 pt-1">
+                        <button
+                          onClick={() => { setShowContactDropdown(false); setShowNewContactModal(true); }}
+                          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-white/30 hover:text-white/60 hover:bg-white/[0.04] transition-colors"
+                        >
+                          <Plus size={11} /> New contact
+                        </button>
+                      </div>
                     </div>
                   </>
                 )}
@@ -527,6 +540,7 @@ function MeetingDetail({ meeting }: { meeting: Meeting }) {
                     item={item}
                     meetingId={meeting.id}
                     isMe={!item.assignee || item.assignee.toLowerCase() === myName}
+                    onOpenTask={onOpenTask}
                   />
                 ))}
               </div>
@@ -576,6 +590,15 @@ function MeetingDetail({ meeting }: { meeting: Meeting }) {
 
       {/* Sticky chat bar */}
       <MeetingChat meeting={meeting} />
+
+      {showNewContactModal && (
+        <NewContactModal
+          onClose={() => setShowNewContactModal(false)}
+          onCreated={id => {
+            updateMeeting(meeting.id, { linkedContactIds: [...(meeting.linkedContactIds ?? []), id] });
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -583,7 +606,7 @@ function MeetingDetail({ meeting }: { meeting: Meeting }) {
 // ---------------------------------------------------------------------------
 // Default view — all pending action items across all meetings
 // ---------------------------------------------------------------------------
-function AllActionItemsView() {
+function AllActionItemsView({ onOpenTask }: { onOpenTask?: (id: string) => void }) {
   const { meetings, currentUser } = useStore();
   const myName = currentUser?.name?.toLowerCase() ?? '';
   const [showAll, setShowAll] = useState(false);
@@ -642,6 +665,7 @@ function AllActionItemsView() {
                   showMeetingTitle
                   meetingTitle={meeting.title}
                   isMe={isMe}
+                  onOpenTask={onOpenTask}
                 />
               ))}
             </div>
@@ -658,8 +682,8 @@ function AllActionItemsView() {
 // ---------------------------------------------------------------------------
 // Main Page
 // ---------------------------------------------------------------------------
-export default function MeetingsPage() {
-  const { meetings, projects } = useStore();
+export default function MeetingsPage({ onOpenTask }: { onOpenTask?: (id: string) => void } = {}) {
+  const { meetings, projects, contacts } = useStore();
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(() =>
     localStorage.getItem('hive_meetings_selectedId')
@@ -787,7 +811,20 @@ export default function MeetingsPage() {
       >
         <div className="flex-1 min-w-0">
           <p className="text-[13px] text-white/70 truncate leading-snug">{m.title}</p>
-          <p className="text-[10px] text-white/25 mt-0.5">{format(new Date(m.date), 'MMM d · h:mm a')}</p>
+          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+            <span className="text-[10px] text-white/25">{format(new Date(m.date), 'MMM d')}</span>
+            {(() => {
+              const linkedContacts = (m.linkedContactIds ?? []).map(id => contacts.find(c => c.id === id)?.name).filter(Boolean);
+              if (linkedContacts.length === 0) return null;
+              return <span className="text-[10px] text-white/35 truncate">{linkedContacts.join(', ')}</span>;
+            })()}
+            {(() => {
+              const linkedProjects = (m.linkedProjectIds ?? []).map(id => projects.find(p => p.id === id)?.name).filter(Boolean);
+              if (linkedProjects.length === 0) return null;
+              const label = linkedProjects.length === 1 ? linkedProjects[0] : `${linkedProjects[0]} +${linkedProjects.length - 1}`;
+              return <span className="text-[10px] text-brand-400/60 truncate">{label}</span>;
+            })()}
+          </div>
         </div>
         {pendingCount > 0 && (
           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-semibold flex-shrink-0 mt-0.5">
@@ -919,9 +956,9 @@ export default function MeetingsPage() {
 
       {/* Main panel */}
       {selected ? (
-        <MeetingDetail key={selected.id} meeting={selected} />
+        <MeetingDetail key={selected.id} meeting={selected} onOpenTask={onOpenTask} />
       ) : (
-        <AllActionItemsView />
+        <AllActionItemsView onOpenTask={onOpenTask} />
       )}
     </div>
   );

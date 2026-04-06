@@ -1009,7 +1009,9 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
           </div>
         )}
 
-        <InlineCapture ref={captureRef} />
+        <div className="max-w-3xl mx-auto">
+          <InlineCapture ref={captureRef} onOpenDetail={id => onOpenTask(id)} />
+        </div>
 
         {/* Task list / board */}
         {isBoard ? (

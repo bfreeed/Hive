@@ -3,7 +3,7 @@ import { useStore } from './store';
 import { DEFAULT_HOME_SECTIONS } from './types';
 import { useAuth } from './hooks/useAuth';
 import { apiFetch } from './lib/apiFetch';
-import { Home as HomeIcon, CheckSquare, MessageSquare, Users, MoreHorizontal, Calendar, FolderOpen } from 'lucide-react';
+import { Home as HomeIcon, CheckSquare, MessageSquare, Users, MoreHorizontal, Calendar, FolderOpen, Eye, EyeOff } from 'lucide-react';
 import LoginPage from './pages/LoginPage';
 import Sidebar from './components/Sidebar';
 import VoicePanel from './components/VoicePanel';
@@ -44,6 +44,10 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
   const [newFlagColor, setNewFlagColor] = useState('#6366f1');
   const [editingFlagId, setEditingFlagId] = useState<string | null>(null);
   const [editingFlagName, setEditingFlagName] = useState('');
+  const [showClientId, setShowClientId] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [showAnthropicKey, setShowAnthropicKey] = useState(false);
+  const [showGranolaKey, setShowGranolaKey] = useState(false);
 
   const FLAG_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#10b981', '#06b6d4', '#6366f1', '#a855f7', '#ec4899'];
 
@@ -339,23 +343,33 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
             </p>
             <div>
               <label className="text-xs text-white/40 block mb-1.5">OAuth Client ID</label>
-              <input
-                ref={clientIdRef}
-                type="text"
-                defaultValue={localStorage.getItem(GOOGLE_CLIENT_ID_KEY) || ''}
-                placeholder="xxxxxxxx.apps.googleusercontent.com"
-                className="w-full px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white/60 placeholder-white/20 focus:outline-none focus:border-brand-500/40 font-mono"
-              />
+              <div className="relative">
+                <input
+                  ref={clientIdRef}
+                  type={showClientId ? 'text' : 'password'}
+                  defaultValue={localStorage.getItem(GOOGLE_CLIENT_ID_KEY) || ''}
+                  placeholder="xxxxxxxx.apps.googleusercontent.com"
+                  className="w-full px-3 py-2 pr-9 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white/60 placeholder-white/20 focus:outline-none focus:border-brand-500/40 font-mono"
+                />
+                <button type="button" onClick={() => setShowClientId(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/50 transition-colors">
+                  {showClientId ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
             </div>
             <div>
               <label className="text-xs text-white/40 block mb-1.5">API Key</label>
-              <input
-                ref={apiKeyRef}
-                type="text"
-                defaultValue={localStorage.getItem(GOOGLE_API_KEY_KEY) || ''}
-                placeholder="AIzaSy..."
-                className="w-full px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white/60 placeholder-white/20 focus:outline-none focus:border-brand-500/40 font-mono"
-              />
+              <div className="relative">
+                <input
+                  ref={apiKeyRef}
+                  type={showApiKey ? 'text' : 'password'}
+                  defaultValue={localStorage.getItem(GOOGLE_API_KEY_KEY) || ''}
+                  placeholder="AIzaSy..."
+                  className="w-full px-3 py-2 pr-9 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white/60 placeholder-white/20 focus:outline-none focus:border-brand-500/40 font-mono"
+                />
+                <button type="button" onClick={() => setShowApiKey(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/50 transition-colors">
+                  {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
             </div>
             <button
               onClick={saveCredentials}
@@ -376,13 +390,18 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
             </p>
             <div>
               <label className="text-xs text-white/40 block mb-1.5">Anthropic API Key</label>
-              <input
-                ref={anthropicKeyRef}
-                type="password"
-                defaultValue={localStorage.getItem(ANTHROPIC_API_KEY_KEY) || userSettings?.anthropicApiKey || ''}
-                placeholder="sk-ant-..."
-                className="w-full px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white/60 placeholder-white/20 focus:outline-none focus:border-brand-500/40 font-mono"
-              />
+              <div className="relative">
+                <input
+                  ref={anthropicKeyRef}
+                  type={showAnthropicKey ? 'text' : 'password'}
+                  defaultValue={localStorage.getItem(ANTHROPIC_API_KEY_KEY) || userSettings?.anthropicApiKey || ''}
+                  placeholder="sk-ant-..."
+                  className="w-full px-3 py-2 pr-9 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white/60 placeholder-white/20 focus:outline-none focus:border-brand-500/40 font-mono"
+                />
+                <button type="button" onClick={() => setShowAnthropicKey(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/50 transition-colors">
+                  {showAnthropicKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
             </div>
             <button
               onClick={saveCredentials}
@@ -450,13 +469,18 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
               </p>
               <div className="mb-3">
                 <label className="text-xs text-white/40 block mb-1.5">Granola API Key</label>
-                <input
-                  ref={granolaKeyRef}
-                  type="password"
-                  defaultValue={userSettings?.granolaApiKey ?? ''}
-                  placeholder="gran_..."
-                  className="w-full px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white/60 placeholder-white/20 focus:outline-none focus:border-brand-500/40 font-mono"
-                />
+                <div className="relative">
+                  <input
+                    ref={granolaKeyRef}
+                    type={showGranolaKey ? 'text' : 'password'}
+                    defaultValue={userSettings?.granolaApiKey ?? ''}
+                    placeholder="gran_..."
+                    className="w-full px-3 py-2 pr-9 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white/60 placeholder-white/20 focus:outline-none focus:border-brand-500/40 font-mono"
+                  />
+                  <button type="button" onClick={() => setShowGranolaKey(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/50 transition-colors">
+                    {showGranolaKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -731,7 +755,7 @@ function AuthenticatedApp() {
       case 'messages':
         return <MessagesPage />;
       case 'meetings':
-        return <MeetingsPage />;
+        return <MeetingsPage onOpenTask={setOpenTaskId} />;
       case 'project':
         return <ProjectHub projectId={(page as any).projectId} onNavigate={navigate} onOpenTask={setOpenTaskId} />;
       case 'team-member':

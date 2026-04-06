@@ -4,6 +4,7 @@ import { Plus, Search, ArrowUpDown, List, LayoutGrid } from 'lucide-react';
 import type { Task } from '../types';
 import TaskRow from '../components/TaskRow';
 import BoardView from '../components/BoardView';
+import InlineCapture from '../components/InlineCapture';
 import { buildGroups, sortTasks } from '../utils/buildGroups';
 import type { BoardGroupBy, BoardSortBy, BoardSortOrder } from '../utils/buildGroups';
 
@@ -269,25 +270,14 @@ export default function TeamMemberView({ userId, onOpenTask }: { userId: string;
 
         {/* New task input */}
         {showNewTask && (
-          <div className="mb-4 flex items-center gap-2 p-3 bg-white/[0.04] rounded-xl border border-white/[0.08]">
-            <input
-              autoFocus
-              value={newTaskTitle}
-              onChange={e => setNewTaskTitle(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleAddTask(); if (e.key === 'Escape') setShowNewTask(false); }}
-              placeholder="Task title..."
-              className="flex-1 bg-transparent text-sm text-white placeholder-white/20 focus:outline-none"
+          <div className="max-w-3xl mx-auto">
+            <InlineCapture
+              initialAssigneeId={userId}
+              showCollapsedButton={false}
+              onCreated={() => setShowNewTask(false)}
+              onCancel={() => setShowNewTask(false)}
+              onOpenDetail={id => { setShowNewTask(false); onOpenTask(id); }}
             />
-            <select
-              value={newTaskProject}
-              onChange={e => setNewTaskProject(e.target.value)}
-              className="text-xs bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-1.5 text-white/60 focus:outline-none"
-            >
-              <option value="">No project</option>
-              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-            <button onClick={handleAddTask} className="px-3 py-1.5 bg-brand-600 text-white text-xs rounded-lg hover:bg-brand-500">Add</button>
-            <button onClick={() => setShowNewTask(false)} className="text-white/30 hover:text-white/60 text-xs">Cancel</button>
           </div>
         )}
 

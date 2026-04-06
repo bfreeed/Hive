@@ -60,6 +60,8 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [showPriorityPicker, setShowPriorityPicker] = useState(false);
   const [showProjectPicker, setShowProjectPicker] = useState(false);
+  const [reminderUnit, setReminderUnit] = useState<'minutes' | 'hours' | 'days' | 'weeks'>('minutes');
+  const [reminderValue, setReminderValue] = useState<string>('30');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const prevDueDateRef = useRef<string | undefined>(undefined);
 
@@ -284,6 +286,14 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                     className="px-2.5 py-1 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/60 focus:outline-none focus:border-brand-500/40"
                     style={{ colorScheme: 'dark' }}
                   />
+                  {task.dueDate && !task.dueTime && (
+                    <button
+                      onClick={() => update('dueTime', '09:00')}
+                      className="px-2 py-1 rounded-lg text-xs text-white/30 hover:text-white/60 bg-white/[0.04] hover:bg-white/[0.08] transition-colors"
+                    >
+                      + Add time
+                    </button>
+                  )}
                   {task.dueTime && (
                     <>
                       <div className="flex items-center gap-1">
@@ -492,59 +502,51 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
 
               {/* Reminder */}
               <PropRow icon={<Bell size={13} />} label="Reminder">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {task.reminderAt ? (
+                <div className="flex items-center gap-1.5">
+                  {task.reminderMinutes != null ? (
                     <>
-                      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20 rounded-lg text-xs font-medium">
-                        <Bell size={10} />
-                        {format(new Date(task.reminderAt), 'MMM d, h:mm a')}
-                        {task.reminderSent && <span className="ml-1 text-emerald-400/80">✓</span>}
-                      </div>
                       <input
-                        type="date"
-                        value={task.reminderAt!.slice(0, 10)}
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            const time = format(new Date(task.reminderAt!), 'HH:mm');
-                            update('reminderAt', new Date(e.target.value + 'T' + time).toISOString());
-                            update('reminderSent', false);
+                        type="number"
+                        min={1}
+                        value={reminderValue}
+                        onChange={e => {
+                          setReminderValue(e.target.value);
+                          const n = parseInt(e.target.value);
+                          if (!isNaN(n) && n > 0) {
+                            const multipliers = { minutes: 1, hours: 60, days: 1440, weeks: 10080 };
+                            update('reminderMinutes', n * multipliers[reminderUnit]);
                           }
                         }}
-                        className="px-2 py-1 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/60 focus:outline-none focus:border-brand-500/40"
-                        style={{ colorScheme: 'dark' }}
+                        className="w-16 px-2.5 py-1 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/60 focus:outline-none focus:border-brand-500/40"
                       />
-                      <input
-                        type="time"
-                        value={format(new Date(task.reminderAt), 'HH:mm')}
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            const base = task.reminderAt!.slice(0, 10);
-                            update('reminderAt', new Date(base + 'T' + e.target.value).toISOString());
-                            update('reminderSent', false);
+                      <select
+                        value={reminderUnit}
+                        onChange={e => {
+                          const unit = e.target.value as typeof reminderUnit;
+                          setReminderUnit(unit);
+                          const n = parseInt(reminderValue);
+                          if (!isNaN(n) && n > 0) {
+                            const multipliers = { minutes: 1, hours: 60, days: 1440, weeks: 10080 };
+                            update('reminderMinutes', n * multipliers[unit]);
                           }
                         }}
-                        className="px-2 py-1 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/60 focus:outline-none focus:border-brand-500/40"
-                        style={{ colorScheme: 'dark' }}
-                      />
-                      <button onClick={() => { update('reminderAt', undefined); update('reminderSent', undefined); }} className="text-white/40 hover:text-white/70 transition-colors"><X size={12} /></button>
-                      {task.reminderSent && <span className="text-xs text-emerald-400/60">Sent</span>}
+                        className="px-2.5 py-1 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/60 focus:outline-none focus:border-brand-500/40"
+                      >
+                        <option value="minutes">minutes</option>
+                        <option value="hours">hours</option>
+                        <option value="days">days</option>
+                        <option value="weeks">weeks</option>
+                      </select>
+                      <span className="text-xs text-white/25">before</span>
+                      <button onClick={() => update('reminderMinutes', undefined)} className="text-white/30 hover:text-white/60 transition-colors"><X size={12} /></button>
                     </>
                   ) : (
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="date"
-                        value=""
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            update('reminderAt', new Date(e.target.value + 'T09:00:00').toISOString());
-                            update('reminderSent', false);
-                          }
-                        }}
-                        className="px-2 py-1 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/60 focus:outline-none focus:border-brand-500/40"
-                        style={{ colorScheme: 'dark' }}
-                      />
-                      <span className="text-xs text-white/20">pick a date to set a text reminder</span>
-                    </div>
+                    <button
+                      onClick={() => { update('reminderMinutes', 30); setReminderValue('30'); setReminderUnit('minutes'); }}
+                      className="px-2.5 py-1 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/40 hover:text-white/60 transition-colors"
+                    >
+                      Add reminder
+                    </button>
                   )}
                 </div>
               </PropRow>

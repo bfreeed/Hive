@@ -59,8 +59,9 @@ export interface Task {
   comments: Comment[];
   audioNotes: AudioNote[];
   attachments: Attachment[];
-  reminderAt?: string;    // ISO datetime — when to send the Pushover notification
-  reminderSent?: boolean; // true after notification has been fired, prevents double-send
+  reminderAt?: string;    // legacy Pushover — no longer used
+  reminderSent?: boolean; // legacy Pushover — no longer used
+  reminderMinutes?: number; // Google Calendar popup reminder: minutes before event
   parentId?: string;      // subtask: ID of parent task
   sectionId?: string;     // which project section this task belongs to
   dependsOn?: string[];   // IDs of tasks that must be done before this one

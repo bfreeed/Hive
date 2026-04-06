@@ -680,12 +680,15 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                 {/* Inline add-task */}
                 {taskViewTab !== 'today' && (
                   showAddTask ? (
-                    <InlineCapture
-                      initialProjectId={projectId}
-                      showCollapsedButton={false}
-                      onCreated={() => setShowAddTask(false)}
-                      onCancel={() => setShowAddTask(false)}
-                    />
+                    <div className="max-w-3xl mx-auto">
+                      <InlineCapture
+                        initialProjectId={projectId}
+                        showCollapsedButton={false}
+                        onCreated={() => setShowAddTask(false)}
+                        onCancel={() => setShowAddTask(false)}
+                        onOpenDetail={id => { setShowAddTask(false); onOpenTask(id); }}
+                      />
+                    </div>
                   ) : (
                     <button
                       onClick={() => setShowAddTask(true)}

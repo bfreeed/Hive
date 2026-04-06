@@ -76,6 +76,9 @@ export async function syncTaskToCalendar(task: Task, forcePrompt = false): Promi
     summary: task.title,
     description: task.description || '',
     transparency: showAs === 'free' ? 'transparent' : 'opaque',
+    ...(task.reminderMinutes != null ? {
+      reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: task.reminderMinutes }] }
+    } : { reminders: { useDefault: true } }),
   };
 
   if (!task.dueTime) {

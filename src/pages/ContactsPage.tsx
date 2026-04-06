@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useStore } from '../store';
 import { RelationshipTag } from '../types';
 import { Plus, Mail, Phone, ExternalLink, Calendar, CheckSquare, X, Building2, MapPin, Cake, Tag, ChevronDown, Trash2, Search, Clock } from 'lucide-react';
+import NewContactModal from '../components/NewContactModal';
 
 const TAG_COLORS = ['#6366f1','#10b981','#f59e0b','#ef4444','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f97316','#84cc16'];
 
@@ -253,6 +254,10 @@ export default function ContactsPage() {
   const [newPhone, setNewPhone] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newBusiness, setNewBusiness] = useState('');
+  const [newBirthday, setNewBirthday] = useState('');
+  const [newAddress, setNewAddress] = useState('');
+  const [newProjectIds, setNewProjectIds] = useState<string[]>([]);
+  const [newTagIds, setNewTagIds] = useState<string[]>([]);
   const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (showNew) nameRef.current?.focus(); }, [showNew]);
@@ -281,14 +286,23 @@ export default function ContactsPage() {
       phone: newPhone.trim() || undefined,
       email: newEmail.trim() || undefined,
       business: newBusiness.trim() || undefined,
-      projectIds: [],
+      birthday: newBirthday.trim() || undefined,
+      address: newAddress.trim() || undefined,
+      projectIds: newProjectIds,
       notes: '',
     });
-    setNewName(''); setNewPhone(''); setNewEmail(''); setNewBusiness('');
+    // Apply relationship tags after creation
+    if (newTagIds.length > 0) {
+      setTimeout(() => {
+        const created = useStore.getState().contacts.find(c => c.name === newName.trim());
+        if (created) useStore.getState().updateContact(created.id, { relationshipTagIds: newTagIds });
+      }, 50);
+    }
+    setNewName(''); setNewPhone(''); setNewEmail(''); setNewBusiness(''); setNewBirthday(''); setNewAddress(''); setNewProjectIds([]); setNewTagIds([]);
     setShowNew(false);
   };
 
-  const resetNewForm = () => { setShowNew(false); setNewName(''); setNewPhone(''); setNewEmail(''); setNewBusiness(''); };
+  const resetNewForm = () => { setShowNew(false); setNewName(''); setNewPhone(''); setNewEmail(''); setNewBusiness(''); setNewBirthday(''); setNewAddress(''); setNewProjectIds([]); setNewTagIds([]); };
 
   const filtered = contacts
     .filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || (c.business ?? '').toLowerCase().includes(search.toLowerCase()))
@@ -356,26 +370,11 @@ export default function ContactsPage() {
             <button onClick={() => setShowNew(true)} className="p-1 rounded text-white/30 hover:text-white/60 hover:bg-white/[0.06] transition-colors"><Plus size={14} /></button>
           </div>
 
-          {/* New Contact Form */}
           {showNew && (
-            <div className="mb-3 p-3 bg-white/[0.04] border border-white/[0.08] rounded-xl space-y-2">
-              <input ref={nameRef} value={newName} onChange={e => setNewName(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleAddContact(); if (e.key === 'Escape') resetNewForm(); }}
-                placeholder="Name" className="w-full bg-transparent text-sm text-white/80 placeholder-white/25 focus:outline-none border-b border-white/[0.06] pb-1.5" />
-              <input value={newPhone} onChange={e => setNewPhone(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleAddContact(); if (e.key === 'Escape') resetNewForm(); }}
-                placeholder="Phone" className="w-full bg-transparent text-sm text-white/60 placeholder-white/20 focus:outline-none border-b border-white/[0.06] pb-1.5" />
-              <input value={newEmail} onChange={e => setNewEmail(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleAddContact(); if (e.key === 'Escape') resetNewForm(); }}
-                placeholder="Email" className="w-full bg-transparent text-sm text-white/60 placeholder-white/20 focus:outline-none border-b border-white/[0.06] pb-1.5" />
-              <input value={newBusiness} onChange={e => setNewBusiness(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleAddContact(); if (e.key === 'Escape') resetNewForm(); }}
-                placeholder="Business" className="w-full bg-transparent text-sm text-white/60 placeholder-white/20 focus:outline-none" />
-              <div className="flex items-center gap-1.5 pt-0.5">
-                <button onClick={handleAddContact} className="flex-1 py-1 bg-brand-600 hover:bg-brand-500 text-white text-xs rounded-lg transition-colors">Add Contact</button>
-                <button onClick={resetNewForm} className="p-1 text-white/30 hover:text-white/60 transition-colors"><X size={13} /></button>
-              </div>
-            </div>
+            <NewContactModal
+              onClose={resetNewForm}
+              onCreated={id => setSelected(id)}
+            />
           )}
 
           {/* Search */}
