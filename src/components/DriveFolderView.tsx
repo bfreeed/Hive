@@ -20,6 +20,10 @@ async function apiFetch<T>(path: string, body?: unknown): Promise<T> {
     headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body ?? {}),
   });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`${res.status}: ${text || res.statusText}`);
+  }
   return res.json();
 }
 
@@ -184,8 +188,9 @@ export default function DriveFolderView({ folderId, folderName, onLink, onUnlink
       }
       setConnected(true);
       await loadFiles({ id: folderId, name: folderName ?? 'Drive folder' });
-    } catch {
-      setError('Could not reach server. Try refreshing.');
+    } catch (err) {
+      console.error('Drive token check failed:', err);
+      setError(err instanceof Error ? `Drive error: ${err.message}` : 'Could not reach server. Try refreshing.');
     } finally {
       setLoading(false);
     }
@@ -215,8 +220,9 @@ export default function DriveFolderView({ folderId, folderName, onLink, onUnlink
       } else {
         setError(res.error ?? 'Could not start Google sign-in.');
       }
-    } catch {
-      setError('Could not reach server.');
+    } catch (err) {
+      console.error('Drive initiate failed:', err);
+      setError(err instanceof Error ? `Drive error: ${err.message}` : 'Could not reach server.');
     }
   };
 
@@ -317,7 +323,7 @@ export default function DriveFolderView({ folderId, folderName, onLink, onUnlink
           <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
           <div className="space-y-2">
             <p>{error}</p>
-            <button type="button" onClick={handleConnect} className="underline hover:no-underline">Try again</button>
+            <button type="button" onClick={() => { setError(null); checkAndLoad(); }} className="underline hover:no-underline">Try again</button>
           </div>
         </div>
       )}
