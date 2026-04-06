@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
 import { Mic, MicOff, X, Volume2 } from 'lucide-react';
 
@@ -16,6 +16,13 @@ export default function VoicePanel() {
   const [response, setResponse] = useState('');
   const [loading, setLoading] = useState(false);
   const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!voiceOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') toggleVoice(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [voiceOpen, toggleVoice]);
 
   if (!voiceOpen) return null;
 

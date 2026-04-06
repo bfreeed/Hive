@@ -67,6 +67,7 @@ export interface Task {
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
+  deletedAt?: string;
 }
 
 export interface AudioNote {
@@ -107,9 +108,12 @@ export interface Project {
   docs?: Attachment[];
   docContent?: any;
   parentId?: string; // sub-project support: ID of the parent project
+  folderId?: string; // sidebar folder this project belongs to
+  isFolder?: boolean; // true = this is a folder container, not a real project
   // Google Drive
   googleDriveFolderId?: string;
   googleDriveFolderName?: string;
+  deletedAt?: string;
 }
 
 export interface Contact {

@@ -92,6 +92,11 @@ function LinkFolderModal({ onLink, onClose }: {
   onClose: () => void;
 }) {
   const [url, setUrl] = useState('');
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
   const invalid = url.length > 0 && !extractFolderIdFromUrl(url);
 
   return (
