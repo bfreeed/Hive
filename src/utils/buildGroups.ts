@@ -58,7 +58,7 @@ export function buildGroups(
   }
 
   if (groupBy === 'status') {
-    return (['todo', 'doing', 'waiting', 'review', 'done'] as TaskStatus[])
+    return (['todo', 'doing', 'waiting', 'review'] as TaskStatus[])
       .map(s => ({ label: STATUS_LABELS[s], tasks: taskList.filter(t => t.status === s) }))
       .filter(g => g.tasks.length > 0);
   }

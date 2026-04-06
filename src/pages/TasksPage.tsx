@@ -213,7 +213,7 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
     { id: 'project' as ActiveTab,   label: 'By Project'  },
     { id: 'date' as ActiveTab,      label: 'By Date'     },
     { id: 'today' as ActiveTab,     label: 'Today'       },
-    { id: 'completed' as ActiveTab, label: 'Completed'   },
+    { id: 'completed' as ActiveTab, label: 'Done'        },
   ];
   const DEFAULT_TAB_ORDER = ALL_TABS.map(t => t.id);
   const [tabOrder, setTabOrder] = useState<ActiveTab[]>(() => {
@@ -289,7 +289,7 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
   // Groups (for regular list view — date grouping)
   // ---------------------------------------------------------------------------
   const dateGroups = buildGroups(sorted, 'date', projects, users);
-  const boardGroups = buildGroups(sortedAllStatuses, boardGroupBy, projects, users);
+  const boardGroups = buildGroups(sorted, boardGroupBy, projects, users);
 
   // ---------------------------------------------------------------------------
   // Dependency blocked helper
