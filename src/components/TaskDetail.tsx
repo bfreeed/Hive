@@ -64,6 +64,7 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
   const [reminderValue, setReminderValue] = useState<string>('30');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const prevDueDateRef = useRef<string | undefined>(undefined);
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const { open: openDrivePicker, loading: driveLoading } = useGooglePicker((file) => {
     const att = {
@@ -279,13 +280,23 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
               {/* Due */}
               <PropRow icon={<Calendar size={13} />} label="Due">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <input
-                    type="date"
-                    value={task.dueDate ? task.dueDate.slice(0, 10) : ''}
-                    onChange={(e) => update('dueDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : undefined)}
-                    className="px-2.5 py-1 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/60 focus:outline-none focus:border-brand-500/40"
-                    style={{ colorScheme: 'dark' }}
-                  />
+                  <div
+                    className="relative px-2.5 py-1 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/60 cursor-pointer hover:border-white/[0.15] transition-colors"
+                    onClick={() => dateInputRef.current?.showPicker()}
+                  >
+                    <span>{task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Pick a date'}</span>
+                    <input
+                      ref={dateInputRef}
+                      type="date"
+                      value={task.dueDate ? task.dueDate.slice(0, 10) : ''}
+                      onChange={(e) => update('dueDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : undefined)}
+                      autoComplete="off"
+                      data-1p-ignore
+                      data-lpignore="true"
+                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                      style={{ colorScheme: 'dark' }}
+                    />
+                  </div>
                   {task.dueDate && !task.dueTime && (
                     <button
                       onClick={() => update('dueTime', '09:00')}
@@ -302,6 +313,9 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                           type="time"
                           value={task.dueTime || ''}
                           onChange={(e) => update('dueTime', e.target.value || undefined)}
+                          autoComplete="off"
+                          data-1p-ignore
+                          data-lpignore="true"
                           className="px-2.5 py-1 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/60 focus:outline-none focus:border-brand-500/40"
                           style={{ colorScheme: 'dark' }}
                         />
@@ -312,6 +326,9 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                           type="time"
                           value={task.dueTimeEnd || ''}
                           onChange={(e) => update('dueTimeEnd', e.target.value || undefined)}
+                          autoComplete="off"
+                          data-1p-ignore
+                          data-lpignore="true"
                           className="px-2.5 py-1 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/60 focus:outline-none focus:border-brand-500/40"
                           style={{ colorScheme: 'dark' }}
                           placeholder="optional"
