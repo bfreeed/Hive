@@ -4,7 +4,7 @@ import {
   FileText, AlertCircle, Loader2, ChevronRight,
 } from 'lucide-react';
 import {
-  listFolderFiles, getFolderMeta, ensureDriveToken, clearDriveToken,
+  listFolderFiles, getFolderMeta, ensureDriveToken, clearDriveToken, getDriveToken,
   extractFolderIdFromUrl, mimeLabel, isFolder, formatBytes,
   type DriveFile,
 } from '../lib/googleDrive';

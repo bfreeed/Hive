@@ -77,7 +77,9 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteStatus, setInviteStatus] = useState<'idle' | 'loading' | 'sent' | 'notfound' | 'already'>('idle');
   const inviteRef = useRef<HTMLInputElement>(null);
-  const [activeTab, setActiveTab] = useState<MainTab>('tasks');
+  const [activeTab, setActiveTab] = useState<MainTab>(() => {
+    return (localStorage.getItem(`hive_project_tab_${projectId}`) as MainTab) ?? 'tasks';
+  });
   const [mainTabOrder, setMainTabOrder] = useState<MainTab[]>(() => {
     try {
       const saved = localStorage.getItem('hive_main_tabOrder');
@@ -394,7 +396,7 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
               {project.description && <p className="text-white/40 text-sm">{project.description}</p>}
             </div>
             <button
-              onClick={() => { setActiveTab('tasks'); setShowAddTask(true); }}
+              onClick={() => { setActiveTab('tasks'); localStorage.setItem(`hive_project_tab_${projectId}`, 'tasks'); setShowAddTask(true); }}
               className="flex items-center gap-2 px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-sm rounded-lg transition-colors"
             >
               <Plus size={14} /> Add Task
@@ -540,7 +542,7 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                   id={tab}
                   label={getMainTabLabel(tab)}
                   active={activeTab === tab}
-                  onClick={() => setActiveTab(tab)}
+                  onClick={() => { setActiveTab(tab); localStorage.setItem(`hive_project_tab_${projectId}`, tab); }}
                 />
               ))}
             </SortableContext>
