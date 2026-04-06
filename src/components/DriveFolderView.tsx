@@ -172,11 +172,14 @@ export default function DriveFolderView({
     setNeedsAuth(false);
     setError(null);
     try {
-      const token = await ensureDriveToken(clientId);
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Connection timed out. Try clicking Connect again.')), 15_000)
+      );
+      const token = await Promise.race([ensureDriveToken(clientId), timeout]);
       const results = await listFolderFiles(folder.id, token);
       setFiles(results);
     } catch (err: any) {
-      if (err.message?.includes('401') || err.message?.includes('token')) {
+      if (err.message?.includes('401') || err.message?.includes('token') || err.message?.includes('access_denied') || err.message?.includes('popup_closed')) {
         clearDriveToken();
         setNeedsAuth(true);
       } else {
