@@ -1,10 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getUserSettings, supabaseAdmin } from '../_lib/auth';
+import { getUserSettings, supabaseAdmin } from './_lib/auth';
 import { randomBytes } from 'crypto';
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
 const APP_URL = process.env.APP_URL || 'https://hivenow.app';
-const REDIRECT_URI = `${APP_URL}/api/auth/google-drive-callback`;
+const REDIRECT_URI = `${APP_URL}/api/google-drive-callback`;
 const SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -13,7 +13,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const ctx = await getUserSettings(req, res);
   if (!ctx) return;
 
-  // Generate random state and store it so the callback can look up the user
   const state = randomBytes(32).toString('hex');
   await supabaseAdmin
     .from('user_settings')
@@ -26,7 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     response_type: 'code',
     scope: SCOPE,
     access_type: 'offline',
-    prompt: 'consent', // always return refresh_token
+    prompt: 'consent',
     state,
   });
 

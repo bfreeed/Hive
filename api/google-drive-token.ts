@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getUserSettings, supabaseAdmin } from '../_lib/auth';
+import { getUserSettings, supabaseAdmin } from './_lib/auth';
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!;
@@ -16,13 +16,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ connected: false });
   }
 
-  // Token still valid
   const expiry = settings.google_drive_token_expiry ?? 0;
   if (Date.now() < expiry) {
     return res.status(200).json({ connected: true, token: settings.google_drive_access_token });
   }
 
-  // Expired — try refresh
   if (!settings.google_drive_refresh_token) {
     return res.status(200).json({ connected: false });
   }
@@ -41,7 +39,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const tokens = await refreshRes.json() as { access_token?: string; expires_in?: number };
 
   if (!refreshRes.ok || !tokens.access_token) {
-    // Clear stale token so user is prompted to reconnect
     await supabaseAdmin
       .from('user_settings')
       .update({ google_drive_access_token: null, google_drive_token_expiry: null })

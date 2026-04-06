@@ -176,7 +176,7 @@ export default function DriveFolderView({ folderId, folderName, onLink, onUnlink
     setLoading(true);
     setError(null);
     try {
-      const res = await apiFetch<{ connected: boolean; token?: string }>('/api/drive/token');
+      const res = await apiFetch<{ connected: boolean; token?: string }>('/api/google-drive-token');
       if (!res.connected) {
         setConnected(false);
         setLoading(false);
@@ -195,7 +195,7 @@ export default function DriveFolderView({ folderId, folderName, onLink, onUnlink
     setLoading(true);
     setError(null);
     try {
-      const res = await apiFetch<{ connected: boolean; files?: DriveFile[]; error?: string }>('/api/drive/files', { folderId: folder.id });
+      const res = await apiFetch<{ connected: boolean; files?: DriveFile[]; error?: string }>('/api/google-drive-files', { folderId: folder.id });
       if (!res.connected) { setConnected(false); return; }
       if (res.error) { setError(res.error); return; }
       setFiles(res.files ?? []);
@@ -209,7 +209,7 @@ export default function DriveFolderView({ folderId, folderName, onLink, onUnlink
   const handleConnect = async () => {
     setError(null);
     try {
-      const res = await apiFetch<{ authUrl?: string; error?: string }>('/api/auth/google-drive-initiate');
+      const res = await apiFetch<{ authUrl?: string; error?: string }>('/api/google-drive-initiate');
       if (res.authUrl) {
         window.location.href = res.authUrl;
       } else {
