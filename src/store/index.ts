@@ -147,6 +147,10 @@ function dbToContact(row: any): Contact {
     email: row.email ?? undefined,
     phone: row.phone ?? undefined,
     avatar: row.avatar ?? undefined,
+    business: row.business ?? undefined,
+    birthday: row.birthday ?? undefined,
+    address: row.address ?? undefined,
+    relationshipTagIds: row.relationship_tag_ids ?? [],
     projectIds: row.project_ids ?? [],
     notes: row.notes ?? undefined,
     bookingLink: row.booking_link ?? undefined,
@@ -162,6 +166,10 @@ function contactToDb(c: Contact, userId?: string) {
     email: c.email ?? null,
     phone: c.phone ?? null,
     avatar: c.avatar ?? null,
+    business: c.business ?? null,
+    birthday: c.birthday ?? null,
+    address: c.address ?? null,
+    relationship_tag_ids: c.relationshipTagIds,
     project_ids: c.projectIds,
     notes: c.notes ?? null,
     booking_link: c.bookingLink ?? null,
@@ -380,8 +388,9 @@ interface AppStore {
   permanentDeleteProject: (id: string) => void;
   emptyTrash: () => void;
   addUser: (email: string, name?: string) => User;
-  addContact: (c: Omit<Contact, 'id' | 'meetings' | 'linkedTaskIds'>) => void;
+  addContact: (c: Omit<Contact, 'id' | 'meetings' | 'linkedTaskIds' | 'relationshipTagIds'>) => void;
   updateContact: (id: string, u: Partial<Contact>) => void;
+  deleteContact: (id: string) => void;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   deleteNotification: (id: string) => void;
@@ -1057,7 +1066,7 @@ export const useStore = create<AppStore>()((set, get) => ({
   // -------------------------------------------------------------------------
   addContact: (c) => {
     const currentUserId = get().currentUser.id;
-    const newContact: Contact = { ...c, id: uid(), meetings: [], linkedTaskIds: [] };
+    const newContact: Contact = { relationshipTagIds: [], ...c, id: uid(), meetings: [], linkedTaskIds: [] };
     set((s) => ({ contacts: [...s.contacts, newContact] }));
     supabase.from('contacts').insert(contactToDb(newContact, currentUserId))
       .then(({ error }) => { if (error) console.error('addContact error:', error); });
@@ -1070,6 +1079,12 @@ export const useStore = create<AppStore>()((set, get) => ({
       supabase.from('contacts').update(contactToDb(updated)).eq('id', id)
         .then(({ error }) => { if (error) console.error('updateContact error:', error); });
     }
+  },
+
+  deleteContact: (id) => {
+    set((s) => ({ contacts: s.contacts.filter((c) => c.id !== id) }));
+    supabase.from('contacts').delete().eq('id', id)
+      .then(({ error }) => { if (error) console.error('deleteContact error:', error); });
   },
 
   // -------------------------------------------------------------------------

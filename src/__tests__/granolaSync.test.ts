@@ -15,6 +15,7 @@ const makeContact = (overrides: Partial<Contact> = {}): Contact => ({
   id: 'c1',
   name: 'Alice Example',
   email: 'alice@example.com',
+  relationshipTagIds: [],
   projectIds: [],
   meetings: [],
   linkedTaskIds: [],

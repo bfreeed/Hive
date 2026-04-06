@@ -116,12 +116,22 @@ export interface Project {
   deletedAt?: string;
 }
 
+export interface RelationshipTag {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface Contact {
   id: string;
   name: string;
   email?: string;
   phone?: string;
   avatar?: string;
+  business?: string;
+  birthday?: string;
+  address?: string;
+  relationshipTagIds: string[];
   projectIds: string[];
   notes?: string;
   bookingLink?: string;
@@ -204,6 +214,8 @@ export interface UserSettings {
   anthropicApiKey?: string;
   // Home layout
   homeSections?: HomeSection[];
+  // Relationship tags for contacts
+  relationshipTags?: RelationshipTag[];
   createdAt?: string;
   updatedAt?: string;
 }
