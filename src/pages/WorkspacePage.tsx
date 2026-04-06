@@ -10,6 +10,11 @@ import { SpaceEditor } from '../components/workspace/SpaceEditor';
 // Template picker modal
 // ─────────────────────────────────────────────
 function TemplatePicker({ onSelect, onClose }: { onSelect: (templateId: string | null) => void; onClose: () => void }) {
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
       <div className="bg-[#18181b] border border-white/10 rounded-2xl p-6 w-[640px] max-h-[80vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>

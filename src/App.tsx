@@ -21,6 +21,7 @@ import NotificationsPage from './pages/NotificationsPage';
 import TodayPage from './pages/TodayPage';
 import MeetingsPage, { useUnreviewedMeetingCount } from './pages/MeetingsPage';
 import MobileProjectsPage from './pages/MobileProjectsPage';
+import TrashPage from './pages/TrashPage';
 import { useReminderChecker } from './hooks/useReminderChecker';
 import { useHealthSweep } from './hooks/useHealthSweep';
 import { useGranolaSync } from './hooks/useGranolaSync';
@@ -537,7 +538,8 @@ type Page =
   | { id: 'project'; projectId: string }
   | { id: 'team-member'; userId: string }
   | { id: 'notifications' }
-  | { id: 'settings' };
+  | { id: 'settings' }
+  | { id: 'trash' };
 
 function hashToPage(hash: string): Page {
   const h = hash.replace(/^#/, '');
@@ -548,6 +550,7 @@ function hashToPage(hash: string): Page {
   if (h === 'meetings') return { id: 'meetings' };
   if (h === 'notifications') return { id: 'notifications' };
   if (h === 'settings') return { id: 'settings' };
+  if (h === 'trash') return { id: 'trash' };
   if (h === 'projects') return { id: 'projects' };
   if (h.startsWith('project-')) return { id: 'project', projectId: h.slice(8) };
   if (h.startsWith('team-member-')) return { id: 'team-member', userId: h.slice(12) };
@@ -701,6 +704,7 @@ function AuthenticatedApp() {
     else if (pageName === 'team-member' && id) newPage = { id: 'team-member', userId: id };
     else if (pageName === 'notifications') newPage = { id: 'notifications' };
     else if (pageName === 'settings') newPage = { id: 'settings' };
+    else if (pageName === 'trash') newPage = { id: 'trash' };
     else if (pageName === 'projects') newPage = { id: 'projects' };
     window.location.hash = pageToHash(newPage);
     setPage(newPage);
@@ -736,6 +740,8 @@ function AuthenticatedApp() {
         return <NotificationsPage onNavigate={navigate} onOpenTask={setOpenTaskId} />;
       case 'settings':
         return <SettingsPage currentUser={currentUser} darkMode={darkMode} toggleDarkMode={toggleDarkMode} />;
+      case 'trash':
+        return <TrashPage />;
       default:
         return <Home onNavigate={navigate} onOpenTask={setOpenTaskId} />;
     }

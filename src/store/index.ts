@@ -62,6 +62,7 @@ function dbToTask(row: any): Task {
     completedAt: row.completed_at ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    deletedAt: row.deleted_at ?? undefined,
   };
 }
 
@@ -112,8 +113,11 @@ function dbToProject(row: any): Project {
     isPrivate: row.is_private ?? false,
     createdAt: row.created_at,
     parentId: row.parent_id ?? undefined,
+    folderId: row.folder_id ?? undefined,
+    isFolder: row.is_folder ?? false,
     googleDriveFolderId: row.google_drive_folder_id ?? undefined,
     googleDriveFolderName: row.google_drive_folder_name ?? undefined,
+    deletedAt: row.deleted_at ?? undefined,
   };
 }
 
@@ -129,6 +133,8 @@ function projectToDb(p: Project) {
     is_private: p.isPrivate,
     created_at: p.createdAt,
     parent_id: p.parentId ?? null,
+    folder_id: p.folderId ?? null,
+    is_folder: p.isFolder ?? false,
     google_drive_folder_id: p.googleDriveFolderId ?? null,
     google_drive_folder_name: p.googleDriveFolderName ?? null,
   };
@@ -336,7 +342,9 @@ interface AppStore {
   currentUser: User;
   users: User[];
   projects: Project[];
+  trashedProjects: Project[];
   tasks: Task[];
+  trashedTasks: Task[];
   contacts: Contact[];
   notifications: Notification[];
   channels: Channel[];
@@ -363,8 +371,14 @@ interface AppStore {
   addComment: (taskId: string, body: string) => void;
   updateTask: (id: string, u: Partial<Task>) => void;
   deleteTask: (id: string) => void;
+  restoreTask: (id: string) => void;
+  permanentDeleteTask: (id: string) => void;
   addProject: (p: Omit<Project, 'id' | 'createdAt'>) => void;
   updateProject: (id: string, u: Partial<Project>) => void;
+  deleteProject: (id: string) => void;
+  restoreProject: (id: string) => void;
+  permanentDeleteProject: (id: string) => void;
+  emptyTrash: () => void;
   addUser: (email: string, name?: string) => User;
   addContact: (c: Omit<Contact, 'id' | 'meetings' | 'linkedTaskIds'>) => void;
   updateContact: (id: string, u: Partial<Contact>) => void;
@@ -427,7 +441,9 @@ export const useStore = create<AppStore>()((set, get) => ({
   currentUser: LEV,
   users: [LEV],
   projects: PROJECTS,
+  trashedProjects: [],
   tasks: TASKS,
+  trashedTasks: [],
   contacts: CONTACTS,
   notifications: [],
   invitations: [],
@@ -460,16 +476,19 @@ export const useStore = create<AppStore>()((set, get) => ({
 
       // If no auth user, clear everything and bail out early
       if (!authUser) {
-        set({ isLoading: false, projects: [], tasks: [], channels: CHANNELS, messages: [], meetings: [], pages: [] });
+        set({ isLoading: false, projects: [], trashedProjects: [], tasks: [], trashedTasks: [], channels: CHANNELS, messages: [], meetings: [], pages: [] });
         return;
       }
 
       const uid = authUser.id;
 
       // Load all tables in parallel — filter at DB level so other users' data never reaches the client
+
       const [
         tasksRes,
+        trashedTasksRes,
         projectsRes,
+        trashedProjectsRes,
         contactsRes,
         channelsRes,
         messagesRes,
@@ -481,8 +500,10 @@ export const useStore = create<AppStore>()((set, get) => ({
         pagesRes,
         invitationsRes,
       ] = await Promise.allSettled([
-        supabase.from('tasks').select('*').contains('assignee_ids', [uid]).order('created_at', { ascending: true }),
-        supabase.from('projects').select('*').contains('member_ids', [uid]).order('created_at', { ascending: true }),
+        supabase.from('tasks').select('*').contains('assignee_ids', [uid]).is('deleted_at', null).order('created_at', { ascending: true }),
+        supabase.from('tasks').select('*').contains('assignee_ids', [uid]).not('deleted_at', 'is', null).order('deleted_at', { ascending: false }),
+        supabase.from('projects').select('*').contains('member_ids', [uid]).is('deleted_at', null).order('created_at', { ascending: true }),
+        supabase.from('projects').select('*').contains('member_ids', [uid]).not('deleted_at', 'is', null).order('deleted_at', { ascending: false }),
         supabase.from('contacts').select('*').eq('user_id', uid),
         supabase.from('channels').select('*').contains('member_ids', [uid]),
         supabase.from('messages').select('*').order('created_at', { ascending: true }),
@@ -528,9 +549,26 @@ export const useStore = create<AppStore>()((set, get) => ({
           .map(dbToUser);
       }
 
-      // Data is already filtered at the DB query level — just map it
-      updates.projects = (projectsRes.data ?? []).map(dbToProject);
-      updates.tasks = (tasksRes.data ?? []).map(dbToTask);
+      // Map projects — if deleted_at column doesn't exist yet, fall back to all projects
+      if (projectsRes.data) {
+        updates.projects = projectsRes.data.map(dbToProject);
+        updates.trashedProjects = (trashedProjectsRes.data ?? []).map(dbToProject);
+      } else {
+        // Migration not yet run — fetch all projects without deleted_at filter
+        const { data: allProjects } = await supabase.from('projects').select('*').contains('member_ids', [uid]).order('created_at', { ascending: true });
+        updates.projects = (allProjects ?? []).map(dbToProject);
+        updates.trashedProjects = [];
+      }
+
+      // Map tasks — same fallback pattern
+      if (tasksRes.data) {
+        updates.tasks = tasksRes.data.map(dbToTask);
+        updates.trashedTasks = (trashedTasksRes.data ?? []).map(dbToTask);
+      } else {
+        const { data: allTasks } = await supabase.from('tasks').select('*').contains('assignee_ids', [uid]).order('created_at', { ascending: true });
+        updates.tasks = (allTasks ?? []).map(dbToTask);
+        updates.trashedTasks = [];
+      }
       let userChannels = channelsRes.data ?? [];
 
       // If no channels returned, the general channel likely has old 'lev' member_ids — fix it
@@ -851,9 +889,34 @@ export const useStore = create<AppStore>()((set, get) => ({
   }),
 
   deleteTask: (id) => {
-    set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) }));
-    supabase.from('tasks').delete().eq('id', id)
+    const now = new Date().toISOString();
+    const task = get().tasks.find(t => t.id === id);
+    if (!task) return;
+    const trashed: Task = { ...task, deletedAt: now };
+    set((s) => ({
+      tasks: s.tasks.filter(t => t.id !== id),
+      trashedTasks: [trashed, ...s.trashedTasks],
+    }));
+    supabase.from('tasks').update({ deleted_at: now }).eq('id', id)
       .then(({ error }) => { if (error) console.error('deleteTask error:', error); });
+  },
+
+  restoreTask: (id) => {
+    const task = get().trashedTasks.find(t => t.id === id);
+    if (!task) return;
+    const restored: Task = { ...task, deletedAt: undefined };
+    set((s) => ({
+      trashedTasks: s.trashedTasks.filter(t => t.id !== id),
+      tasks: [...s.tasks, restored],
+    }));
+    supabase.from('tasks').update({ deleted_at: null }).eq('id', id)
+      .then(({ error }) => { if (error) console.error('restoreTask error:', error); });
+  },
+
+  permanentDeleteTask: (id) => {
+    set((s) => ({ trashedTasks: s.trashedTasks.filter(t => t.id !== id) }));
+    supabase.from('tasks').delete().eq('id', id)
+      .then(({ error }) => { if (error) console.error('permanentDeleteTask error:', error); });
   },
 
   // -------------------------------------------------------------------------
@@ -887,6 +950,79 @@ export const useStore = create<AppStore>()((set, get) => ({
           projectId: id,
         });
       });
+    }
+  },
+
+  deleteProject: (id) => {
+    const now = new Date().toISOString();
+    const project = get().projects.find(p => p.id === id);
+    if (!project) return;
+
+    if (project.isFolder) {
+      // Folders: just move child projects out (no trash for folders themselves)
+      set(s => ({
+        projects: s.projects
+          .filter(p => p.id !== id)
+          .map(p => p.folderId === id ? { ...p, folderId: undefined } : p),
+      }));
+      supabase.from('projects').update({ folder_id: null }).eq('folder_id', id);
+      supabase.from('projects').delete().eq('id', id)
+        .then(({ error }) => { if (error) console.error('deleteProject (folder) error:', error); });
+      return;
+    }
+
+    // Soft-delete the project
+    const trashed: Project = { ...project, deletedAt: now };
+
+    // Also soft-delete all tasks belonging to this project
+    const affectedTasks = get().tasks.filter(t => t.projectIds.includes(id));
+    const trashedTasks: Task[] = affectedTasks.map(t => ({ ...t, deletedAt: now }));
+
+    set(s => ({
+      projects: s.projects.filter(p => p.id !== id),
+      trashedProjects: [trashed, ...s.trashedProjects],
+      tasks: s.tasks.filter(t => !t.projectIds.includes(id)),
+      trashedTasks: [...trashedTasks, ...s.trashedTasks],
+    }));
+
+    supabase.from('projects').update({ deleted_at: now }).eq('id', id)
+      .then(({ error }) => { if (error) console.error('deleteProject error:', error); });
+    if (affectedTasks.length > 0) {
+      supabase.from('tasks').update({ deleted_at: now }).in('id', affectedTasks.map(t => t.id))
+        .then(({ error }) => { if (error) console.error('deleteProject tasks error:', error); });
+    }
+  },
+
+  restoreProject: (id) => {
+    const project = get().trashedProjects.find(p => p.id === id);
+    if (!project) return;
+    const restored: Project = { ...project, deletedAt: undefined };
+    set((s) => ({
+      trashedProjects: s.trashedProjects.filter(p => p.id !== id),
+      projects: [...s.projects, restored],
+    }));
+    supabase.from('projects').update({ deleted_at: null }).eq('id', id)
+      .then(({ error }) => { if (error) console.error('restoreProject error:', error); });
+  },
+
+  permanentDeleteProject: (id) => {
+    set((s) => ({ trashedProjects: s.trashedProjects.filter(p => p.id !== id) }));
+    supabase.from('projects').delete().eq('id', id)
+      .then(({ error }) => { if (error) console.error('permanentDeleteProject error:', error); });
+  },
+
+  emptyTrash: () => {
+    const { trashedProjects, trashedTasks } = get();
+    const projectIds = trashedProjects.map(p => p.id);
+    const taskIds = trashedTasks.map(t => t.id);
+    set({ trashedProjects: [], trashedTasks: [] });
+    if (projectIds.length > 0) {
+      supabase.from('projects').delete().in('id', projectIds)
+        .then(({ error }) => { if (error) console.error('emptyTrash projects error:', error); });
+    }
+    if (taskIds.length > 0) {
+      supabase.from('tasks').delete().in('id', taskIds)
+        .then(({ error }) => { if (error) console.error('emptyTrash tasks error:', error); });
     }
   },
 
