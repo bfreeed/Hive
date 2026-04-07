@@ -362,6 +362,8 @@ interface AppStore {
   isLoading: boolean;
   granolaManualSyncTrigger: number;
   triggerGranolaSync: () => void;
+  firefliesManualSyncTrigger: number;
+  triggerFirefliesSync: () => void;
 
   loadData: () => Promise<void>;
 
@@ -467,6 +469,8 @@ export const useStore = create<AppStore>()((set, get) => ({
   isLoading: false,
   granolaManualSyncTrigger: 0,
   triggerGranolaSync: () => set(s => ({ granolaManualSyncTrigger: s.granolaManualSyncTrigger + 1 })),
+  firefliesManualSyncTrigger: 0,
+  triggerFirefliesSync: () => set(s => ({ firefliesManualSyncTrigger: s.firefliesManualSyncTrigger + 1 })),
   userStatuses: {},
 
   // -------------------------------------------------------------------------

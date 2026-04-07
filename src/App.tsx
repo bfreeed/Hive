@@ -24,6 +24,7 @@ import MobileProjectsPage from './pages/MobileProjectsPage';
 import TrashPage from './pages/TrashPage';
 import { useHealthSweep } from './hooks/useHealthSweep';
 import { useGranolaSync } from './hooks/useGranolaSync';
+import { useFirefliesSync } from './hooks/useFirefliesSync';
 import { GOOGLE_CLIENT_ID_KEY, GOOGLE_API_KEY_KEY, ANTHROPIC_API_KEY_KEY } from './lib/storageKeys';
 
 function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: any; darkMode: boolean; toggleDarkMode: () => void }) {
@@ -32,9 +33,11 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
   const apiKeyRef = useRef<HTMLInputElement>(null);
   const anthropicKeyRef = useRef<HTMLInputElement>(null);
   const granolaKeyRef = useRef<HTMLInputElement>(null);
+  const firefliesKeyRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const [saved, setSaved] = useState(false);
   const [granolaKeySaved, setGranolaKeySaved] = useState(false);
+  const [firefliesKeySaved, setFirefliesKeySaved] = useState(false);
   const [importPreview, setImportPreview] = useState<any>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [newFlagName, setNewFlagName] = useState('');
@@ -45,6 +48,7 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
   const [showApiKey, setShowApiKey] = useState(false);
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
   const [showGranolaKey, setShowGranolaKey] = useState(false);
+  const [showFirefliesKey, setShowFirefliesKey] = useState(false);
 
   const FLAG_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#10b981', '#06b6d4', '#6366f1', '#a855f7', '#ec4899'];
 
@@ -163,6 +167,45 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
       console.error('Sync failed:', e);
     }
     setSyncing(false);
+  };
+
+  const saveFirefliesKey = async () => {
+    const key = firefliesKeyRef.current?.value.trim() ?? '';
+    await saveUserSettings({ firefliesApiKey: key || undefined, firefliesLastSyncedAt: undefined });
+    setFirefliesKeySaved(true);
+    setTimeout(() => setFirefliesKeySaved(false), 2000);
+  };
+
+  const [syncingFireflies, setSyncingFireflies] = useState(false);
+  const syncFirefliesNow = async () => {
+    const apiKey = firefliesKeyRef.current?.value.trim() || userSettings?.firefliesApiKey || '';
+    if (!apiKey || syncingFireflies) return;
+    setSyncingFireflies(true);
+    try {
+      const res = await apiFetch('/api/sync-fireflies', { since: null, limit: 30 });
+      if (!res.ok) { setSyncingFireflies(false); return; }
+      const { notes } = await res.json() as { notes: any[]; count: number };
+      const { upsertMeeting, updateMeeting, meetings: currentMeetings, contacts, projects } = useStore.getState();
+      const existingIds = new Set(currentMeetings.filter(m => m.externalId).map(m => `${m.provider}:${m.externalId}`));
+      for (const note of notes) {
+        try {
+          const meeting = await upsertMeeting({ ...note, contactId: '', linkedContactIds: [], linkedProjectIds: [], suggestedProjectIds: [], actionItems: [], hasProjectLinks: false, reviewed: false });
+          const isNew = !existingIds.has(`${note.provider}:${note.externalId}`);
+          const hasNoItems = !meeting.actionItems || meeting.actionItems.length === 0;
+          if ((isNew || hasNoItems) && (note.notes || note.transcript)) {
+            apiFetch('/api/link-meeting', { meetingId: meeting.id, title: note.title, notes: note.notes, transcript: note.transcript, projects: projects.map((p: any) => ({ id: p.id, name: p.name })) }).then(r => r.json()).then((linked: any) => {
+              updateMeeting(meeting.id, { linkedProjectIds: linked.linkedProjectIds ?? [], suggestedProjectIds: linked.suggestedProjectIds ?? [], actionItems: linked.actionItems ?? [], hasProjectLinks: (linked.linkedProjectIds?.length ?? 0) > 0 });
+            }).catch(() => {});
+          }
+        } catch (noteErr) {
+          console.error('Fireflies sync: failed to upsert note', note.externalId, noteErr);
+        }
+      }
+      await saveUserSettings({ firefliesLastSyncedAt: new Date().toISOString() });
+    } catch (e) {
+      console.error('Fireflies sync failed:', e);
+    }
+    setSyncingFireflies(false);
   };
 
   return (
@@ -481,11 +524,55 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
               </div>
             </div>
 
-            {/* Fireflies — coming soon */}
-            <div className="border-t border-white/[0.06] pt-4 opacity-40">
-              <div className="flex items-center gap-2">
+            {/* Fireflies */}
+            <div className="border-t border-white/[0.06] pt-4">
+              <div className="flex items-center gap-2 mb-3">
                 <span className="text-sm font-medium text-white/70">Fireflies</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-white/[0.06] text-white/30 font-semibold">Coming soon</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-orange-500/10 text-orange-400 font-semibold">Supported</span>
+                {userSettings?.firefliesLastSyncedAt ? (
+                  <span className="text-[10px] text-white/25 ml-auto flex items-center gap-2">
+                    Last synced {new Date(userSettings.firefliesLastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    <button
+                      onClick={() => saveUserSettings({ firefliesLastSyncedAt: undefined })}
+                      className="text-white/30 hover:text-white/60 underline transition-colors"
+                    >
+                      Re-sync all
+                    </button>
+                  </span>
+                ) : null}
+              </div>
+              <p className="text-xs text-white/25 mb-3">
+                Requires Fireflies Business plan. Get your API key at app.fireflies.ai → Settings → Developer API.
+              </p>
+              <div className="mb-3">
+                <label className="text-xs text-white/40 block mb-1.5">Fireflies API Key</label>
+                <div className="relative">
+                  <input
+                    ref={firefliesKeyRef}
+                    type={showFirefliesKey ? 'text' : 'password'}
+                    defaultValue={userSettings?.firefliesApiKey ?? ''}
+                    placeholder="ff_..."
+                    className="w-full px-3 py-2 pr-9 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white/60 placeholder-white/20 focus:outline-none focus:border-brand-500/40 font-mono"
+                  />
+                  <button type="button" onClick={() => setShowFirefliesKey(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/50 transition-colors">
+                    {showFirefliesKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={saveFirefliesKey}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${firefliesKeySaved ? 'bg-emerald-500/20 text-emerald-400' : 'bg-brand-600 hover:bg-brand-500 text-white'}`}
+                >
+                  {firefliesKeySaved ? '✓ Saved' : 'Save API Key'}
+                </button>
+                <button
+                  onClick={syncFirefliesNow}
+                  disabled={syncingFireflies}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-white/[0.06] hover:bg-white/[0.10] text-white/60 hover:text-white/80 transition-colors disabled:opacity-50"
+                >
+                  {syncingFireflies ? 'Syncing…' : 'Sync Now'}
+                </button>
               </div>
             </div>
 
@@ -666,6 +753,7 @@ function AuthenticatedApp() {
 
   useHealthSweep(currentUser?.id || '__loading__');
   useGranolaSync();
+  useFirefliesSync();
   const unreviewedMeetingCount = useUnreviewedMeetingCount();
 
   // Handle ?task=xxx URL param for deep links from SMS reminders
