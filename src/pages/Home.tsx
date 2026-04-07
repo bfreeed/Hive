@@ -339,12 +339,6 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
             </p>
             <div className="flex items-center gap-2 flex-shrink-0">
               <button
-                onClick={() => captureRef.current?.open()}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-brand-500 text-white hover:bg-brand-600 active:scale-95 transition-all shadow-lg shadow-brand-500/25"
-              >
-                <Plus size={15} /> New Task
-              </button>
-              <button
                 onClick={triggerBriefing}
                 disabled={isSpeaking}
                 title="Read morning briefing aloud"

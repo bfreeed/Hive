@@ -887,23 +887,8 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
               ? projects.find(p => p.id === filterProject)?.name ?? 'Project'
               : 'My Tasks'}
           </h1>
-          {/* New Task + Search + View toggle + Sort */}
+          {/* Search + View toggle + Sort */}
           <div className="flex items-center gap-2 sm:gap-4">
-            <button
-              onClick={() => captureRef.current?.open()}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-sm rounded-lg transition-colors"
-            >
-              <Plus size={14} /> New Task
-            </button>
-            <div className="relative hidden sm:block">
-              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/30" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search..."
-                className="bg-white/[0.04] border border-white/[0.08] rounded-lg pl-8 pr-3 py-1.5 text-xs text-white/70 placeholder-white/20 focus:outline-none focus:border-brand-500/50 w-40"
-              />
-            </div>
           <div className="hidden sm:flex items-center gap-1">
             {([
               { id: 'list' as const,  icon: <List size={14} />,       label: 'List'  },
@@ -1009,8 +994,21 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
           </div>
         )}
 
-        <div className="max-w-3xl mx-auto">
-          <InlineCapture ref={captureRef} onOpenDetail={id => onOpenTask(id)} />
+        <div className="max-w-3xl mx-auto flex items-stretch gap-2 mb-6">
+          {/* Search bar */}
+          <div className="relative flex-shrink-0 w-48">
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search tasks..."
+              className="h-full w-full bg-white/[0.04] border border-dashed border-white/40 hover:border-white/55 rounded-xl pl-8 pr-3 text-sm text-white/70 placeholder-white/30 focus:outline-none focus:border-brand-500/50 transition-colors"
+            />
+          </div>
+          {/* New Task inline capture */}
+          <div className="flex-1 min-w-0">
+            <InlineCapture ref={captureRef} onOpenDetail={id => onOpenTask(id)} />
+          </div>
         </div>
 
         {/* Task list / board */}

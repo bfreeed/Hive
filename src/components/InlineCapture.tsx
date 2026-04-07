@@ -91,9 +91,9 @@ const InlineCapture = forwardRef<InlineCaptureHandle, InlineCaptureProps>(functi
     return (
       <button
         onClick={() => setShow(true)}
-        className="mb-6 w-full flex items-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-white/40 hover:border-white/55 text-white/40 hover:text-white/60 text-sm transition-colors"
+        className="w-full h-full flex items-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-white/40 hover:border-white/55 text-white/40 hover:text-white/60 text-sm transition-colors"
       >
-        <Plus size={14} /> Quick capture… <span className="ml-auto text-xs font-mono bg-white/[0.06] px-1.5 py-0.5 rounded">N</span>
+        <Plus size={14} /> New Task… <span className="ml-auto text-xs font-mono bg-white/[0.06] px-1.5 py-0.5 rounded">N</span>
       </button>
     );
   }
@@ -101,7 +101,7 @@ const InlineCapture = forwardRef<InlineCaptureHandle, InlineCaptureProps>(functi
   const selectClass = 'text-xs bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-1.5 text-white/60 focus:outline-none';
 
   return (
-    <div ref={containerRef} className="mb-6 bg-white/[0.04] rounded-xl border border-brand-500/30 overflow-hidden">
+    <div ref={containerRef} className="bg-white/[0.04] rounded-xl border border-brand-500/30 overflow-hidden">
       {/* Title row */}
       <div className="flex items-center gap-2 px-3 py-2.5">
         <input
