@@ -251,7 +251,7 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
       {/* Header */}
       <div className="flex items-center justify-between px-3 h-14 border-b border-white/[0.06]">
         {sidebarOpen && <span className="text-sm font-semibold text-white tracking-tight">Hive</span>}
-        <button onClick={toggleSidebar} className="p-1.5 rounded-md text-white/40 hover:text-white/80 hover:bg-white/[0.06] transition-colors ml-auto">
+        <button onClick={toggleSidebar} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-white/40 hover:text-white/80 hover:bg-white/[0.06] transition-colors ml-auto">
           <Menu size={16} />
         </button>
       </div>
@@ -276,10 +276,10 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
         {/* Projects */}
         <div className="pt-3">
           {sidebarOpen ? (
-            <div ref={projectsMenuRef} className="flex items-center px-2 py-1 group/projheader relative">
+            <div ref={projectsMenuRef} className="flex items-center px-2 py-1.5 group/projheader relative">
               <button
                 onClick={() => setProjectsExpanded(!projectsExpanded)}
-                className="flex items-center gap-1.5 text-xs font-medium text-white/30 hover:text-white/60 uppercase tracking-wider transition-colors flex-1"
+                className="flex items-center gap-1.5 text-xs font-medium text-white/30 hover:text-white/60 uppercase tracking-wider transition-colors flex-1 min-h-[28px]"
               >
                 {projectsExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                 Projects
