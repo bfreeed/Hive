@@ -331,6 +331,7 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
       <div className="max-w-3xl mx-auto px-5 py-6">
         {/* Header */}
         <div className="mb-6">
+          <h1 className="sr-only">Home</h1>
           <p className="text-white/30 text-xs font-medium tracking-wide uppercase mb-3">{today}</p>
           <div className="flex items-center justify-between gap-3">
             <p className="text-white/50 text-sm whitespace-nowrap">
