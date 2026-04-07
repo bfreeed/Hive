@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Declare dark color scheme so browser-native controls (scrollbars, inputs) match */
+:root {
+  color-scheme: dark;
+}
+
 /* DocEditor prose styles */
 .doc-editor h1 { font-size: 1.5rem; font-weight: 600; color: white; margin-bottom: 0.5rem; margin-top: 1rem; }
 .doc-editor h2 { font-size: 1.25rem; font-weight: 600; color: rgba(255,255,255,0.9); margin-bottom: 0.5rem; margin-top: 0.75rem; }
