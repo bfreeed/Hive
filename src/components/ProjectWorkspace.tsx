@@ -12,8 +12,6 @@ import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrate
 
 function sortPages(pageList: HivePage[]): HivePage[] {
   return [...pageList].sort((a, b) => {
-    if (a.type === 'folder' && b.type !== 'folder') return -1;
-    if (a.type !== 'folder' && b.type === 'folder') return 1;
     if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
     return a.createdAt < b.createdAt ? -1 : 1;
   });
