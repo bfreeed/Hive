@@ -355,7 +355,7 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
                     return (
                       <div className="flex items-center gap-1.5 px-2 text-xs text-white/80 cursor-grabbing">
                         <Folder size={11} />
-                        <span className="font-medium uppercase tracking-wide text-[10px]">{p.name}</span>
+                        <span className="font-medium uppercase tracking-wide text-[11px]">{p.name}</span>
                       </div>
                     );
                   }
@@ -585,7 +585,7 @@ function FolderRow({ folder, expanded, folderExpanded, onToggle, onRename, onDel
             onClick={e => e.stopPropagation()}
             className="flex-1 bg-white/[0.08] border border-white/20 rounded px-1 py-0 text-xs text-white focus:outline-none focus:border-brand-500/50 min-w-0" />
         ) : (
-          <span className="truncate flex-1 text-left font-medium uppercase tracking-wide text-[10px]">{folder.name}</span>
+          <span className="truncate flex-1 text-left font-medium uppercase tracking-wide text-[11px]">{folder.name}</span>
         )}
       </button>
       {!editing && (
