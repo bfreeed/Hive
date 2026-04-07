@@ -22,7 +22,6 @@ import TodayPage from './pages/TodayPage';
 import MeetingsPage, { useUnreviewedMeetingCount } from './pages/MeetingsPage';
 import MobileProjectsPage from './pages/MobileProjectsPage';
 import TrashPage from './pages/TrashPage';
-import { useReminderChecker } from './hooks/useReminderChecker';
 import { useHealthSweep } from './hooks/useHealthSweep';
 import { useGranolaSync } from './hooks/useGranolaSync';
 import { GOOGLE_CLIENT_ID_KEY, GOOGLE_API_KEY_KEY, ANTHROPIC_API_KEY_KEY } from './lib/storageKeys';
@@ -145,13 +144,18 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
       const { upsertMeeting, updateMeeting, meetings: currentMeetings, contacts, projects } = useStore.getState();
       const existingIds = new Set(currentMeetings.filter(m => m.externalId).map(m => `${m.provider}:${m.externalId}`));
       for (const note of notes) {
-        const meeting = await upsertMeeting({ ...note, contactId: '', linkedContactIds: [], linkedProjectIds: [], suggestedProjectIds: [], actionItems: [], hasProjectLinks: false, reviewed: false });
-        const isNew = !existingIds.has(`${note.provider}:${note.externalId}`);
-        const hasNoItems = !meeting.actionItems || meeting.actionItems.length === 0;
-        if ((isNew || hasNoItems) && note.notes) {
-          apiFetch('/api/link-meeting', { meetingId: meeting.id, title: note.title, notes: note.notes, transcript: note.transcript, projects: projects.map((p: any) => ({ id: p.id, name: p.name })) }).then(r => r.json()).then((linked: any) => {
-            updateMeeting(meeting.id, { linkedProjectIds: linked.linkedProjectIds ?? [], suggestedProjectIds: linked.suggestedProjectIds ?? [], actionItems: linked.actionItems ?? [], hasProjectLinks: (linked.linkedProjectIds?.length ?? 0) > 0 });
-          }).catch(() => {});
+        try {
+          const meeting = await upsertMeeting({ ...note, contactId: '', linkedContactIds: [], linkedProjectIds: [], suggestedProjectIds: [], actionItems: [], hasProjectLinks: false, reviewed: false });
+          const isNew = !existingIds.has(`${note.provider}:${note.externalId}`);
+          const hasNoItems = !meeting.actionItems || meeting.actionItems.length === 0;
+          if ((isNew || hasNoItems) && note.notes) {
+            apiFetch('/api/link-meeting', { meetingId: meeting.id, title: note.title, notes: note.notes, transcript: note.transcript, projects: projects.map((p: any) => ({ id: p.id, name: p.name })) }).then(r => r.json()).then((linked: any) => {
+              updateMeeting(meeting.id, { linkedProjectIds: linked.linkedProjectIds ?? [], suggestedProjectIds: linked.suggestedProjectIds ?? [], actionItems: linked.actionItems ?? [], hasProjectLinks: (linked.linkedProjectIds?.length ?? 0) > 0 });
+            }).catch(() => {});
+          }
+        } catch (noteErr) {
+          console.error('Granola sync: failed to upsert note', note.externalId, noteErr);
+          // Continue processing remaining notes
         }
       }
       await saveUserSettings({ granolaLastSyncedAt: new Date().toISOString() });
@@ -641,8 +645,6 @@ function AuthenticatedApp() {
   const [cmdKOpen, setCmdKOpen] = useState(false);
   const [quickCaptureText, setQuickCaptureText] = useState<string | null>(null);
 
-  // Mount the SMS reminder checker + Granola sync
-  useReminderChecker(currentUser?.id || '__loading__');
   useHealthSweep(currentUser?.id || '__loading__');
   useGranolaSync();
   const unreviewedMeetingCount = useUnreviewedMeetingCount();

@@ -16,14 +16,7 @@ const DEFAULT_FLAGS: UserFlag[] = [
 /** Placeholder user shown while auth is loading — replaced by real profile from Supabase */
 const PLACEHOLDER_USER: User = { id: '__loading__', name: '', email: '', role: 'owner', flags: DEFAULT_FLAGS };
 
-const now = new Date().toISOString();
-
-const PROJECTS: Project[] = [];
-const SECTIONS: Section[] = [];
-const TASKS: Task[] = [];
-const CONTACTS: Contact[] = [];
 const CHANNELS: Channel[] = [];
-const MESSAGES: Message[] = [];
 
 // ---------------------------------------------------------------------------
 // Mappers: DB row (snake_case) → TypeScript type (camelCase)
@@ -450,16 +443,16 @@ interface AppStore {
 export const useStore = create<AppStore>()((set, get) => ({
   currentUser: PLACEHOLDER_USER,
   users: [PLACEHOLDER_USER],
-  projects: PROJECTS,
+  projects: [],
   trashedProjects: [],
-  tasks: TASKS,
+  tasks: [],
   trashedTasks: [],
-  contacts: CONTACTS,
+  contacts: [],
   notifications: [],
   invitations: [],
   channels: CHANNELS,
-  messages: MESSAGES,
-  sections: SECTIONS,
+  messages: [],
+  sections: [],
   meetings: [],
   pages: [],
   userSettings: null,
@@ -1011,12 +1004,23 @@ export const useStore = create<AppStore>()((set, get) => ({
     const project = get().trashedProjects.find(p => p.id === id);
     if (!project) return;
     const restored: Project = { ...project, deletedAt: undefined };
+    // Also restore tasks that were soft-deleted when the project was deleted
+    const restoredTasks = get().trashedTasks
+      .filter(t => t.projectIds.includes(id))
+      .map(t => ({ ...t, deletedAt: undefined }));
+    const restoredTaskIds = restoredTasks.map(t => t.id);
     set((s) => ({
       trashedProjects: s.trashedProjects.filter(p => p.id !== id),
       projects: [...s.projects, restored],
+      trashedTasks: s.trashedTasks.filter(t => !restoredTaskIds.includes(t.id)),
+      tasks: [...s.tasks, ...restoredTasks],
     }));
     supabase.from('projects').update({ deleted_at: null }).eq('id', id)
       .then(({ error }) => { if (error) console.error('restoreProject error:', error); });
+    if (restoredTaskIds.length > 0) {
+      supabase.from('tasks').update({ deleted_at: null }).in('id', restoredTaskIds)
+        .then(({ error }) => { if (error) console.error('restoreProject tasks error:', error); });
+    }
   },
 
   permanentDeleteProject: (id) => {
@@ -1539,11 +1543,11 @@ supabase.auth.onAuthStateChange((event) => {
   }
   if (event === 'SIGNED_OUT') {
     useStore.setState({
-      tasks: TASKS,
-      projects: PROJECTS,
-      contacts: CONTACTS,
+      tasks: [],
+      projects: [],
+      contacts: [],
       channels: CHANNELS,
-      messages: MESSAGES,
+      messages: [],
       notifications: [],
       users: [PLACEHOLDER_USER],
       currentUser: PLACEHOLDER_USER,
