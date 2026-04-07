@@ -492,8 +492,7 @@ export const useStore = create<AppStore>()((set, get) => ({
 
       const uid = authUser.id;
 
-      // Load all tables in parallel — filter at DB level so other users' data never reaches the client
-
+      // Phase 1 — user-scoped queries with no cross-table dependencies
       const [
         tasksRes,
         trashedTasksRes,
@@ -501,9 +500,7 @@ export const useStore = create<AppStore>()((set, get) => ({
         trashedProjectsRes,
         contactsRes,
         channelsRes,
-        messagesRes,
         notificationsRes,
-        profilesRes,
         prefsRes,
         meetingsRes,
         settingsRes,
@@ -516,16 +513,33 @@ export const useStore = create<AppStore>()((set, get) => ({
         supabase.from('projects').select('*').contains('member_ids', [uid]).not('deleted_at', 'is', null).order('deleted_at', { ascending: false }),
         supabase.from('contacts').select('*').eq('user_id', uid),
         supabase.from('channels').select('*').contains('member_ids', [uid]),
-        supabase.from('messages').select('*').order('created_at', { ascending: true }),
-        supabase.from('notifications').select('*').order('created_at', { ascending: false }),
-        supabase.from('profiles').select('*'),
+        supabase.from('notifications').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
         supabase.from('user_preferences').select('*').eq('user_id', uid).maybeSingle(),
         supabase.from('meetings').select('*').eq('user_id', uid).order('date', { ascending: false }),
         supabase.from('user_settings').select('*').eq('user_id', uid).maybeSingle(),
         supabase.from('pages').select('*').eq('user_id', uid).order('updated_at', { ascending: false }),
         supabase.from('invitations').select('*').eq('invited_user_id', uid).eq('status', 'pending'),
       ]).then(results => results.map((r, i) => {
-        if (r.status === 'rejected') { console.error(`loadData query ${i} failed:`, r.reason); return { data: null, error: r.reason }; }
+        if (r.status === 'rejected') { console.error(`loadData phase1 query ${i} failed:`, r.reason); return { data: null, error: r.reason }; }
+        return r.value;
+      }));
+
+      // Phase 2 — queries that depend on channel membership (must run after phase 1)
+      // Messages filtered to only the user's channels; profiles filtered to channel members only.
+      const phase1Channels = channelsRes.data ?? [];
+      const phase1ChannelIds = phase1Channels.map((c: any) => c.id as string);
+      const allChannelMemberIds = new Set<string>([
+        ...phase1Channels.flatMap((c: any) => c.member_ids ?? []),
+        uid,
+      ]);
+
+      const [messagesRes, profilesRes] = await Promise.allSettled([
+        phase1ChannelIds.length > 0
+          ? supabase.from('messages').select('*').in('channel_id', phase1ChannelIds).order('created_at', { ascending: true })
+          : Promise.resolve({ data: [] as any[], error: null }),
+        supabase.from('profiles').select('*').in('id', Array.from(allChannelMemberIds)),
+      ]).then(results => results.map((r, i) => {
+        if (r.status === 'rejected') { console.error(`loadData phase2 query ${i} failed:`, r.reason); return { data: null, error: r.reason }; }
         return r.value;
       }));
 
@@ -547,16 +561,9 @@ export const useStore = create<AppStore>()((set, get) => ({
         }).then(({ error }) => { if (error) console.error('profile upsert error:', error); });
         updates.currentUser = { id: uid, name: derivedName, email: authUser.email ?? '', role: 'owner', flags: DEFAULT_FLAGS };
       }
-      // Only include users who share a channel with the current user — never expose all of Hive's users
-      // (populated after channels are resolved below, but we set it here using all channel member IDs)
-      const allChannelMemberIds = new Set(
-        (channelsRes.data ?? []).flatMap((c: any) => c.member_ids ?? [])
-      );
-      allChannelMemberIds.add(uid);
+      // Only expose profiles for users who share a channel — already filtered at DB level above
       if (profilesRes.data && profilesRes.data.length > 0) {
-        updates.users = profilesRes.data
-          .filter((p: any) => allChannelMemberIds.has(p.id))
-          .map(dbToUser);
+        updates.users = profilesRes.data.map(dbToUser);
       }
 
       // Map projects — if deleted_at column doesn't exist yet, fall back to all projects
@@ -600,11 +607,8 @@ export const useStore = create<AppStore>()((set, get) => ({
         updates.activeChannelId = userChannels[0]?.id ?? null;
       }
 
-      // Messages: filter to only channels this user is in
-      const userChannelIds = new Set(userChannels.map((c: any) => c.id));
-      updates.messages = (messagesRes.data ?? [])
-        .filter((m: any) => userChannelIds.has(m.channel_id))
-        .map(dbToMessage);
+      // Messages already filtered to this user's channels at DB level (phase 2 query)
+      updates.messages = (messagesRes.data ?? []).map(dbToMessage);
 
       if (contactsRes.data && contactsRes.data.length > 0) {
         updates.contacts = contactsRes.data.map(dbToContact);
@@ -1098,8 +1102,9 @@ export const useStore = create<AppStore>()((set, get) => ({
   },
 
   markAllNotificationsRead: () => {
+    const { currentUser } = get();
     set((s) => ({ notifications: s.notifications.map((n) => ({ ...n, read: true })) }));
-    supabase.from('notifications').update({ read: true }).eq('read', false)
+    supabase.from('notifications').update({ read: true }).eq('read', false).eq('user_id', currentUser.id)
       .then(({ error }) => { if (error) console.error('markAllNotificationsRead error:', error); });
   },
 
