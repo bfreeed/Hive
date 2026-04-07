@@ -105,7 +105,7 @@ function Section({ title, icon, count, color = 'text-white/50', children }: {
 }
 
 export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: string, id?: string) => void; onOpenTask: (id: string) => void }) {
-  const { tasks, projects, meetings, messages, channels, userSettings, saveUserSettings, currentUser, invitations, respondToInvitation } = useStore();
+  const { tasks, projects, messages, channels, userSettings, saveUserSettings, currentUser, invitations, respondToInvitation } = useStore();
   const [isSpeaking, setIsSpeaking] = useState(false);
   const captureRef = useRef<InlineCaptureHandle>(null);
 
@@ -271,39 +271,7 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
     return isWithinInterval(d, { start: addDays(startOfDay(now), 1), end: addDays(startOfDay(now), 7) });
   });
   const questions = activeTasks.filter(t => t.flags?.some(f => f.flagId === 'flag-questions'));
-  const unreviewedMeetings = meetings.filter(m => m.reviewed === false && m.provider && m.provider !== 'manual');
-
   const sectionData: Record<string, { tasks?: typeof activeTasks; count: number; render: () => React.ReactNode }> = {
-    unreviewed_meetings: {
-      count: unreviewedMeetings.length,
-      render: () => unreviewedMeetings.length === 0 ? null : (
-        <div className="mb-6">
-          <div className="flex items-center gap-2 mb-2 text-amber-400">
-            <Sparkles size={13} />
-            <span className="text-xs font-semibold uppercase tracking-wider">Meetings to Review</span>
-            <span className="text-xs opacity-50 ml-1">{unreviewedMeetings.length}</span>
-          </div>
-          <div className="space-y-0.5">
-            {unreviewedMeetings.slice(0, 5).map(m => (
-              <button
-                key={m.id}
-                onClick={() => onNavigate('meetings')}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/[0.04] text-left transition-colors group"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
-                <span className="flex-1 text-sm text-white/70 truncate">{m.title}</span>
-                <ChevronRight size={12} className="text-white/20 group-hover:text-white/40 flex-shrink-0" />
-              </button>
-            ))}
-            {unreviewedMeetings.length > 5 && (
-              <button onClick={() => onNavigate('meetings')} className="text-xs text-white/30 hover:text-white/50 px-3 py-1 transition-colors">
-                +{unreviewedMeetings.length - 5} more
-              </button>
-            )}
-          </div>
-        </div>
-      ),
-    },
     within_72h: {
       count: within72.length,
       render: () => (

@@ -13,7 +13,8 @@ import type { Contact, Meeting } from '../types';
 
 const makeContact = (overrides: Partial<Contact> = {}): Contact => ({
   id: 'c1',
-  name: 'Alice Example',
+  firstName: 'Alice',
+  lastName: 'Example',
   email: 'alice@example.com',
   relationshipTagIds: [],
   projectIds: [],
@@ -58,27 +59,27 @@ describe('matchParticipantsToContacts', () => {
   });
 
   it('matches by exact name (case-insensitive)', () => {
-    const contacts = [makeContact({ id: 'c1', name: 'Alice Example', email: undefined })];
+    const contacts = [makeContact({ id: 'c1', firstName: 'Alice', lastName: 'Example', email: undefined })];
     const result = matchParticipantsToContacts(['alice example'], [], contacts);
     expect(result).toEqual(['c1']);
   });
 
   it('does not match partial names', () => {
-    const contacts = [makeContact({ id: 'c1', name: 'Alice Example' })];
+    const contacts = [makeContact({ id: 'c1', firstName: 'Alice', lastName: 'Example' })];
     const result = matchParticipantsToContacts(['Alice'], [], contacts);
     expect(result).toEqual([]);
   });
 
   it('returns unique IDs even if both name and email match', () => {
-    const contacts = [makeContact({ id: 'c1', name: 'Alice Example', email: 'alice@example.com' })];
+    const contacts = [makeContact({ id: 'c1', firstName: 'Alice', lastName: 'Example', email: 'alice@example.com' })];
     const result = matchParticipantsToContacts(['Alice Example'], ['alice@example.com'], contacts);
     expect(result).toEqual(['c1']);
   });
 
   it('matches multiple contacts', () => {
     const contacts = [
-      makeContact({ id: 'c1', name: 'Alice Example', email: 'alice@example.com' }),
-      makeContact({ id: 'c2', name: 'Bob Smith', email: 'bob@example.com' }),
+      makeContact({ id: 'c1', firstName: 'Alice', lastName: 'Example', email: 'alice@example.com' }),
+      makeContact({ id: 'c2', firstName: 'Bob', lastName: 'Smith', email: 'bob@example.com' }),
     ];
     const result = matchParticipantsToContacts(
       ['Alice Example', 'Bob Smith'],
@@ -91,13 +92,13 @@ describe('matchParticipantsToContacts', () => {
   });
 
   it('returns empty array when no contacts match', () => {
-    const contacts = [makeContact({ id: 'c1', name: 'Carol Jones', email: 'carol@example.com' })];
+    const contacts = [makeContact({ id: 'c1', firstName: 'Carol', lastName: 'Jones', email: 'carol@example.com' })];
     const result = matchParticipantsToContacts(['Alice Example'], ['alice@example.com'], contacts);
     expect(result).toEqual([]);
   });
 
   it('handles contacts without email gracefully', () => {
-    const contacts = [makeContact({ id: 'c1', name: 'Alice Example', email: undefined })];
+    const contacts = [makeContact({ id: 'c1', firstName: 'Alice', lastName: 'Example', email: undefined })];
     const result = matchParticipantsToContacts([], ['alice@example.com'], contacts);
     expect(result).toEqual([]); // no email on contact → no email match
   });

@@ -247,10 +247,11 @@ export default function ContactsPage() {
   const [search, setSearch] = useState('');
   const [showNew, setShowNew] = useState(false);
   const [filterTag, setFilterTag] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<'name' | 'lastContacted'>('name');
+  const [sortBy, setSortBy] = useState<'firstName' | 'lastName' | 'lastContacted'>('firstName');
 
   // New contact form state
-  const [newName, setNewName] = useState('');
+  const [newFirstName, setNewFirstName] = useState('');
+  const [newLastName, setNewLastName] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newBusiness, setNewBusiness] = useState('');
@@ -258,9 +259,9 @@ export default function ContactsPage() {
   const [newAddress, setNewAddress] = useState('');
   const [newProjectIds, setNewProjectIds] = useState<string[]>([]);
   const [newTagIds, setNewTagIds] = useState<string[]>([]);
-  const nameRef = useRef<HTMLInputElement>(null);
+  const firstNameRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { if (showNew) nameRef.current?.focus(); }, [showNew]);
+  useEffect(() => { if (showNew) firstNameRef.current?.focus(); }, [showNew]);
 
   const tags = userSettings?.relationshipTags ?? [];
 
@@ -280,9 +281,11 @@ export default function ContactsPage() {
   }, [contacts, meetings]);
 
   const handleAddContact = () => {
-    if (!newName.trim()) { setShowNew(false); return; }
+    if (!newFirstName.trim()) { setShowNew(false); return; }
+    const fullName = `${newFirstName.trim()} ${newLastName.trim()}`.trim();
     addContact({
-      name: newName.trim(),
+      firstName: newFirstName.trim(),
+      lastName: newLastName.trim(),
       phone: newPhone.trim() || undefined,
       email: newEmail.trim() || undefined,
       business: newBusiness.trim() || undefined,
@@ -291,30 +294,34 @@ export default function ContactsPage() {
       projectIds: newProjectIds,
       notes: '',
     });
-    // Apply relationship tags after creation
     if (newTagIds.length > 0) {
       setTimeout(() => {
-        const created = useStore.getState().contacts.find(c => c.name === newName.trim());
+        const created = useStore.getState().contacts.find(c => `${c.firstName} ${c.lastName}`.trim() === fullName);
         if (created) useStore.getState().updateContact(created.id, { relationshipTagIds: newTagIds });
       }, 50);
     }
-    setNewName(''); setNewPhone(''); setNewEmail(''); setNewBusiness(''); setNewBirthday(''); setNewAddress(''); setNewProjectIds([]); setNewTagIds([]);
-    setShowNew(false);
+    resetNewForm();
   };
 
-  const resetNewForm = () => { setShowNew(false); setNewName(''); setNewPhone(''); setNewEmail(''); setNewBusiness(''); setNewBirthday(''); setNewAddress(''); setNewProjectIds([]); setNewTagIds([]); };
+  const resetNewForm = () => { setShowNew(false); setNewFirstName(''); setNewLastName(''); setNewPhone(''); setNewEmail(''); setNewBusiness(''); setNewBirthday(''); setNewAddress(''); setNewProjectIds([]); setNewTagIds([]); };
+
+  const displayName = (c: { firstName: string; lastName: string }) => `${c.firstName} ${c.lastName}`.trim();
 
   const filtered = contacts
-    .filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || (c.business ?? '').toLowerCase().includes(search.toLowerCase()))
+    .filter(c => {
+      const q = search.toLowerCase();
+      return c.firstName.toLowerCase().includes(q) || c.lastName.toLowerCase().includes(q) || displayName(c).toLowerCase().includes(q) || (c.business ?? '').toLowerCase().includes(q);
+    })
     .filter(c => !filterTag || c.relationshipTagIds.includes(filterTag))
     .sort((a, b) => {
       if (sortBy === 'lastContacted') {
         const da = lastContactedMap[a.id]; const db = lastContactedMap[b.id];
-        if (!da && !db) return a.name.localeCompare(b.name);
+        if (!da && !db) return a.firstName.localeCompare(b.firstName);
         if (!da) return 1; if (!db) return -1;
         return new Date(db).getTime() - new Date(da).getTime();
       }
-      return a.name.localeCompare(b.name);
+      if (sortBy === 'lastName') return a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName);
+      return a.firstName.localeCompare(b.firstName) || a.lastName.localeCompare(b.lastName);
     });
 
   const activeContact = contacts.find(c => c.id === selected);
@@ -391,9 +398,10 @@ export default function ContactsPage() {
               <option value="">All relationships</option>
               {tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
-            <select value={sortBy} onChange={e => setSortBy(e.target.value as 'name' | 'lastContacted')}
+            <select value={sortBy} onChange={e => setSortBy(e.target.value as 'firstName' | 'lastName' | 'lastContacted')}
               className="bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/50 px-2 py-1 focus:outline-none appearance-none cursor-pointer">
-              <option value="name">A-Z</option>
+              <option value="firstName">First Name</option>
+              <option value="lastName">Last Name</option>
               <option value="lastContacted">Recent</option>
             </select>
           </div>
@@ -408,10 +416,10 @@ export default function ContactsPage() {
               <button key={contact.id} onClick={() => setSelected(contact.id)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${selected === contact.id ? 'bg-white/[0.08]' : 'hover:bg-white/[0.04]'}`}>
                 <div className="w-8 h-8 rounded-full bg-brand-600/30 flex items-center justify-center text-sm font-semibold text-brand-300 flex-shrink-0">
-                  {contact.name[0]}
+                  {contact.firstName[0] ?? '?'}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white/80 truncate">{contact.name}</p>
+                  <p className="text-sm font-medium text-white/80 truncate">{displayName(contact)}</p>
                   <div className="flex items-center gap-1 mt-0.5 flex-wrap">
                     {contactTags.slice(0, 2).map(t => (
                       <span key={t.id} className="text-[10px] px-1.5 py-0 rounded-full" style={{ backgroundColor: t.color + '18', color: t.color + 'cc' }}>{t.name}</span>
@@ -434,10 +442,13 @@ export default function ContactsPage() {
             {/* Header */}
             <div className="flex items-start gap-4 mb-6">
               <div className="w-16 h-16 rounded-2xl bg-brand-600/30 flex items-center justify-center text-2xl font-semibold text-brand-300">
-                {activeContact.name[0]}
+                {activeContact.firstName[0] ?? '?'}
               </div>
               <div className="flex-1 min-w-0">
-                <EditableField value={activeContact.name} placeholder="Name" onSave={v => updateContact(activeContact.id, { name: v })} />
+                <div className="flex items-center gap-2">
+                  <EditableField value={activeContact.firstName} placeholder="First name" onSave={v => updateContact(activeContact.id, { firstName: v })} />
+                  <EditableField value={activeContact.lastName} placeholder="Last name" onSave={v => updateContact(activeContact.id, { lastName: v })} />
+                </div>
                 <div className="mt-0.5">
                   <EditableField value={activeContact.business} placeholder="Add business" icon={<Building2 size={14} />}
                     onSave={v => updateContact(activeContact.id, { business: v })} />

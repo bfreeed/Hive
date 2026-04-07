@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useStore } from '../store';
-import { LayoutGrid, List, Plus, ArrowUpDown, X, Lock, ChevronRight, FolderOpen } from 'lucide-react';
+import { LayoutGrid, List, Plus, ArrowUpDown, X, Lock, ChevronRight, FolderOpen, Eye, EyeOff } from 'lucide-react';
 import type { Task } from '../types';
 import { isPast } from 'date-fns';
 import TaskRow from '../components/TaskRow';
@@ -451,26 +451,40 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                 const subTotal = subActive + subDone;
                 const subProgress = subTotal > 0 ? Math.round((subDone / subTotal) * 100) : 0;
                 return (
-                  <button
-                    key={sub.id}
-                    onClick={() => onNavigate('project', sub.id)}
-                    className="flex flex-col gap-2 w-44 p-3 bg-white/[0.03] border border-white/[0.07] rounded-xl hover:border-white/[0.15] hover:bg-white/[0.05] transition-all text-left group"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: sub.color }} />
-                      <span className="text-sm font-medium text-white/80 truncate flex-1 group-hover:text-white">{sub.name}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-white/30">
-                      <FolderOpen size={10} />
-                      <span>{subActive} active</span>
-                      {subDone > 0 && <span>· {subDone} done</span>}
-                    </div>
-                    {subTotal > 0 && (
-                      <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full bg-brand-500/60" style={{ width: `${subProgress}%` }} />
+                  <div key={sub.id} className={`relative flex flex-col gap-2 w-44 p-3 border rounded-xl transition-all group ${sub.hideFromSidebar ? 'bg-white/[0.02] border-white/[0.04] opacity-60' : 'bg-white/[0.03] border-white/[0.07] hover:border-white/[0.15] hover:bg-white/[0.05]'}`}>
+                    <button
+                      onClick={() => onNavigate('project', sub.id)}
+                      className="flex flex-col gap-2 text-left w-full"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: sub.color }} />
+                        <span className="text-sm font-medium text-white/80 truncate flex-1 group-hover:text-white">{sub.name}</span>
                       </div>
+                      <div className="flex items-center gap-2 text-xs text-white/30">
+                        <FolderOpen size={10} />
+                        <span>{subActive} active</span>
+                        {subDone > 0 && <span>· {subDone} done</span>}
+                      </div>
+                      {subTotal > 0 && (
+                        <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full bg-brand-500/60" style={{ width: `${subProgress}%` }} />
+                        </div>
+                      )}
+                    </button>
+                    {/* Hide/show sidebar toggle */}
+                    <button
+                      onClick={e => { e.stopPropagation(); updateProject(sub.id, { hideFromSidebar: !sub.hideFromSidebar }); }}
+                      title={sub.hideFromSidebar ? 'Show in sidebar' : 'Hide from sidebar'}
+                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 rounded text-white/30 hover:text-white/70 transition-all"
+                    >
+                      {sub.hideFromSidebar
+                        ? <Eye size={11} />
+                        : <EyeOff size={11} />}
+                    </button>
+                    {sub.hideFromSidebar && (
+                      <span className="text-[10px] text-white/25">Hidden from sidebar</span>
                     )}
-                  </button>
+                  </div>
                 );
               })}
 
@@ -719,10 +733,10 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                 <div key={c.id} className="flex items-center gap-3 px-4 py-3 bg-white/[0.03] rounded-xl border border-white/[0.06] hover:border-white/10 cursor-pointer transition-colors"
                   onClick={() => onNavigate('contact', c.id)}>
                   <div className="w-8 h-8 rounded-full bg-brand-600/30 flex items-center justify-center text-sm font-semibold text-brand-300">
-                    {c.name[0]}
+                    {c.firstName[0] ?? '?'}
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-white/80">{c.name}</p>
+                    <p className="text-sm font-medium text-white/80">{`${c.firstName} ${c.lastName}`.trim()}</p>
                     {c.email && <p className="text-xs text-white/30">{c.email}</p>}
                   </div>
                   <span className="ml-auto text-xs text-white/20">{c.linkedTaskIds.length} tasks</span>

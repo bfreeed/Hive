@@ -274,7 +274,7 @@ function MeetingDetail({ meeting, onOpenTask }: { meeting: Meeting; onOpenTask?:
                 const isEditing = editingParticipant?.index === i;
                 const isMenuOpen = participantMenu === i;
                 const alreadyContact = contacts.some(c =>
-                  c.name.toLowerCase() === name.toLowerCase() ||
+                  `${c.firstName} ${c.lastName}`.trim().toLowerCase() === name.toLowerCase() ||
                   (meeting.participantEmails?.[i] && c.email && c.email.toLowerCase() === meeting.participantEmails[i].toLowerCase())
                 );
                 return (
@@ -328,8 +328,10 @@ function MeetingDetail({ meeting, onOpenTask }: { meeting: Meeting; onOpenTask?:
                           {!alreadyContact && (
                             <button
                               onClick={() => {
+                                const parts = name.split(' ');
                                 addContact({
-                                  name,
+                                  firstName: parts[0] || '',
+                                  lastName: parts.slice(1).join(' '),
                                   email: meeting.participantEmails?.[i] ?? undefined,
                                   projectIds: [],
                                 });
@@ -472,9 +474,9 @@ function MeetingDetail({ meeting, onOpenTask }: { meeting: Meeting; onOpenTask?:
                               className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-white/60 hover:bg-white/[0.06] hover:text-white/80 transition-colors"
                             >
                               <span className="w-5 h-5 rounded-full bg-white/[0.08] flex items-center justify-center text-[10px] text-white/40 flex-shrink-0">
-                                {c.name.charAt(0).toUpperCase()}
+                                {c.firstName.charAt(0).toUpperCase()}
                               </span>
-                              {c.name}
+                              {`${c.firstName} ${c.lastName}`.trim()}
                             </button>
                           ))}
                         {contacts.filter(c => !(meeting.linkedContactIds ?? []).includes(c.id)).filter(c => !contactSearch.trim() || `${c.firstName} ${c.lastName}`.toLowerCase().includes(contactSearch.toLowerCase())).length === 0 && (
@@ -842,7 +844,7 @@ export default function MeetingsPage({ onOpenTask }: { onOpenTask?: (id: string)
           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
             <span className="text-[10px] text-white/25">{format(new Date(m.date), 'MMM d')}</span>
             {(() => {
-              const linkedContacts = (m.linkedContactIds ?? []).map(id => contacts.find(c => c.id === id)?.name).filter(Boolean);
+              const linkedContacts = (m.linkedContactIds ?? []).map(id => { const c = contacts.find(c => c.id === id); return c ? `${c.firstName} ${c.lastName}`.trim() : undefined; }).filter(Boolean);
               if (linkedContacts.length === 0) return null;
               return <span className="text-[10px] text-white/35 truncate">{linkedContacts.join(', ')}</span>;
             })()}

@@ -49,8 +49,9 @@ export function matchParticipantsToContacts(
     const emailMatch = contact.email && participantEmails.some(
       e => e.toLowerCase() === contact.email!.toLowerCase()
     );
+    const fullName = `${contact.firstName} ${contact.lastName}`.trim();
     const nameMatch = participantNames.some(
-      n => n.toLowerCase() === contact.name.toLowerCase()
+      n => n.toLowerCase() === fullName.toLowerCase()
     );
     if (emailMatch || nameMatch) matched.add(contact.id);
   }

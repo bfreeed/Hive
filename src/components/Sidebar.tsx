@@ -662,6 +662,9 @@ function ProjectNode({
     return order.map(id => all.find(p => p.id === id)!).filter(Boolean);
   }, [allProjects, project.id, childOrder]);
 
+  // Only show non-hidden sub-projects in sidebar
+  const visibleChildren = useMemo(() => children.filter(c => !c.hideFromSidebar), [children]);
+
   const [childrenExpanded, setChildrenExpanded] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -750,7 +753,7 @@ function ProjectNode({
           <GripVertical size={12} />
         </span>
         {/* Expand chevron */}
-        {children.length > 0 ? (
+        {visibleChildren.length > 0 ? (
           <button onClick={e => { e.stopPropagation(); setChildrenExpanded(v => !v); }}
             className="flex-shrink-0 w-4 h-6 flex items-center justify-center text-white/20 hover:text-white/50 transition-colors">
             {childrenExpanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
@@ -806,6 +809,12 @@ function ProjectNode({
               className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/60 hover:bg-white/[0.06] transition-colors">
               <Plus size={11} /> Add Sub-project
             </button>
+            {project.parentId && (
+              <button onClick={e => { e.stopPropagation(); setShowMenu(false); updateProject(project.id, { hideFromSidebar: !project.hideFromSidebar }); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/60 hover:bg-white/[0.06] transition-colors">
+                {project.hideFromSidebar ? <><ChevronDown size={11} /> Show in Sidebar</> : <><ChevronRight size={11} /> Hide from Sidebar</>}
+              </button>
+            )}
             {!showDeleteConfirm ? (
               <button onClick={e => { e.stopPropagation(); setShowDeleteConfirm(true); }}
                 className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400/80 hover:bg-white/[0.06] transition-colors">
@@ -831,11 +840,11 @@ function ProjectNode({
       </div>
 
       {/* Children */}
-      {childrenExpanded && children.length > 0 && (
+      {childrenExpanded && visibleChildren.length > 0 && (
         <div className="ml-2 border-l border-white/[0.06] pl-1 space-y-0.5 mb-0.5">
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleChildDragEnd}>
-            <SortableContext items={children.map(c => c.id)} strategy={verticalListSortingStrategy}>
-              {children.map(child => (
+            <SortableContext items={visibleChildren.map(c => c.id)} strategy={verticalListSortingStrategy}>
+              {visibleChildren.map(child => (
                 <ProjectNode key={child.id} project={child} activePage={activePage}
                   onNavigate={onNavigate} allProjects={allProjects} />
               ))}

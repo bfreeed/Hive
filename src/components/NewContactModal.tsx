@@ -13,7 +13,8 @@ interface Props {
 export default function NewContactModal({ onClose, onCreated }: Props) {
   const { addContact, userSettings, saveUserSettings } = useStore();
 
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [business, setBusiness] = useState('');
@@ -22,21 +23,22 @@ export default function NewContactModal({ onClose, onCreated }: Props) {
   const [projectIds, setProjectIds] = useState<string[]>([]);
   const [tagIds, setTagIds] = useState<string[]>([]);
 
-  const nameRef = useRef<HTMLInputElement>(null);
+  const firstNameRef = useRef<HTMLInputElement>(null);
   const tags = userSettings?.relationshipTags ?? [];
   const projects = useStore(s => s.projects);
 
   useEffect(() => {
-    nameRef.current?.focus();
+    firstNameRef.current?.focus();
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
   const handleCreate = () => {
-    if (!name.trim()) return;
+    if (!firstName.trim()) return;
     addContact({
-      name: name.trim(),
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
       phone: phone.trim() || undefined,
       email: email.trim() || undefined,
       business: business.trim() || undefined,
@@ -45,15 +47,16 @@ export default function NewContactModal({ onClose, onCreated }: Props) {
       projectIds,
       notes: '',
     });
+    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
     if (tagIds.length > 0) {
       setTimeout(() => {
-        const created = useStore.getState().contacts.find(c => c.name === name.trim());
+        const created = useStore.getState().contacts.find(c => `${c.firstName} ${c.lastName}`.trim() === fullName);
         if (created) useStore.getState().updateContact(created.id, { relationshipTagIds: tagIds });
       }, 50);
     }
     if (onCreated) {
       setTimeout(() => {
-        const created = useStore.getState().contacts.find(c => c.name === name.trim());
+        const created = useStore.getState().contacts.find(c => `${c.firstName} ${c.lastName}`.trim() === fullName);
         if (created) onCreated(created.id);
       }, 60);
     }
@@ -81,9 +84,14 @@ export default function NewContactModal({ onClose, onCreated }: Props) {
         </div>
 
         <div className="space-y-3">
-          <input ref={nameRef} value={name} onChange={e => setName(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleCreate(); }}
-            placeholder="Name *" className={inputClass} />
+          <div className="grid grid-cols-2 gap-2">
+            <input ref={firstNameRef} value={firstName} onChange={e => setFirstName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleCreate(); }}
+              placeholder="First name *" className={inputClass} />
+            <input value={lastName} onChange={e => setLastName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleCreate(); }}
+              placeholder="Last name" className={inputClass} />
+          </div>
           <input value={phone} onChange={e => setPhone(e.target.value)}
             placeholder="Phone" className={inputClass} />
           <input value={email} onChange={e => setEmail(e.target.value)}
@@ -128,7 +136,7 @@ export default function NewContactModal({ onClose, onCreated }: Props) {
 
         <div className="flex gap-2 mt-6">
           <button onClick={onClose} className="flex-1 py-2 text-sm text-white/40 hover:text-white/70 border border-white/[0.08] rounded-lg transition-colors">Cancel</button>
-          <button onClick={handleCreate} disabled={!name.trim()}
+          <button onClick={handleCreate} disabled={!firstName.trim()}
             className="flex-1 py-2 text-sm font-semibold bg-brand-500 hover:bg-brand-600 text-white rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
             Add Contact
           </button>

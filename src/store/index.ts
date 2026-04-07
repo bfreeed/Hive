@@ -142,7 +142,8 @@ function projectToDb(p: Project) {
 function dbToContact(row: any): Contact {
   return {
     id: row.id,
-    name: row.name,
+    firstName: row.first_name ?? (row.name ? row.name.split(' ')[0] : ''),
+    lastName: row.last_name ?? (row.name ? row.name.split(' ').slice(1).join(' ') : ''),
     email: row.email ?? undefined,
     phone: row.phone ?? undefined,
     avatar: row.avatar ?? undefined,
@@ -161,7 +162,8 @@ function dbToContact(row: any): Contact {
 function contactToDb(c: Contact, userId?: string) {
   return {
     id: c.id,
-    name: c.name,
+    first_name: c.firstName,
+    last_name: c.lastName,
     email: c.email ?? null,
     phone: c.phone ?? null,
     avatar: c.avatar ?? null,

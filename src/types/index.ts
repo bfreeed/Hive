@@ -111,6 +111,7 @@ export interface Project {
   parentId?: string; // sub-project support: ID of the parent project
   folderId?: string; // sidebar folder this project belongs to
   isFolder?: boolean; // true = this is a folder container, not a real project
+  hideFromSidebar?: boolean; // sub-project: hide from sidebar but still show in parent project page
   // Google Drive
   googleDriveFolderId?: string;
   googleDriveFolderName?: string;
@@ -125,7 +126,8 @@ export interface RelationshipTag {
 
 export interface Contact {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   email?: string;
   phone?: string;
   avatar?: string;
@@ -182,13 +184,12 @@ export interface Meeting {
 }
 
 export interface HomeSection {
-  id: 'unreviewed_meetings' | 'within_72h' | 'overdue' | 'today' | 'high_priority' | 'upcoming' | 'questions';
+  id: 'within_72h' | 'overdue' | 'today' | 'high_priority' | 'upcoming' | 'questions';
   enabled: boolean;
   label: string;
 }
 
 export const DEFAULT_HOME_SECTIONS: HomeSection[] = [
-  { id: 'unreviewed_meetings',enabled: true,  label: 'Meetings to Review' },
   { id: 'within_72h',         enabled: true,  label: 'Within 72 Hours' },
   { id: 'overdue',            enabled: true,  label: 'Overdue' },
   { id: 'today',              enabled: true,  label: 'Due Today' },
