@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, FolderPlus, Layout } from 'lucide-react';
 import { useStore } from '../store';
 import type { HivePage } from '../types';
@@ -6,31 +6,17 @@ import { PageTreeItem } from './workspace/PageTreeItem';
 import { SpaceEditor } from './workspace/SpaceEditor';
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors,
-  type DragEndEvent, DragOverlay, type DragStartEvent,
+  type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 
-interface FlatItem { id: string; parentId?: string; depth: number; page: HivePage }
-
-function flattenTree(
-  pageList: HivePage[],
-  childrenOf: (id: string) => HivePage[],
-  depth = 0,
-): FlatItem[] {
-  const sorted = [...pageList].sort((a, b) => {
+function sortPages(pageList: HivePage[]): HivePage[] {
+  return [...pageList].sort((a, b) => {
     if (a.type === 'folder' && b.type !== 'folder') return -1;
     if (a.type !== 'folder' && b.type === 'folder') return 1;
     if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
     return a.createdAt < b.createdAt ? -1 : 1;
   });
-  const result: FlatItem[] = [];
-  for (const page of sorted) {
-    result.push({ id: page.id, parentId: page.parentId, depth, page });
-    if (page.type === 'folder') {
-      result.push(...flattenTree(childrenOf(page.id), childrenOf, depth + 1));
-    }
-  }
-  return result;
 }
 
 export default function ProjectWorkspace({ projectId }: { projectId: string }) {
@@ -71,54 +57,28 @@ export default function ProjectWorkspace({ projectId }: { projectId: string }) {
   const rootPages = pages.filter(p => !p.parentId);
   const childrenOf = (id: string) => pages.filter(p => p.parentId === id);
 
-  const flatItems = useMemo(() => flattenTree(rootPages, childrenOf), [pages]); // eslint-disable-line react-hooks/exhaustive-deps
-  const flatIds = useMemo(() => flatItems.map(fi => fi.id), [flatItems]);
-
-  const handleDragStart = (event: DragStartEvent) => {
-    setDragActiveId(event.active.id as string);
-  };
-
-  // Check if a page is a descendant of another
-  const isDescendant = (pageId: string, ancestorId: string): boolean => {
-    const page = pages.find(p => p.id === pageId);
-    if (!page?.parentId) return false;
-    if (page.parentId === ancestorId) return true;
-    return isDescendant(page.parentId, ancestorId);
-  };
-
-  const handleDragEnd = async (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent, parentId?: string) => {
     setDragActiveId(null);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
     const draggedId = active.id as string;
     const overId = over.id as string;
-    const draggedPage = pages.find(p => p.id === draggedId);
-    const overPage = pages.find(p => p.id === overId);
-    if (!draggedPage || !overPage) return;
-
-    // Prevent dropping a folder into its own descendant
-    if (isDescendant(overId, draggedId)) return;
-
-    // Determine new parent: place dragged item at the same level as the over item
-    const newParentId = overPage.parentId;
-    const siblings = newParentId ? childrenOf(newParentId) : rootPages;
-    // Remove dragged item and any of its descendants from the siblings list
-    const filtered = siblings.filter(p => p.id !== draggedId);
+    const siblings = parentId ? childrenOf(parentId) : rootPages;
+    const sorted = sortPages(siblings);
+    const filtered = sorted.filter(p => p.id !== draggedId);
     const overIndex = filtered.findIndex(p => p.id === overId);
-    const newOrder = [...filtered];
-    newOrder.splice(overIndex >= 0 ? overIndex : newOrder.length, 0, draggedPage);
+    if (overIndex < 0) return;
+    const draggedPage = sorted.find(p => p.id === draggedId);
+    if (!draggedPage) return;
 
-    // Batch update sortOrder + parentId
+    const newOrder = [...filtered];
+    newOrder.splice(overIndex, 0, draggedPage);
+
     const updates: Promise<void>[] = [];
     for (let i = 0; i < newOrder.length; i++) {
-      const p = newOrder[i];
-      const needsUpdate = p.sortOrder !== i || (p.id === draggedId && p.parentId !== newParentId);
-      if (needsUpdate) {
-        updates.push(updatePage(p.id, {
-          sortOrder: i,
-          ...(p.id === draggedId ? { parentId: newParentId } : {}),
-        }));
+      if (newOrder[i].sortOrder !== i) {
+        updates.push(updatePage(newOrder[i].id, { sortOrder: i }));
       }
     }
     await Promise.all(updates);
@@ -158,29 +118,35 @@ export default function ProjectWorkspace({ projectId }: { projectId: string }) {
     await updatePage(id, u);
   };
 
-  function renderTree(pageList: HivePage[], depth = 0): React.ReactNode {
-    const sorted = [...pageList].sort((a, b) => {
-      if (a.type === 'folder' && b.type !== 'folder') return -1;
-      if (a.type !== 'folder' && b.type === 'folder') return 1;
-      if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
-      return a.createdAt < b.createdAt ? -1 : 1;
-    });
-    return sorted.map(page => (
-      <PageTreeItem
-        key={page.id}
-        page={page}
-        depth={depth}
-        isActive={activeSpaceId === page.id}
-        isOverFolder={page.type === 'folder' && dragActiveId !== null && dragActiveId !== page.id}
-        onSelect={() => { if (page.type !== 'folder') setActiveSpaceId(page.id); }}
-        onDelete={() => handleDelete(page.id)}
-        onAddChild={() => handleCreateSpace(page.id)}
-        onAddSubfolder={() => handleCreateFolder(page.id)}
-        onRename={(title) => handleUpdate(page.id, { title })}
+  function renderTree(pageList: HivePage[], depth = 0, parentId?: string): React.ReactNode {
+    const sorted = sortPages(pageList);
+    const ids = sorted.map(p => p.id);
+    return (
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={(e) => setDragActiveId(e.active.id as string)}
+        onDragEnd={(e) => handleDragEnd(e, parentId)}
       >
-        {renderTree(childrenOf(page.id), depth + 1)}
-      </PageTreeItem>
-    ));
+        <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+          {sorted.map(page => (
+            <PageTreeItem
+              key={page.id}
+              page={page}
+              depth={depth}
+              isActive={activeSpaceId === page.id}
+              onSelect={() => { if (page.type !== 'folder') setActiveSpaceId(page.id); }}
+              onDelete={() => handleDelete(page.id)}
+              onAddChild={() => handleCreateSpace(page.id)}
+              onAddSubfolder={() => handleCreateFolder(page.id)}
+              onRename={(title) => handleUpdate(page.id, { title })}
+            >
+              {renderTree(childrenOf(page.id), depth + 1, page.id)}
+            </PageTreeItem>
+          ))}
+        </SortableContext>
+      </DndContext>
+    );
   }
 
   return (
@@ -212,16 +178,7 @@ export default function ProjectWorkspace({ projectId }: { projectId: string }) {
               <Plus size={14} /> New space
             </button>
           ) : (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext items={flatIds} strategy={verticalListSortingStrategy}>
-                {renderTree(rootPages)}
-              </SortableContext>
-            </DndContext>
+            renderTree(rootPages, 0, undefined)
           )}
         </div>
 
