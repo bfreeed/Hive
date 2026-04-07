@@ -333,7 +333,7 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
         <div className="mb-6">
           <p className="text-white/30 text-xs font-medium tracking-wide uppercase mb-3">{today}</p>
           <div className="flex items-center justify-between gap-3">
-            <p className="text-white/50 text-sm">
+            <p className="text-white/50 text-sm whitespace-nowrap">
               {activeTasks.length} active tasks · {new Set(activeTasks.flatMap(t => t.projectIds ?? [])).size} projects
             </p>
             <div className="flex items-center gap-2 flex-shrink-0">
