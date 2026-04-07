@@ -21,7 +21,7 @@ const STATUS_PILL: Record<string, string> = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  todo: 'To Do', doing: 'Doing', waiting: 'Waiting', review: 'In Review', done: 'Done',
+  todo: 'To Do', doing: 'Doing', waiting: 'Waiting', review: 'Do Later', done: 'Done',
 };
 
 interface BoardViewProps {
@@ -147,7 +147,7 @@ export default function BoardView({ groups, onOpenTask, addTask, filterProject }
   const handleAddTaskInColumn = (group: TaskGroup, title: string) => {
     // Determine status/priority/project from the group label
     const statusMap: Record<string, Task['status']> = {
-      'To Do': 'todo', 'Doing': 'doing', 'Waiting': 'waiting', 'In Review': 'review', 'Done': 'done',
+      'To Do': 'todo', 'Doing': 'doing', 'Waiting': 'waiting', 'Do Later': 'review', 'Done': 'done',
     };
     const priorityMap: Record<string, Priority> = {
       'Urgent': 'urgent', 'High': 'high', 'Medium': 'medium', 'Low': 'low',

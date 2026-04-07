@@ -8,7 +8,7 @@ export type BoardSortOrder = 'asc' | 'desc';
 export interface TaskGroup { label: string; color?: string; tasks: Task[] }
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
-  todo: 'To Do', doing: 'Doing', waiting: 'Waiting', review: 'In Review', done: 'Done',
+  todo: 'To Do', doing: 'Doing', waiting: 'Waiting', review: 'Do Later', done: 'Done',
 };
 const PRIORITY_ORDER: Record<Priority, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
 const STATUS_ORDER: Record<TaskStatus, number> = { todo: 0, doing: 1, waiting: 2, review: 3, done: 4 };

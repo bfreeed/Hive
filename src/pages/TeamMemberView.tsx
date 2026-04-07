@@ -163,7 +163,7 @@ export default function TeamMemberView({ userId, onOpenTask }: { userId: string;
             <div>
               <h1 className="text-2xl font-semibold text-white tracking-tight">{member.name}</h1>
               <p className="text-white/40 text-sm">
-                {doingCount} active · {waitingCount} waiting · {reviewCount} in review
+                {doingCount} active · {waitingCount} waiting · {reviewCount} do later
               </p>
             </div>
           </div>
