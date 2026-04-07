@@ -78,6 +78,14 @@ export default function ProjectWorkspace({ projectId }: { projectId: string }) {
     setDragActiveId(event.active.id as string);
   };
 
+  // Check if a page is a descendant of another
+  const isDescendant = (pageId: string, ancestorId: string): boolean => {
+    const page = pages.find(p => p.id === pageId);
+    if (!page?.parentId) return false;
+    if (page.parentId === ancestorId) return true;
+    return isDescendant(page.parentId, ancestorId);
+  };
+
   const handleDragEnd = async (event: DragEndEvent) => {
     setDragActiveId(null);
     const { active, over } = event;
@@ -89,22 +97,19 @@ export default function ProjectWorkspace({ projectId }: { projectId: string }) {
     const overPage = pages.find(p => p.id === overId);
     if (!draggedPage || !overPage) return;
 
-    // If dropping onto a folder, nest inside it
-    if (overPage.type === 'folder' && draggedPage.parentId !== overId) {
-      const folderChildren = childrenOf(overId);
-      await updatePage(draggedId, { parentId: overId, sortOrder: folderChildren.length });
-      return;
-    }
+    // Prevent dropping a folder into its own descendant
+    if (isDescendant(overId, draggedId)) return;
 
-    // Otherwise, reorder: move dragged item to the same parent as the over item
+    // Determine new parent: place dragged item at the same level as the over item
     const newParentId = overPage.parentId;
     const siblings = newParentId ? childrenOf(newParentId) : rootPages;
+    // Remove dragged item and any of its descendants from the siblings list
     const filtered = siblings.filter(p => p.id !== draggedId);
     const overIndex = filtered.findIndex(p => p.id === overId);
     const newOrder = [...filtered];
     newOrder.splice(overIndex >= 0 ? overIndex : newOrder.length, 0, draggedPage);
 
-    // Batch update sortOrder for all siblings + update parentId if changed
+    // Batch update sortOrder + parentId
     const updates: Promise<void>[] = [];
     for (let i = 0; i < newOrder.length; i++) {
       const p = newOrder[i];

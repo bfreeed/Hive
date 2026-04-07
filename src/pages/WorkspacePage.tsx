@@ -102,6 +102,13 @@ export default function WorkspacePage({ initialPageId, projectId }: { initialPag
   }
   const flatIds = useMemo(() => flattenTree(rootPages), [pages]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const isDescendant = (pageId: string, ancestorId: string): boolean => {
+    const page = pages.find(p => p.id === pageId);
+    if (!page?.parentId) return false;
+    if (page.parentId === ancestorId) return true;
+    return isDescendant(page.parentId, ancestorId);
+  };
+
   const handleDragStart = (event: DragStartEvent) => { setDragActiveId(event.active.id as string); };
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -114,14 +121,10 @@ export default function WorkspacePage({ initialPageId, projectId }: { initialPag
     const overPage = pages.find(p => p.id === overId);
     if (!draggedPage || !overPage) return;
 
-    // Dropping onto a folder → nest inside
-    if (overPage.type === 'folder' && draggedPage.parentId !== overId) {
-      const folderChildren = childrenOf(overId);
-      await updatePage(draggedId, { parentId: overId, sortOrder: folderChildren.length });
-      return;
-    }
+    // Prevent dropping into own descendant
+    if (isDescendant(overId, draggedId)) return;
 
-    // Reorder within same parent level
+    // Place at same level as the over item
     const newParentId = overPage.parentId;
     const siblings = newParentId ? childrenOf(newParentId) : rootPages;
     const filtered = siblings.filter(p => p.id !== draggedId);
