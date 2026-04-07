@@ -227,7 +227,9 @@ function MeetingDetail({ meeting, onOpenTask }: { meeting: Meeting; onOpenTask?:
   const { currentUser, projects, contacts, updateMeeting, addContact } = useStore();
   const myName = currentUser?.name?.toLowerCase() ?? '';
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [projectSearch, setProjectSearch] = useState('');
   const [showContactDropdown, setShowContactDropdown] = useState(false);
+  const [contactSearch, setContactSearch] = useState('');
   const [showNewContactModal, setShowNewContactModal] = useState(false);
   const [participantMenu, setParticipantMenu] = useState<number | null>(null);
   const [editingParticipant, setEditingParticipant] = useState<{ index: number; value: string } | null>(null);
@@ -392,28 +394,41 @@ function MeetingDetail({ meeting, onOpenTask }: { meeting: Meeting; onOpenTask?:
                 </button>
                 {showProjectDropdown && (
                   <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowProjectDropdown(false)} />
-                    <div className="absolute left-0 top-full mt-1 bg-[#1a1a1f] border border-white/[0.08] rounded-xl shadow-xl p-1 min-w-[200px] z-50 max-h-60 overflow-y-auto">
-                      {projects
-                        .filter(p => !(meeting.linkedProjectIds ?? []).includes(p.id))
-                        .map(p => (
-                          <button
-                            key={p.id}
-                            onClick={() => {
-                              updateMeeting(meeting.id, {
-                                linkedProjectIds: [...(meeting.linkedProjectIds ?? []), p.id],
-                              });
-                              setShowProjectDropdown(false);
-                            }}
-                            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-white/60 hover:bg-white/[0.06] hover:text-white/80 transition-colors"
-                          >
-                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: p.color ?? '#6366f1' }} />
-                            {p.name}
-                          </button>
-                        ))}
-                      {projects.filter(p => !(meeting.linkedProjectIds ?? []).includes(p.id)).length === 0 && (
-                        <p className="px-3 py-2 text-xs text-white/30">All projects linked</p>
-                      )}
+                    <div className="fixed inset-0 z-40" onClick={() => { setShowProjectDropdown(false); setProjectSearch(''); }} />
+                    <div className="absolute left-0 top-full mt-1 bg-[#1a1a1f] border border-white/[0.08] rounded-xl shadow-xl min-w-[220px] z-50">
+                      <div className="p-1.5">
+                        <input
+                          autoFocus
+                          value={projectSearch}
+                          onChange={e => setProjectSearch(e.target.value)}
+                          placeholder="Search projects..."
+                          className="w-full px-2.5 py-1.5 bg-white/[0.06] border border-white/[0.08] rounded-lg text-xs text-white/70 placeholder-white/25 focus:outline-none focus:border-brand-500/40"
+                        />
+                      </div>
+                      <div className="max-h-48 overflow-y-auto p-1">
+                        {projects
+                          .filter(p => !(meeting.linkedProjectIds ?? []).includes(p.id))
+                          .filter(p => !projectSearch.trim() || p.name.toLowerCase().includes(projectSearch.toLowerCase()))
+                          .map(p => (
+                            <button
+                              key={p.id}
+                              onClick={() => {
+                                updateMeeting(meeting.id, {
+                                  linkedProjectIds: [...(meeting.linkedProjectIds ?? []), p.id],
+                                });
+                                setShowProjectDropdown(false);
+                                setProjectSearch('');
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-white/60 hover:bg-white/[0.06] hover:text-white/80 transition-colors"
+                            >
+                              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: p.color ?? '#6366f1' }} />
+                              {p.name}
+                            </button>
+                          ))}
+                        {projects.filter(p => !(meeting.linkedProjectIds ?? []).includes(p.id)).filter(p => !projectSearch.trim() || p.name.toLowerCase().includes(projectSearch.toLowerCase())).length === 0 && (
+                          <p className="px-3 py-2 text-xs text-white/30">{projectSearch.trim() ? 'No matches' : 'All projects linked'}</p>
+                        )}
+                      </div>
                     </div>
                   </>
                 )}
@@ -429,33 +444,46 @@ function MeetingDetail({ meeting, onOpenTask }: { meeting: Meeting; onOpenTask?:
                 </button>
                 {showContactDropdown && (
                   <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowContactDropdown(false)} />
-                    <div className="absolute left-0 top-full mt-1 bg-[#1a1a1f] border border-white/[0.08] rounded-xl shadow-xl p-1 min-w-[220px] z-50 max-h-72 overflow-y-auto">
-                      {contacts
-                        .filter(c => !(meeting.linkedContactIds ?? []).includes(c.id))
-                        .map(c => (
-                          <button
-                            key={c.id}
-                            onClick={() => {
-                              updateMeeting(meeting.id, {
-                                linkedContactIds: [...(meeting.linkedContactIds ?? []), c.id],
-                              });
-                              setShowContactDropdown(false);
-                            }}
-                            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-white/60 hover:bg-white/[0.06] hover:text-white/80 transition-colors"
-                          >
-                            <span className="w-5 h-5 rounded-full bg-white/[0.08] flex items-center justify-center text-[10px] text-white/40 flex-shrink-0">
-                              {c.name.charAt(0).toUpperCase()}
-                            </span>
-                            {c.name}
-                          </button>
-                        ))}
-                      {contacts.filter(c => !(meeting.linkedContactIds ?? []).includes(c.id)).length === 0 && (
-                        <p className="px-3 py-2 text-xs text-white/30">All contacts linked</p>
-                      )}
-                      <div className="border-t border-white/[0.06] mt-1 pt-1">
+                    <div className="fixed inset-0 z-40" onClick={() => { setShowContactDropdown(false); setContactSearch(''); }} />
+                    <div className="absolute left-0 top-full mt-1 bg-[#1a1a1f] border border-white/[0.08] rounded-xl shadow-xl min-w-[220px] z-50">
+                      <div className="p-1.5">
+                        <input
+                          autoFocus
+                          value={contactSearch}
+                          onChange={e => setContactSearch(e.target.value)}
+                          placeholder="Search contacts..."
+                          className="w-full px-2.5 py-1.5 bg-white/[0.06] border border-white/[0.08] rounded-lg text-xs text-white/70 placeholder-white/25 focus:outline-none focus:border-brand-500/40"
+                        />
+                      </div>
+                      <div className="max-h-48 overflow-y-auto p-1">
+                        {contacts
+                          .filter(c => !(meeting.linkedContactIds ?? []).includes(c.id))
+                          .filter(c => !contactSearch.trim() || `${c.firstName} ${c.lastName}`.toLowerCase().includes(contactSearch.toLowerCase()))
+                          .map(c => (
+                            <button
+                              key={c.id}
+                              onClick={() => {
+                                updateMeeting(meeting.id, {
+                                  linkedContactIds: [...(meeting.linkedContactIds ?? []), c.id],
+                                });
+                                setShowContactDropdown(false);
+                                setContactSearch('');
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-white/60 hover:bg-white/[0.06] hover:text-white/80 transition-colors"
+                            >
+                              <span className="w-5 h-5 rounded-full bg-white/[0.08] flex items-center justify-center text-[10px] text-white/40 flex-shrink-0">
+                                {c.name.charAt(0).toUpperCase()}
+                              </span>
+                              {c.name}
+                            </button>
+                          ))}
+                        {contacts.filter(c => !(meeting.linkedContactIds ?? []).includes(c.id)).filter(c => !contactSearch.trim() || `${c.firstName} ${c.lastName}`.toLowerCase().includes(contactSearch.toLowerCase())).length === 0 && (
+                          <p className="px-3 py-2 text-xs text-white/30">{contactSearch.trim() ? 'No matches' : 'All contacts linked'}</p>
+                        )}
+                      </div>
+                      <div className="border-t border-white/[0.06] p-1">
                         <button
-                          onClick={() => { setShowContactDropdown(false); setShowNewContactModal(true); }}
+                          onClick={() => { setShowContactDropdown(false); setContactSearch(''); setShowNewContactModal(true); }}
                           className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-white/30 hover:text-white/60 hover:bg-white/[0.04] transition-colors"
                         >
                           <Plus size={11} /> New contact
