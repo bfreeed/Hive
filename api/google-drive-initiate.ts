@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getUserSettings, supabaseAdmin } from './lib/auth';
+import { getUserSettings, supabaseAdmin } from './_lib/auth.js';
 import { randomBytes } from 'crypto';
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? '';
