@@ -888,14 +888,14 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
               : 'My Tasks'}
           </h1>
           {/* New Task + Search + View toggle + Sort */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <button
               onClick={() => captureRef.current?.open()}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-sm rounded-lg transition-colors"
             >
               <Plus size={14} /> New Task
             </button>
-            <div className="relative">
+            <div className="relative hidden sm:block">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/30" />
               <input
                 value={search}
@@ -904,7 +904,7 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
                 className="bg-white/[0.04] border border-white/[0.08] rounded-lg pl-8 pr-3 py-1.5 text-xs text-white/70 placeholder-white/20 focus:outline-none focus:border-brand-500/50 w-40"
               />
             </div>
-          <div className="flex items-center gap-1">
+          <div className="hidden sm:flex items-center gap-1">
             {([
               { id: 'list' as const,  icon: <List size={14} />,       label: 'List'  },
               { id: 'board' as const, icon: <LayoutGrid size={14} />, label: 'Board' },
