@@ -91,7 +91,7 @@ const InlineCapture = forwardRef<InlineCaptureHandle, InlineCaptureProps>(functi
     return (
       <button
         onClick={() => setShow(true)}
-        className="mb-6 w-full flex items-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-white/20 hover:border-white/30 text-white/30 hover:text-white/50 text-sm transition-colors"
+        className="mb-6 w-full flex items-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-white/40 hover:border-white/55 text-white/40 hover:text-white/60 text-sm transition-colors"
       >
         <Plus size={14} /> Quick capture… <span className="ml-auto text-xs font-mono bg-white/[0.06] px-1.5 py-0.5 rounded">N</span>
       </button>
