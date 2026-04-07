@@ -3,7 +3,6 @@
  * Use these instead of hardcoding key strings across the codebase.
  */
 
-export const getPushoverKey = (userId: string) => `pushover_user_key_${userId}`;
 export const getReminderLockKey = (taskId: string) => `reminder_lock_${taskId}`;
 export const getHealthNotifKey = (userId: string, type: string, taskId: string, date: string) =>
   `health_notif_${userId}_${type}_${taskId}_${date}`;

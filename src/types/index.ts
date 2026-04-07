@@ -59,8 +59,8 @@ export interface Task {
   comments: Comment[];
   audioNotes: AudioNote[];
   attachments: Attachment[];
-  reminderAt?: string;    // legacy Pushover — no longer used
-  reminderSent?: boolean; // legacy Pushover — no longer used
+  reminderAt?: string;      // optional reminder datetime (metadata only — no push notifications)
+  reminderSent?: boolean;   // kept for DB compat — unused
   reminderMinutes?: number; // Google Calendar popup reminder: minutes before event
   parentId?: string;      // subtask: ID of parent task
   sectionId?: string;     // which project section this task belongs to

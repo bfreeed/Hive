@@ -25,18 +25,16 @@ import TrashPage from './pages/TrashPage';
 import { useReminderChecker } from './hooks/useReminderChecker';
 import { useHealthSweep } from './hooks/useHealthSweep';
 import { useGranolaSync } from './hooks/useGranolaSync';
-import { getPushoverKey, GOOGLE_CLIENT_ID_KEY, GOOGLE_API_KEY_KEY, ANTHROPIC_API_KEY_KEY } from './lib/storageKeys';
+import { GOOGLE_CLIENT_ID_KEY, GOOGLE_API_KEY_KEY, ANTHROPIC_API_KEY_KEY } from './lib/storageKeys';
 
 function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: any; darkMode: boolean; toggleDarkMode: () => void }) {
   const { addUserFlag, updateUserFlag, removeUserFlag, userSettings, saveUserSettings, triggerGranolaSync } = useStore();
   const clientIdRef = useRef<HTMLInputElement>(null);
   const apiKeyRef = useRef<HTMLInputElement>(null);
   const anthropicKeyRef = useRef<HTMLInputElement>(null);
-  const phoneRef = useRef<HTMLInputElement>(null);
   const granolaKeyRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const [saved, setSaved] = useState(false);
-  const [phoneSaved, setPhoneSaved] = useState(false);
   const [granolaKeySaved, setGranolaKeySaved] = useState(false);
   const [importPreview, setImportPreview] = useState<any>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -127,16 +125,6 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const savePhone = () => {
-    if (phoneRef.current) {
-      const val = phoneRef.current.value.trim();
-      if (val) localStorage.setItem(getPushoverKey(userId), val);
-      else localStorage.removeItem(getPushoverKey(userId));
-    }
-    setPhoneSaved(true);
-    setTimeout(() => setPhoneSaved(false), 2000);
-  };
-
   const saveGranolaKey = async () => {
     const key = granolaKeyRef.current?.value.trim() ?? '';
     // Clear granolaLastSyncedAt so the next sync re-fetches all meetings from scratch
@@ -198,35 +186,6 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
                 <span className={`block w-4 h-4 rounded-full bg-white mx-1 transition-transform ${darkMode ? 'translate-x-4' : 'translate-x-0'}`} />
               </button>
             </div>
-          </div>
-        </div>
-
-        {/* Reminders */}
-        <div className="mb-8">
-          <h2 className="text-xs font-semibold text-white/30 uppercase tracking-wider mb-3">Reminders</h2>
-          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 space-y-4">
-            <p className="text-xs text-white/40 leading-relaxed">
-              Get push notifications when tasks are due via{' '}
-              <span className="text-white/60">Pushover</span>.{' '}
-              <span className="text-white/25">Setup: pushover.net → sign up → buy the app ($5 one-time) → copy your User Key below.</span>
-            </p>
-            <div>
-              <label className="text-xs text-white/40 block mb-1.5">Pushover User Key</label>
-              <input
-                ref={phoneRef}
-                type="text"
-                defaultValue={localStorage.getItem(getPushoverKey(userId)) || ''}
-                placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxx"
-                className="w-full px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white/60 placeholder-white/20 focus:outline-none focus:border-brand-500/40 font-mono"
-              />
-              <p className="text-xs text-white/25 mt-1.5">Found on your Pushover dashboard</p>
-            </div>
-            <button
-              onClick={savePhone}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${phoneSaved ? 'bg-emerald-500/20 text-emerald-400' : 'bg-brand-600 hover:bg-brand-500 text-white'}`}
-            >
-              {phoneSaved ? '✓ Saved' : 'Save User Key'}
-            </button>
           </div>
         </div>
 

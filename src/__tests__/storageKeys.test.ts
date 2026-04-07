@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  getPushoverKey,
   getReminderLockKey,
   getHealthNotifKey,
   getBriefingKey,
@@ -11,17 +10,6 @@ import {
 } from '../lib/storageKeys';
 
 describe('storageKeys', () => {
-  describe('getPushoverKey', () => {
-    it('generates a unique key per user', () => {
-      expect(getPushoverKey('lev')).toBe('pushover_user_key_lev');
-      expect(getPushoverKey('sarah')).toBe('pushover_user_key_sarah');
-    });
-
-    it('keys are distinct for different users', () => {
-      expect(getPushoverKey('lev')).not.toBe(getPushoverKey('sarah'));
-    });
-  });
-
   describe('getReminderLockKey', () => {
     it('generates a key for a task id', () => {
       expect(getReminderLockKey('task-abc')).toBe('reminder_lock_task-abc');
