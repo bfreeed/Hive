@@ -9,7 +9,7 @@ import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core';
-import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 
 // ─────────────────────────────────────────────
 // Template picker modal
@@ -91,20 +91,17 @@ export default function WorkspacePage({ initialPageId, projectId }: { initialPag
     setDragActiveId(null);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    const draggedId = active.id as string;
-    const overId = over.id as string;
+
     const siblings = parentId ? childrenOf(parentId) : rootPages;
     const sorted = [...siblings].sort((a, b) => {
       if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
       return a.createdAt < b.createdAt ? -1 : 1;
     });
-    const filtered = sorted.filter(p => p.id !== draggedId);
-    const overIndex = filtered.findIndex(p => p.id === overId);
-    if (overIndex < 0) return;
-    const draggedPage = sorted.find(p => p.id === draggedId);
-    if (!draggedPage) return;
-    const newOrder = [...filtered];
-    newOrder.splice(overIndex, 0, draggedPage);
+    const oldIndex = sorted.findIndex(p => p.id === active.id);
+    const newIndex = sorted.findIndex(p => p.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+
+    const newOrder = arrayMove(sorted, oldIndex, newIndex);
     const updates: Promise<void>[] = [];
     for (let i = 0; i < newOrder.length; i++) {
       if (newOrder[i].sortOrder !== i) {

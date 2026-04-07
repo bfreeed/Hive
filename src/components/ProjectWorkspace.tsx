@@ -8,7 +8,7 @@ import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors,
   type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core';
-import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 
 function sortPages(pageList: HivePage[]): HivePage[] {
   return [...pageList].sort((a, b) => {
@@ -60,33 +60,22 @@ export default function ProjectWorkspace({ projectId }: { projectId: string }) {
   const handleDragEnd = async (event: DragEndEvent, parentId?: string) => {
     setDragActiveId(null);
     const { active, over } = event;
-    console.log('[DnD] dragEnd', { activeId: active.id, overId: over?.id, parentId });
     if (!over || active.id === over.id) return;
 
-    const draggedId = active.id as string;
-    const overId = over.id as string;
     const siblings = parentId ? childrenOf(parentId) : rootPages;
     const sorted = sortPages(siblings);
-    console.log('[DnD] siblings', sorted.map(p => ({ id: p.id, title: p.title, sortOrder: p.sortOrder })));
-    const filtered = sorted.filter(p => p.id !== draggedId);
-    const overIndex = filtered.findIndex(p => p.id === overId);
-    console.log('[DnD] overIndex', overIndex);
-    if (overIndex < 0) { console.log('[DnD] overIndex < 0, bailing'); return; }
-    const draggedPage = sorted.find(p => p.id === draggedId);
-    if (!draggedPage) { console.log('[DnD] draggedPage not found, bailing'); return; }
+    const oldIndex = sorted.findIndex(p => p.id === active.id);
+    const newIndex = sorted.findIndex(p => p.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
 
-    const newOrder = [...filtered];
-    newOrder.splice(overIndex, 0, draggedPage);
-    console.log('[DnD] newOrder', newOrder.map(p => ({ id: p.id, title: p.title, newSort: newOrder.indexOf(p) })));
+    const newOrder = arrayMove(sorted, oldIndex, newIndex);
 
     const updates: Promise<void>[] = [];
     for (let i = 0; i < newOrder.length; i++) {
       if (newOrder[i].sortOrder !== i) {
-        console.log('[DnD] updating', newOrder[i].title, 'sortOrder', newOrder[i].sortOrder, '->', i);
         updates.push(updatePage(newOrder[i].id, { sortOrder: i }));
       }
     }
-    if (updates.length === 0) console.log('[DnD] no updates needed (sortOrders already match)');
     await Promise.all(updates);
   };
 
