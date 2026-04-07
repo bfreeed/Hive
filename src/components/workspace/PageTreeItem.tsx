@@ -1,14 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronRight, ChevronDown, FileText, Folder, FolderOpen, FolderPlus, Plus, MoreHorizontal, Trash2 } from 'lucide-react';
+import { ChevronRight, ChevronDown, FileText, Folder, FolderOpen, FolderPlus, Plus, MoreHorizontal, Trash2, GripVertical } from 'lucide-react';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type { HivePage } from '../../types';
 
 export function PageTreeItem({
-  page, depth, isActive, children, onSelect, onDelete, onAddChild, onAddSubfolder, onRename,
+  page, depth, isActive, children, onSelect, onDelete, onAddChild, onAddSubfolder, onRename, isOverFolder,
 }: {
   page: HivePage; depth: number; isActive: boolean; children?: React.ReactNode;
   onSelect: () => void; onDelete: () => void; onAddChild: () => void;
   onAddSubfolder?: () => void; onRename?: (title: string) => void;
+  isOverFolder?: boolean;
 }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: page.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  };
   const [expanded, setExpanded] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -62,12 +71,21 @@ export function PageTreeItem({
   };
 
   return (
-    <div>
+    <div ref={setNodeRef} style={style}>
       <div
-        className={`group relative flex items-center gap-1 px-2 py-1 rounded-lg cursor-pointer transition-colors ${isActive ? 'bg-brand-500/10 text-brand-300' : 'text-white/55 hover:bg-white/[0.05] hover:text-white/80'}`}
+        className={`group relative flex items-center gap-1 px-2 py-1 rounded-lg cursor-pointer transition-colors ${isOverFolder ? 'bg-brand-500/20 ring-1 ring-brand-500/40' : isActive ? 'bg-brand-500/10 text-brand-300' : 'text-white/55 hover:bg-white/[0.05] hover:text-white/80'}`}
         style={{ paddingLeft: `${8 + depth * 14}px` }}
         onClick={isFolder ? () => setExpanded(v => !v) : onSelect}
       >
+        {/* Drag handle */}
+        <div
+          {...attributes}
+          {...listeners}
+          className="w-3 flex items-center justify-center flex-shrink-0 cursor-grab active:cursor-grabbing text-white/0 group-hover:text-white/25 hover:!text-white/50 transition-colors"
+        >
+          <GripVertical size={10} />
+        </div>
+
         {/* Expand toggle */}
         <button
           className={`w-4 h-4 flex items-center justify-center flex-shrink-0 text-white/20 hover:text-white/50 ${!hasChildren && !isFolder ? 'invisible' : ''}`}

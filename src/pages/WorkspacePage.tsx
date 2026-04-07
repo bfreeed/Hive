@@ -1,10 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Plus, Layout, X } from 'lucide-react';
 import { useStore } from '../store';
 import type { HivePage } from '../types';
 import { PAGE_TEMPLATES } from '../data/pageTemplates';
 import { PageTreeItem } from '../components/workspace/PageTreeItem';
 import { SpaceEditor } from '../components/workspace/SpaceEditor';
+import {
+  DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors,
+  type DragEndEvent, type DragStartEvent,
+} from '@dnd-kit/core';
+import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 
 // ─────────────────────────────────────────────
 // Template picker modal
@@ -70,11 +75,69 @@ export default function WorkspacePage({ initialPageId, projectId }: { initialPag
   const [activePageId, setActivePageId] = useState<string | null>(initialPageId ?? null);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [pendingParentId, setPendingParentId] = useState<string | null | undefined>(undefined);
+  const [dragActiveId, setDragActiveId] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const activePage = activePageId ? pages.find(p => p.id === activePageId) ?? null : null;
 
   const rootPages = pages.filter(p => !p.parentId);
   const childrenOf = (id: string) => pages.filter(p => p.parentId === id);
+
+  // Flatten tree for SortableContext
+  function flattenTree(pageList: HivePage[], depth = 0): string[] {
+    const sorted = [...pageList].sort((a, b) => {
+      if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+      return a.createdAt < b.createdAt ? -1 : 1;
+    });
+    const result: string[] = [];
+    for (const page of sorted) {
+      result.push(page.id);
+      result.push(...flattenTree(childrenOf(page.id), depth + 1));
+    }
+    return result;
+  }
+  const flatIds = useMemo(() => flattenTree(rootPages), [pages]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleDragStart = (event: DragStartEvent) => { setDragActiveId(event.active.id as string); };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    setDragActiveId(null);
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const draggedId = active.id as string;
+    const overId = over.id as string;
+    const draggedPage = pages.find(p => p.id === draggedId);
+    const overPage = pages.find(p => p.id === overId);
+    if (!draggedPage || !overPage) return;
+
+    // Dropping onto a folder → nest inside
+    if (overPage.type === 'folder' && draggedPage.parentId !== overId) {
+      const folderChildren = childrenOf(overId);
+      await updatePage(draggedId, { parentId: overId, sortOrder: folderChildren.length });
+      return;
+    }
+
+    // Reorder within same parent level
+    const newParentId = overPage.parentId;
+    const siblings = newParentId ? childrenOf(newParentId) : rootPages;
+    const filtered = siblings.filter(p => p.id !== draggedId);
+    const overIndex = filtered.findIndex(p => p.id === overId);
+    const newOrder = [...filtered];
+    newOrder.splice(overIndex >= 0 ? overIndex : newOrder.length, 0, draggedPage);
+    const updates: Promise<void>[] = [];
+    for (let i = 0; i < newOrder.length; i++) {
+      const p = newOrder[i];
+      const needsUpdate = p.sortOrder !== i || (p.id === draggedId && p.parentId !== newParentId);
+      if (needsUpdate) {
+        updates.push(updatePage(p.id, { sortOrder: i, ...(p.id === draggedId ? { parentId: newParentId } : {}) }));
+      }
+    }
+    await Promise.all(updates);
+  };
 
   const openTemplatePicker = (parentId?: string | null) => {
     setPendingParentId(parentId);
@@ -106,12 +169,17 @@ export default function WorkspacePage({ initialPageId, projectId }: { initialPag
   };
 
   function renderTree(pageList: HivePage[], depth = 0): React.ReactNode {
-    return pageList.map(page => (
+    const sorted = [...pageList].sort((a, b) => {
+      if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+      return a.createdAt < b.createdAt ? -1 : 1;
+    });
+    return sorted.map(page => (
       <PageTreeItem
         key={page.id}
         page={page}
         depth={depth}
         isActive={activePageId === page.id}
+        isOverFolder={page.type === 'folder' && dragActiveId !== null && dragActiveId !== page.id}
         onSelect={() => setActivePageId(page.id)}
         onDelete={() => handleDelete(page.id)}
         onAddChild={() => openTemplatePicker(page.id)}
@@ -144,7 +212,11 @@ export default function WorkspacePage({ initialPageId, projectId }: { initialPag
               <Plus size={14} /> New page
             </button>
           ) : (
-            renderTree(rootPages)
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+              <SortableContext items={flatIds} strategy={verticalListSortingStrategy}>
+                {renderTree(rootPages)}
+              </SortableContext>
+            </DndContext>
           )}
         </div>
 

@@ -1,15 +1,49 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, FolderPlus, Layout } from 'lucide-react';
 import { useStore } from '../store';
 import type { HivePage } from '../types';
 import { PageTreeItem } from './workspace/PageTreeItem';
 import { SpaceEditor } from './workspace/SpaceEditor';
+import {
+  DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors,
+  type DragEndEvent, DragOverlay, type DragStartEvent,
+} from '@dnd-kit/core';
+import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
+
+interface FlatItem { id: string; parentId?: string; depth: number; page: HivePage }
+
+function flattenTree(
+  pageList: HivePage[],
+  childrenOf: (id: string) => HivePage[],
+  depth = 0,
+): FlatItem[] {
+  const sorted = [...pageList].sort((a, b) => {
+    if (a.type === 'folder' && b.type !== 'folder') return -1;
+    if (a.type !== 'folder' && b.type === 'folder') return 1;
+    if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+    return a.createdAt < b.createdAt ? -1 : 1;
+  });
+  const result: FlatItem[] = [];
+  for (const page of sorted) {
+    result.push({ id: page.id, parentId: page.parentId, depth, page });
+    if (page.type === 'folder') {
+      result.push(...flattenTree(childrenOf(page.id), childrenOf, depth + 1));
+    }
+  }
+  return result;
+}
 
 export default function ProjectWorkspace({ projectId }: { projectId: string }) {
   const { pages: allPages, addPage, updatePage, deletePage, projects, updateProject } = useStore();
   const pages = allPages.filter(p => p.projectId === projectId);
   const [activeSpaceId, setActiveSpaceId] = useState<string | null>(null);
   const [migrated, setMigrated] = useState(false);
+  const [dragActiveId, setDragActiveId] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   // Auto-migrate existing project.docContent into a space (one-time)
   const project = projects.find(p => p.id === projectId);
@@ -36,6 +70,54 @@ export default function ProjectWorkspace({ projectId }: { projectId: string }) {
 
   const rootPages = pages.filter(p => !p.parentId);
   const childrenOf = (id: string) => pages.filter(p => p.parentId === id);
+
+  const flatItems = useMemo(() => flattenTree(rootPages, childrenOf), [pages]); // eslint-disable-line react-hooks/exhaustive-deps
+  const flatIds = useMemo(() => flatItems.map(fi => fi.id), [flatItems]);
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setDragActiveId(event.active.id as string);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    setDragActiveId(null);
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const draggedId = active.id as string;
+    const overId = over.id as string;
+    const draggedPage = pages.find(p => p.id === draggedId);
+    const overPage = pages.find(p => p.id === overId);
+    if (!draggedPage || !overPage) return;
+
+    // If dropping onto a folder, nest inside it
+    if (overPage.type === 'folder' && draggedPage.parentId !== overId) {
+      const folderChildren = childrenOf(overId);
+      await updatePage(draggedId, { parentId: overId, sortOrder: folderChildren.length });
+      return;
+    }
+
+    // Otherwise, reorder: move dragged item to the same parent as the over item
+    const newParentId = overPage.parentId;
+    const siblings = newParentId ? childrenOf(newParentId) : rootPages;
+    const filtered = siblings.filter(p => p.id !== draggedId);
+    const overIndex = filtered.findIndex(p => p.id === overId);
+    const newOrder = [...filtered];
+    newOrder.splice(overIndex >= 0 ? overIndex : newOrder.length, 0, draggedPage);
+
+    // Batch update sortOrder for all siblings + update parentId if changed
+    const updates: Promise<void>[] = [];
+    for (let i = 0; i < newOrder.length; i++) {
+      const p = newOrder[i];
+      const needsUpdate = p.sortOrder !== i || (p.id === draggedId && p.parentId !== newParentId);
+      if (needsUpdate) {
+        updates.push(updatePage(p.id, {
+          sortOrder: i,
+          ...(p.id === draggedId ? { parentId: newParentId } : {}),
+        }));
+      }
+    }
+    await Promise.all(updates);
+  };
 
   const handleCreateSpace = async (parentId?: string) => {
     const newPage = await addPage({
@@ -72,7 +154,6 @@ export default function ProjectWorkspace({ projectId }: { projectId: string }) {
   };
 
   function renderTree(pageList: HivePage[], depth = 0): React.ReactNode {
-    // Sort: folders first, then by sortOrder, then by creation
     const sorted = [...pageList].sort((a, b) => {
       if (a.type === 'folder' && b.type !== 'folder') return -1;
       if (a.type !== 'folder' && b.type === 'folder') return 1;
@@ -85,6 +166,7 @@ export default function ProjectWorkspace({ projectId }: { projectId: string }) {
         page={page}
         depth={depth}
         isActive={activeSpaceId === page.id}
+        isOverFolder={page.type === 'folder' && dragActiveId !== null && dragActiveId !== page.id}
         onSelect={() => { if (page.type !== 'folder') setActiveSpaceId(page.id); }}
         onDelete={() => handleDelete(page.id)}
         onAddChild={() => handleCreateSpace(page.id)}
@@ -125,7 +207,16 @@ export default function ProjectWorkspace({ projectId }: { projectId: string }) {
               <Plus size={14} /> New space
             </button>
           ) : (
-            renderTree(rootPages)
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext items={flatIds} strategy={verticalListSortingStrategy}>
+                {renderTree(rootPages)}
+              </SortableContext>
+            </DndContext>
           )}
         </div>
 
