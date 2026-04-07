@@ -69,9 +69,11 @@ function RelationshipTagPicker({ selectedIds, onToggle, onCreate }: {
   }, [open]);
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => { if (dropRef.current && !dropRef.current.contains(e.target as Node)) { setOpen(false); setCreating(false); setSearch(''); } };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    const mouseHandler = (e: MouseEvent) => { if (dropRef.current && !dropRef.current.contains(e.target as Node)) { setOpen(false); setCreating(false); setSearch(''); } };
+    const keyHandler = (e: KeyboardEvent) => { if (e.key === 'Escape') { setOpen(false); setCreating(false); setSearch(''); } };
+    document.addEventListener('mousedown', mouseHandler);
+    document.addEventListener('keydown', keyHandler);
+    return () => { document.removeEventListener('mousedown', mouseHandler); document.removeEventListener('keydown', keyHandler); };
   }, []);
 
   const filtered = tags.filter(t => t.name.toLowerCase().includes(search.toLowerCase()));
@@ -160,9 +162,11 @@ function ProjectPicker({ selectedIds, onToggle }: { selectedIds: string[]; onTog
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    const mouseHandler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const keyHandler = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', mouseHandler);
+    document.addEventListener('keydown', keyHandler);
+    return () => { document.removeEventListener('mousedown', mouseHandler); document.removeEventListener('keydown', keyHandler); };
   }, []);
 
   const selected = projects.filter(p => selectedIds.includes(p.id));

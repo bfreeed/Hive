@@ -609,6 +609,22 @@ export default function MessagesPage() {
     setHasNewMessages(!!firstUnreadId);
   }, [activeChannelId]);
 
+  // Escape key: close overlay panels
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea') return;
+      if (showChannelBrowser) { setShowChannelBrowser(false); return; }
+      if (showMembers) { setShowMembers(false); setAddMemberEmail(''); setAddMemberStatus('idle'); return; }
+      if (showNewChannel) { setShowNewChannel(false); setNewChannelName(''); return; }
+      if (showNewDm) { setShowNewDm(false); setNewDmUserId(''); return; }
+      if (openThreadId) { setOpenThreadId(null); return; }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [showChannelBrowser, showMembers, showNewChannel, showNewDm, openThreadId]);
+
   // Show "new messages" indicator when new messages arrive while channel is open
   useEffect(() => {
     if (firstUnreadId) setHasNewMessages(true);
@@ -1646,7 +1662,7 @@ export default function MessagesPage() {
                       type="email"
                       value={addMemberEmail}
                       onChange={e => { setAddMemberEmail(e.target.value); setAddMemberStatus('idle'); }}
-                      onKeyDown={e => e.key === 'Enter' && handleInviteMember()}
+                      onKeyDown={e => { if (e.key === 'Enter') handleInviteMember(); if (e.key === 'Escape') { setShowMembers(false); setAddMemberEmail(''); setAddMemberStatus('idle'); } }}
                       placeholder="Invite by email…"
                       className="flex-1 px-2 py-1.5 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/80 placeholder-white/25 focus:outline-none focus:border-brand-500/40"
                     />

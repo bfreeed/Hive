@@ -39,12 +39,6 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
   const task = tasks.find(t => t.id === taskId);
   const [commentText, setCommentText] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [onClose]);
   const [showSubtasks, setShowSubtasks] = useState(true);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [showNewSubtask, setShowNewSubtask] = useState(false);
@@ -65,6 +59,25 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
   const fileInputRef = useRef<HTMLInputElement>(null);
   const prevDueDateRef = useRef<string | undefined>(undefined);
   const dateInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea') return; // let inputs handle their own Escape
+      // Close open pickers/overlays before closing the panel
+      if (showStatusPicker) { setShowStatusPicker(false); return; }
+      if (showPriorityPicker) { setShowPriorityPicker(false); return; }
+      if (showProjectPicker) { setShowProjectPicker(false); return; }
+      if (showCalPicker) { setShowCalPicker(false); return; }
+      if (showDepPicker) { setShowDepPicker(false); return; }
+      if (showNewSubtask) { setShowNewSubtask(false); setNewSubtaskTitle(''); return; }
+      if (confirmDelete) { setConfirmDelete(false); return; }
+      onClose();
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose, showStatusPicker, showPriorityPicker, showProjectPicker, showCalPicker, showDepPicker, showNewSubtask, confirmDelete]);
 
   const { open: openDrivePicker, loading: driveLoading } = useGooglePicker((file) => {
     const att = {
@@ -214,6 +227,7 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
               className="w-full bg-transparent text-xl md:text-2xl font-semibold text-white resize-none focus:outline-none placeholder-white/20 leading-snug mt-2 mb-1"
               value={task.title}
               onChange={(e) => update('title', e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Escape') (e.target as HTMLElement).blur(); }}
               rows={task.title.length > 55 ? 2 : 1}
               placeholder="Task title..."
             />
@@ -683,6 +697,7 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
             <textarea
               value={task.description || ''}
               onChange={(e) => update('description', e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Escape') (e.target as HTMLElement).blur(); }}
               placeholder="Add notes, context, links..."
               rows={4}
               className="w-full px-4 py-3 bg-white/[0.03] border border-white/[0.06] rounded-xl text-sm text-white/70 placeholder-white/20 focus:outline-none focus:border-brand-500/30 resize-none"
@@ -926,7 +941,10 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                   <textarea
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddComment(); } }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddComment(); }
+                      if (e.key === 'Escape') { setCommentText(''); (e.target as HTMLElement).blur(); }
+                    }}
                     placeholder="Add a comment... (Enter to post)"
                     rows={2}
                     className="w-full px-4 py-2.5 bg-white/[0.04] border border-white/[0.08] rounded-xl text-sm text-white/80 placeholder-white/20 focus:outline-none focus:border-brand-500/30 resize-none"
