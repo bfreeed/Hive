@@ -2,13 +2,17 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getUserSettings, supabaseAdmin } from './_lib/auth';
 import { randomBytes } from 'crypto';
 
-const CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
+const CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? '';
 const APP_URL = process.env.APP_URL || 'https://hivenow.app';
 const REDIRECT_URI = `${APP_URL}/api/google-drive-callback`;
 const SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).end();
+
+  if (!CLIENT_ID) {
+    return res.status(500).json({ error: 'Server missing GOOGLE_CLIENT_ID env var' });
+  }
 
   const ctx = await getUserSettings(req, res);
   if (!ctx) return;

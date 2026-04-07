@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getUserSettings, supabaseAdmin } from './_lib/auth';
 
-const CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
-const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!;
+const CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? '';
+const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET ?? '';
 
 async function getValidToken(settings: Record<string, any>, userId: string): Promise<string | null> {
   if (!settings?.google_drive_access_token) return null;

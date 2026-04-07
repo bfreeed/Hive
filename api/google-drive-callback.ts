@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from './_lib/auth';
 
-const CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
-const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!;
+const CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? '';
+const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET ?? '';
 const APP_URL = process.env.APP_URL || 'https://hivenow.app';
 const REDIRECT_URI = `${APP_URL}/api/google-drive-callback`;
 

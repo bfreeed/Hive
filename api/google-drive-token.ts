@@ -1,11 +1,15 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getUserSettings, supabaseAdmin } from './_lib/auth';
 
-const CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
-const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!;
+const CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? '';
+const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET ?? '';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).end();
+
+  if (!CLIENT_ID || !CLIENT_SECRET) {
+    return res.status(500).json({ error: 'Server missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET env vars' });
+  }
 
   const ctx = await getUserSettings(req, res);
   if (!ctx) return;
