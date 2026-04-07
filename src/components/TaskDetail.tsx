@@ -25,7 +25,7 @@ const PRIORITY_OPTIONS: { value: Priority; label: string; dot: string; active: s
 function PropRow({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-start min-h-[32px] group/prop">
-      <div className="flex items-center gap-2 w-20 md:w-32 flex-shrink-0 text-white/30 text-sm py-1 mt-0.5">
+      <div className="flex items-center gap-2 w-20 md:w-32 flex-shrink-0 text-white/50 text-sm py-1 mt-0.5">
         <span className="flex-shrink-0">{icon}</span>
         <span className="text-xs">{label}</span>
       </div>
@@ -198,21 +198,21 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                 {p.name}
               </span>
             ))}
-            {task.isPrivate && <span className="flex items-center gap-1 text-xs text-white/30"><Lock size={10} /> Private</span>}
+            {task.isPrivate && <span className="flex items-center gap-1 text-xs text-white/50"><Lock size={10} /> Private</span>}
           </div>
           <div className="flex items-center gap-1">
             {confirmDelete ? (
               <>
                 <span className="text-xs text-white/40 mr-2">Delete this task?</span>
                 <button onClick={() => { deleteTask(taskId); onClose(); }} className="px-3 py-1.5 bg-red-500/20 text-red-400 text-xs rounded-lg hover:bg-red-500/30 transition-colors">Yes, delete</button>
-                <button onClick={() => setConfirmDelete(false)} className="px-3 py-1.5 text-white/30 text-xs rounded-lg hover:text-white/60 transition-colors">Cancel</button>
+                <button onClick={() => setConfirmDelete(false)} className="px-3 py-1.5 text-white/50 text-xs rounded-lg hover:text-white/80 transition-colors">Cancel</button>
               </>
             ) : (
-              <button onClick={() => setConfirmDelete(true)} className="p-1.5 rounded-md text-white/20 hover:text-red-400 hover:bg-red-400/10 transition-colors">
+              <button onClick={() => setConfirmDelete(true)} className="p-1.5 rounded-md text-white/40 hover:text-red-400 hover:bg-red-400/10 transition-colors">
                 <Trash2 size={14} />
               </button>
             )}
-            <button onClick={onClose} className="p-1.5 rounded-md text-white/30 hover:text-white hover:bg-white/[0.06] transition-colors ml-1">
+            <button onClick={onClose} className="p-1.5 rounded-md text-white/50 hover:text-white hover:bg-white/[0.06] transition-colors ml-1">
               <X size={16} />
             </button>
           </div>
@@ -252,7 +252,7 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                         <button
                           key={s.value}
                           onClick={() => { update('status', s.value); setShowStatusPicker(false); }}
-                          className="px-3 py-1 rounded-lg text-xs font-medium text-white/30 hover:text-white/60 bg-white/[0.04] hover:bg-white/[0.06] transition-colors"
+                          className="px-3 py-1 rounded-lg text-xs font-medium text-white/50 hover:text-white/80 bg-white/[0.04] hover:bg-white/[0.06] transition-colors"
                         >
                           {s.label}
                         </button>
@@ -280,7 +280,7 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                         <button
                           key={p.value}
                           onClick={() => { update('priority', p.value); setShowPriorityPicker(false); }}
-                          className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium text-white/30 hover:text-white/60 bg-white/[0.04] hover:bg-white/[0.06] transition-colors"
+                          className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium text-white/50 hover:text-white/80 bg-white/[0.04] hover:bg-white/[0.06] transition-colors"
                         >
                           <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${p.dot}`} />
                           {p.label}
@@ -314,7 +314,7 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                   {task.dueDate && !task.dueTime && (
                     <button
                       onClick={() => update('dueTime', '09:00')}
-                      className="px-2 py-1 rounded-lg text-xs text-white/30 hover:text-white/60 bg-white/[0.04] hover:bg-white/[0.08] transition-colors"
+                      className="px-2 py-1 rounded-lg text-xs text-white/50 hover:text-white/80 bg-white/[0.04] hover:bg-white/[0.08] transition-colors"
                     >
                       + Add time
                     </button>
@@ -322,7 +322,7 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                   {task.dueTime && (
                     <>
                       <div className="flex items-center gap-1">
-                        <span className="text-xs text-white/25">Start</span>
+                        <span className="text-xs text-white/45">Start</span>
                         <input
                           type="time"
                           value={task.dueTime || ''}
@@ -335,7 +335,7 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                         />
                       </div>
                       <div className="flex items-center gap-1">
-                        <span className="text-xs text-white/25">End</span>
+                        <span className="text-xs text-white/45">End</span>
                         <input
                           type="time"
                           value={task.dueTimeEnd || ''}
@@ -350,7 +350,7 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                       </div>
                       <button
                         onClick={() => { update('dueTime', undefined); update('dueTimeEnd', undefined); }}
-                        className="px-2 py-1 rounded-lg text-xs text-white/30 hover:text-white/70 bg-white/[0.04] hover:bg-white/[0.08] transition-colors"
+                        className="px-2 py-1 rounded-lg text-xs text-white/50 hover:text-white/80 bg-white/[0.04] hover:bg-white/[0.08] transition-colors"
                       >
                         All day
                       </button>
@@ -359,7 +359,7 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                   {/* Calendar sync */}
                   <button
                     onClick={() => update('calendarSync', !task.calendarSync)}
-                    className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${task.calendarSync ? 'bg-[#4285F4]/15 text-[#4285F4]' : 'bg-white/[0.04] text-white/25 hover:text-white/50'}`}
+                    className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${task.calendarSync ? 'bg-[#4285F4]/15 text-[#4285F4]' : 'bg-white/[0.04] text-white/45 hover:text-white/50'}`}
                   >
                     <Calendar size={10} />
                     {task.calendarSync ? 'Cal On' : 'Cal'}
@@ -389,16 +389,16 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                         {showCalPicker && (
                           <div className="absolute top-full left-0 mt-1 w-52 bg-[#1c1c1f] border border-white/[0.08] rounded-xl shadow-xl z-30 py-1 max-h-56 overflow-y-auto">
                             <div className="flex items-center justify-between px-3 pt-1 pb-1.5 border-b border-white/[0.06]">
-                              <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Choose calendar</span>
-                              <button onClick={() => setShowCalPicker(false)} className="text-white/30 hover:text-white/60"><X size={12} /></button>
+                              <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">Choose calendar</span>
+                              <button onClick={() => setShowCalPicker(false)} className="text-white/50 hover:text-white/80"><X size={12} /></button>
                             </div>
                             {calListLoading && (
                               <div className="flex items-center justify-center py-4">
-                                <RefreshCw size={13} className="animate-spin text-white/30" />
+                                <RefreshCw size={13} className="animate-spin text-white/50" />
                               </div>
                             )}
                             {!calListLoading && calList.length === 0 && (
-                              <p className="text-xs text-white/30 px-3 py-3">No calendars found. Make sure you're signed in.</p>
+                              <p className="text-xs text-white/50 px-3 py-3">No calendars found. Make sure you're signed in.</p>
                             )}
                             {calList.map(cal => (
                               <button
@@ -430,7 +430,7 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                       </div>
                       {/* Sync status */}
                       {calSyncing ? (
-                        <span className="text-xs text-white/30 flex items-center gap-1"><RefreshCw size={10} className="animate-spin" /> Syncing…</span>
+                        <span className="text-xs text-white/50 flex items-center gap-1"><RefreshCw size={10} className="animate-spin" /> Syncing…</span>
                       ) : calSynced ? (
                         <span className="text-xs text-emerald-400 flex items-center gap-1"><Check size={10} /> Synced</span>
                       ) : needsAuth ? (
@@ -438,7 +438,7 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                           <Calendar size={10} /> Authorize
                         </button>
                       ) : task.calendarEventId ? (
-                        <span className="text-xs text-white/20 flex items-center gap-1"><Check size={10} /> On calendar</span>
+                        <span className="text-xs text-white/40 flex items-center gap-1"><Check size={10} /> On calendar</span>
                       ) : null}
                     </>
                   )}
@@ -486,7 +486,7 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                   ))}
                   <button
                     onClick={() => setShowProjectPicker(v => !v)}
-                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-white/25 hover:text-white/50 bg-white/[0.04] hover:bg-white/[0.06] transition-colors"
+                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-white/45 hover:text-white/50 bg-white/[0.04] hover:bg-white/[0.06] transition-colors"
                   >
                     <Plus size={10} />
                   </button>
@@ -568,8 +568,8 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                         <option value="days">days</option>
                         <option value="weeks">weeks</option>
                       </select>
-                      <span className="text-xs text-white/25">before</span>
-                      <button onClick={() => update('reminderMinutes', undefined)} className="text-white/30 hover:text-white/60 transition-colors"><X size={12} /></button>
+                      <span className="text-xs text-white/45">before</span>
+                      <button onClick={() => update('reminderMinutes', undefined)} className="text-white/50 hover:text-white/80 transition-colors"><X size={12} /></button>
                     </>
                   ) : (
                     <button
@@ -588,13 +588,13 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                   <div className="flex rounded-lg overflow-hidden border border-white/[0.08]">
                     <button
                       onClick={() => { if (task.waitDate) update('waitDate', undefined); }}
-                      className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium transition-colors ${!task.waitDate ? 'bg-white/[0.08] text-white/70' : 'text-white/30 hover:text-white/50 hover:bg-white/[0.04]'}`}
+                      className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium transition-colors ${!task.waitDate ? 'bg-white/[0.08] text-white/70' : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'}`}
                     >
                       <BellOff size={10} /> Snooze
                     </button>
                     <button
                       onClick={() => { if (task.snoozeDate) update('snoozeDate', undefined); }}
-                      className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium transition-colors ${task.waitDate ? 'bg-white/[0.08] text-white/70' : 'text-white/30 hover:text-white/50 hover:bg-white/[0.04]'}`}
+                      className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium transition-colors ${task.waitDate ? 'bg-white/[0.08] text-white/70' : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'}`}
                     >
                       <Clock size={10} /> Waiting for
                     </button>
@@ -612,9 +612,9 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                         style={{ colorScheme: 'dark' }}
                       />
                       {task.snoozeDate && (
-                        <button onClick={() => update('snoozeDate', undefined)} className="text-white/20 hover:text-white/50 transition-colors"><X size={11} /></button>
+                        <button onClick={() => update('snoozeDate', undefined)} className="text-white/40 hover:text-white/50 transition-colors"><X size={11} /></button>
                       )}
-                      {task.snoozeDate && <span className="text-xs text-white/30">Hidden until {format(new Date(task.snoozeDate), 'MMM d')}</span>}
+                      {task.snoozeDate && <span className="text-xs text-white/50">Hidden until {format(new Date(task.snoozeDate), 'MMM d')}</span>}
                     </div>
                   ) : (
                     <div className="flex items-center gap-1">
@@ -629,9 +629,9 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                         style={{ colorScheme: 'dark' }}
                       />
                       {task.waitDate && (
-                        <button onClick={() => update('waitDate', undefined)} className="text-white/20 hover:text-white/50 transition-colors"><X size={11} /></button>
+                        <button onClick={() => update('waitDate', undefined)} className="text-white/40 hover:text-white/50 transition-colors"><X size={11} /></button>
                       )}
-                      {task.waitDate && <span className="text-xs text-white/30">Following up {format(new Date(task.waitDate), 'MMM d')}</span>}
+                      {task.waitDate && <span className="text-xs text-white/50">Following up {format(new Date(task.waitDate), 'MMM d')}</span>}
                     </div>
                   )}
                 </div>
@@ -652,7 +652,7 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                           update('flags', next);
                         }}
                         style={active ? { backgroundColor: f.color + '25', color: f.color, boxShadow: `0 0 0 1px ${f.color}40` } : {}}
-                        className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors ${active ? '' : 'bg-white/[0.04] text-white/25 hover:text-white/50 hover:bg-white/[0.06]'}`}
+                        className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors ${active ? '' : 'bg-white/[0.04] text-white/45 hover:text-white/50 hover:bg-white/[0.06]'}`}
                       >
                         {f.name}
                       </button>
@@ -660,7 +660,7 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                   })}
                   <button
                     onClick={() => update('isPrivate', !task.isPrivate)}
-                    className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors ${task.isPrivate ? 'bg-white/10 text-white/60 ring-1 ring-white/20' : 'bg-white/[0.04] text-white/25 hover:text-white/50 hover:bg-white/[0.06]'}`}
+                    className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors ${task.isPrivate ? 'bg-white/10 text-white/60 ring-1 ring-white/20' : 'bg-white/[0.04] text-white/45 hover:text-white/50 hover:bg-white/[0.06]'}`}
                   >
                     🔒 Private
                   </button>
@@ -675,10 +675,10 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                         style={{ color: flagDef.color + 'aa' }}
                       >
                         <span>{flagDef.name}</span>
-                        <span className="text-white/20 text-[10px]">by {applier?.name.split(' ')[0]}</span>
+                        <span className="text-white/40 text-[10px]">by {applier?.name.split(' ')[0]}</span>
                         <button
                           onClick={() => update('flags', task.flags.filter(f => !(f.flagId === tf.flagId && f.appliedBy === tf.appliedBy)))}
-                          className="ml-0.5 text-white/20 hover:text-white/50 transition-colors"
+                          className="ml-0.5 text-white/40 hover:text-white/50 transition-colors"
                         >
                           <X size={10} />
                         </button>
@@ -706,12 +706,12 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
             {/* Attachments */}
             <div className="mt-4">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs text-white/30 uppercase tracking-wider">Attachments</p>
+                <p className="text-xs text-white/50 uppercase tracking-wider">Attachments</p>
                 <div className="flex items-center gap-3">
-                  <button onClick={openDrivePicker} disabled={driveLoading} className="flex items-center gap-1 text-xs text-white/30 hover:text-[#4285F4] transition-colors disabled:opacity-40">
+                  <button onClick={openDrivePicker} disabled={driveLoading} className="flex items-center gap-1 text-xs text-white/50 hover:text-[#4285F4] transition-colors disabled:opacity-40">
                     <Cloud size={11} /> {driveLoading ? 'Opening...' : 'Drive'}
                   </button>
-                  <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1 text-xs text-white/30 hover:text-brand-400 transition-colors">
+                  <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1 text-xs text-white/50 hover:text-brand-400 transition-colors">
                     <Paperclip size={11} /> Upload
                   </button>
                 </div>
@@ -738,18 +738,18 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                       )}
                     </div>
                   ))}
-                  <button onClick={() => fileInputRef.current?.click()} className="w-20 h-20 rounded-xl border border-dashed border-white/[0.08] hover:border-white/20 text-white/20 hover:text-white/40 text-xs flex items-center justify-center transition-colors">
+                  <button onClick={() => fileInputRef.current?.click()} className="w-20 h-20 rounded-xl border border-dashed border-white/[0.08] hover:border-white/20 text-white/40 hover:text-white/40 text-xs flex items-center justify-center transition-colors">
                     +
                   </button>
                 </div>
               ) : (
                 <div className="w-full border border-dashed border-white/[0.08] rounded-xl py-5 flex flex-col items-center justify-center gap-2">
                   <div className="flex items-center gap-3">
-                    <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 text-xs text-white/20 hover:text-white/40 transition-colors">
+                    <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white/40 transition-colors">
                       <Paperclip size={13} /> Upload file
                     </button>
                     <span className="text-white/10 text-xs">or</span>
-                    <button onClick={openDrivePicker} disabled={driveLoading} className="flex items-center gap-1.5 text-xs text-white/20 hover:text-[#4285F4] transition-colors disabled:opacity-40">
+                    <button onClick={openDrivePicker} disabled={driveLoading} className="flex items-center gap-1.5 text-xs text-white/40 hover:text-[#4285F4] transition-colors disabled:opacity-40">
                       <Cloud size={13} /> Attach from Drive
                     </button>
                   </div>
@@ -767,11 +767,11 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                     onClick={() => setShowSubtasks(v => !v)}
                     className="flex items-center gap-2 w-full mb-3 group"
                   >
-                    {showSubtasks ? <ChevronDown size={13} className="text-white/30" /> : <ChevronRight size={13} className="text-white/30" />}
+                    {showSubtasks ? <ChevronDown size={13} className="text-white/50" /> : <ChevronRight size={13} className="text-white/50" />}
                     <GitBranch size={13} className="text-white/40" />
                     <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">Subtasks</span>
                     {subtasks.length > 0 && (
-                      <span className="text-xs text-white/30 ml-1">{doneCount}/{subtasks.length}</span>
+                      <span className="text-xs text-white/50 ml-1">{doneCount}/{subtasks.length}</span>
                     )}
                   </button>
                   {showSubtasks && (
@@ -784,10 +784,10 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                           >
                             {sub.status === 'done' && <span className="text-emerald-400 text-[7px] flex items-center justify-center">✓</span>}
                           </button>
-                          <span className={`flex-1 text-sm ${sub.status === 'done' ? 'line-through text-white/25' : 'text-white/70'}`}>{sub.title}</span>
+                          <span className={`flex-1 text-sm ${sub.status === 'done' ? 'line-through text-white/45' : 'text-white/70'}`}>{sub.title}</span>
                           <button
                             onClick={() => deleteTask(sub.id)}
-                            className="opacity-0 group-hover/sub:opacity-100 p-0.5 text-white/20 hover:text-red-400 transition-all"
+                            className="opacity-0 group-hover/sub:opacity-100 p-0.5 text-white/40 hover:text-red-400 transition-all"
                           >
                             <X size={11} />
                           </button>
@@ -810,14 +810,14 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                             placeholder="Subtask title..."
                             className="flex-1 bg-transparent text-sm text-white/80 placeholder-white/25 focus:outline-none"
                           />
-                          <button onClick={() => { setShowNewSubtask(false); setNewSubtaskTitle(''); }} className="text-white/30 hover:text-white/60">
+                          <button onClick={() => { setShowNewSubtask(false); setNewSubtaskTitle(''); }} className="text-white/50 hover:text-white/80">
                             <X size={11} />
                           </button>
                         </div>
                       ) : (
                         <button
                           onClick={() => setShowNewSubtask(true)}
-                          className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-white/30 hover:text-white/60 transition-colors rounded-lg hover:bg-white/[0.03] w-full"
+                          className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-white/50 hover:text-white/80 transition-colors rounded-lg hover:bg-white/[0.03] w-full"
                         >
                           <Plus size={12} /> Add subtask
                         </button>
@@ -845,10 +845,10 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                     onClick={() => setShowDeps(v => !v)}
                     className="flex items-center gap-2 w-full mb-3"
                   >
-                    {showDeps ? <ChevronDown size={13} className="text-white/30" /> : <ChevronRight size={13} className="text-white/30" />}
+                    {showDeps ? <ChevronDown size={13} className="text-white/50" /> : <ChevronRight size={13} className="text-white/50" />}
                     <Link2 size={13} className="text-white/40" />
                     <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">Blocked by</span>
-                    {deps.length > 0 && <span className="text-xs text-white/30 ml-1">{deps.length}</span>}
+                    {deps.length > 0 && <span className="text-xs text-white/50 ml-1">{deps.length}</span>}
                   </button>
                   {showDeps && (
                     <div className="space-y-1">
@@ -856,10 +856,10 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                         <div key={dep.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-white/[0.03] group/dep">
                           <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dep.status === 'done' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
                           <span className="flex-1 text-sm text-white/60 truncate">{dep.title}</span>
-                          <span className="text-[10px] text-white/25 capitalize">{dep.status}</span>
+                          <span className="text-[10px] text-white/45 capitalize">{dep.status}</span>
                           <button
                             onClick={() => updateTask(taskId, { dependsOn: (task.dependsOn ?? []).filter(id => id !== dep.id) })}
-                            className="opacity-0 group-hover/dep:opacity-100 p-0.5 text-white/20 hover:text-red-400 transition-all"
+                            className="opacity-0 group-hover/dep:opacity-100 p-0.5 text-white/40 hover:text-red-400 transition-all"
                           >
                             <X size={11} />
                           </button>
@@ -875,7 +875,7 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                             className="w-full bg-transparent text-xs text-white/80 placeholder-white/25 focus:outline-none px-1"
                           />
                           {depCandidates.length === 0 ? (
-                            <p className="text-xs text-white/25 px-1 py-1">No matching tasks</p>
+                            <p className="text-xs text-white/45 px-1 py-1">No matching tasks</p>
                           ) : (
                             depCandidates.map(t => (
                               <button
@@ -888,12 +888,12 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                               </button>
                             ))
                           )}
-                          <button onClick={() => { setShowDepPicker(false); setDepSearch(''); }} className="text-xs text-white/25 hover:text-white/50 mt-1 px-1">Cancel</button>
+                          <button onClick={() => { setShowDepPicker(false); setDepSearch(''); }} className="text-xs text-white/45 hover:text-white/50 mt-1 px-1">Cancel</button>
                         </div>
                       ) : (
                         <button
                           onClick={() => setShowDepPicker(true)}
-                          className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-white/30 hover:text-white/60 transition-colors rounded-lg hover:bg-white/[0.03] w-full"
+                          className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-white/50 hover:text-white/80 transition-colors rounded-lg hover:bg-white/[0.03] w-full"
                         >
                           <Plus size={12} /> Add dependency
                         </button>
@@ -906,7 +906,7 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
 
             {/* Comments */}
             <div className="mt-6 pt-5 border-t border-white/[0.06]">
-              <p className="text-xs text-white/30 uppercase tracking-wider mb-3">
+              <p className="text-xs text-white/50 uppercase tracking-wider mb-3">
                 Comments {task.comments.length > 0 && <span className="opacity-50 ml-1">{task.comments.length}</span>}
               </p>
 
@@ -922,7 +922,7 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="text-xs font-semibold text-white/60">{author?.name || 'Unknown'}</span>
-                            <span className="text-[10px] text-white/20">{format(new Date(c.createdAt), 'MMM d, h:mm a')}</span>
+                            <span className="text-[10px] text-white/40">{format(new Date(c.createdAt), 'MMM d, h:mm a')}</span>
                           </div>
                           <p className="text-sm text-white/70 bg-white/[0.03] rounded-xl px-4 py-2.5 border border-white/[0.05] leading-relaxed">{c.body}</p>
                         </div>
