@@ -69,7 +69,7 @@ export async function syncTaskToCalendar(task: Task, forcePrompt = false): Promi
 
   const token = await getToken(clientId, forcePrompt);
   const calId = task.calendarId || 'primary';
-  const showAs = task.calendarShowAs || 'busy';
+  const showAs = task.calendarShowAs || 'free';
   const dateStr = task.dueDate.slice(0, 10);
 
   const event: any = {

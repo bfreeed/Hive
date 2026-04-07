@@ -36,7 +36,7 @@ function dbToTask(row: any): Task {
     dueTimeEnd: row.due_time_end ?? undefined,
     calendarEventId: row.calendar_event_id ?? undefined,
     calendarShowAs: row.calendar_show_as ?? undefined,
-    calendarSync: row.calendar_sync ?? true,
+    calendarSync: row.calendar_sync ?? false,
     calendarId: row.calendar_id ?? undefined,
     snoozeDate: row.snooze_date ?? undefined,
     waitDate: row.wait_date ?? undefined,
@@ -308,6 +308,8 @@ function dbToUserSettings(row: any): UserSettings {
     googleClientId: row.google_client_id ?? undefined,
     anthropicApiKey: row.anthropic_api_key ?? undefined,
     homeSections: row.home_sections ?? undefined,
+    relationshipTags: row.relationship_tags ?? undefined,
+    calendarDefaultSync: row.calendar_default_sync ?? false,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -770,6 +772,7 @@ export const useStore = create<AppStore>()((set, get) => ({
     );
     // Always ensure at least the current user is assigned so loadData can find the task
     if (assigneeIds.length === 0 && realUid) assigneeIds = [realUid];
+    const calDefault = get().userSettings?.calendarDefaultSync ?? false;
     const newTask: Task = {
       ...task,
       assigneeIds,
@@ -779,7 +782,7 @@ export const useStore = create<AppStore>()((set, get) => ({
       comments: [],
       audioNotes: [],
       attachments: [],
-      calendarSync: true,
+      calendarSync: task.calendarSync ?? calDefault,
     };
     // Optimistic update
     set((s) => ({ tasks: [...s.tasks, newTask] }));
@@ -1446,6 +1449,8 @@ export const useStore = create<AppStore>()((set, get) => ({
     if ('googleClientId' in s) row.google_client_id = s.googleClientId ?? null;
     if ('anthropicApiKey' in s) row.anthropic_api_key = s.anthropicApiKey ?? null;
     if ('homeSections' in s) row.home_sections = s.homeSections ?? null;
+    if ('relationshipTags' in s) row.relationship_tags = s.relationshipTags ?? null;
+    if ('calendarDefaultSync' in s) row.calendar_default_sync = s.calendarDefaultSync ?? false;
     const { error } = await supabase.from('user_settings').upsert(row, { onConflict: 'user_id' });
     if (error) { console.error('saveUserSettings error:', error); return; }
     set((st) => ({ userSettings: { ...(st.userSettings ?? { userId: user.id }), ...s } }));

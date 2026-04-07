@@ -343,6 +343,25 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
           </div>
         </div>
 
+        {/* Google Calendar defaults */}
+        <div className="mb-8">
+          <h2 className="text-xs font-semibold text-white/30 uppercase tracking-wider mb-3">Google Calendar</h2>
+          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4">
+            <label className="flex items-center justify-between cursor-pointer">
+              <div>
+                <p className="text-sm text-white/70">Sync new tasks to calendar by default</p>
+                <p className="text-xs text-white/30 mt-0.5">When enabled, new tasks with a due date will automatically appear on your Google Calendar</p>
+              </div>
+              <button
+                onClick={() => saveUserSettings({ calendarDefaultSync: !(userSettings?.calendarDefaultSync ?? false) })}
+                className={`w-10 h-5 rounded-full transition-colors flex-shrink-0 ml-4 ${userSettings?.calendarDefaultSync ? 'bg-brand-500' : 'bg-white/[0.12]'}`}
+              >
+                <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform mx-0.5 ${userSettings?.calendarDefaultSync ? 'translate-x-5' : 'translate-x-0'}`} />
+              </button>
+            </label>
+          </div>
+        </div>
+
         {/* Claude / Anthropic */}
         <div className="mb-8">
           <h2 className="text-xs font-semibold text-white/30 uppercase tracking-wider mb-3">Claude AI</h2>

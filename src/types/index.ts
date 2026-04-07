@@ -217,6 +217,8 @@ export interface UserSettings {
   homeSections?: HomeSection[];
   // Relationship tags for contacts
   relationshipTags?: RelationshipTag[];
+  // Calendar defaults
+  calendarDefaultSync?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
