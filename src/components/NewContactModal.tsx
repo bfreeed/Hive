@@ -75,7 +75,7 @@ export default function NewContactModal({ onClose, onCreated }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
       <div
-        className="bg-[#18181b] border border-white/10 rounded-2xl p-6 w-[480px] max-h-[85vh] overflow-y-auto shadow-2xl"
+        className="bg-[#18181b] border border-white/10 rounded-2xl p-6 w-[480px] max-h-[85vh] overflow-y-auto shadow-2xl animate-slide-in"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-5">

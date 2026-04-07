@@ -442,7 +442,7 @@ export default function ContactsPage() {
       {/* ── Right Panel: Contact Detail ── */}
       <div className="flex-1 min-w-0 overflow-y-auto scrollbar-hide">
         {activeContact ? (
-          <div className="px-8 py-8 max-w-2xl">
+          <div key={activeContact.id} className="px-8 py-8 max-w-2xl animate-fade-in">
             {/* Header */}
             <div className="flex items-start gap-4 mb-6">
               <div className="w-16 h-16 rounded-2xl bg-brand-600/30 flex items-center justify-center text-2xl font-semibold text-brand-300">

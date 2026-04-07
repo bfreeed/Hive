@@ -877,7 +877,7 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
 
 
   return (
-    <div className="flex-1 overflow-y-auto scrollbar-hide">
+    <div className="flex-1 overflow-y-auto scrollbar-hide animate-fade-in">
       <div className={`${isBoard ? 'max-w-6xl' : 'max-w-3xl'} mx-auto px-5 py-8`}>
 
         {/* Title row */}

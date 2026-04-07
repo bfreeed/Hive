@@ -124,7 +124,7 @@ export default function QuickCapture({ initialText, onClose }: Props) {
   return (
     <>
       <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed top-[14%] left-1/2 -translate-x-1/2 z-50 w-[560px] bg-[#18181b] border border-white/[0.10] rounded-2xl shadow-2xl overflow-hidden">
+      <div className="fixed top-[14%] left-1/2 -translate-x-1/2 z-50 w-[560px] bg-[#18181b] border border-white/[0.10] rounded-2xl shadow-2xl overflow-hidden animate-slide-in">
 
         {/* Input row */}
         <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/[0.06]">

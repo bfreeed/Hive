@@ -327,7 +327,7 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
     .reduce((sum, s) => sum + (sectionData[s.id]?.count ?? 0), 0);
 
   return (
-    <div className="flex-1 overflow-y-auto scrollbar-hide">
+    <div className="flex-1 overflow-y-auto scrollbar-hide animate-fade-in">
       <div className="max-w-3xl mx-auto px-5 py-6">
         {/* Header */}
         <div className="mb-6">

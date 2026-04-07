@@ -247,7 +247,7 @@ function MeetingDetail({ meeting, onOpenTask }: { meeting: Meeting; onOpenTask?:
   }).filter(p => p.items.length > 0 && p.email && p.name.toLowerCase() !== myName);
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden animate-fade-in">
       <div className="flex-1 overflow-y-auto scrollbar-hide">
         <div className="px-10 py-10 max-w-3xl">
           {/* Header */}

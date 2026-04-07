@@ -246,7 +246,7 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
   );
 
   return (
-    <div className="flex-1 overflow-y-auto scrollbar-hide">
+    <div className="flex-1 overflow-y-auto scrollbar-hide animate-fade-in">
       <div className="max-w-5xl mx-auto px-8 py-8">
         {/* Breadcrumb — only shown for sub-projects */}
         {parentProject && (
