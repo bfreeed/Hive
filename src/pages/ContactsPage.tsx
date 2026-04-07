@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useStore } from '../store';
 import { RelationshipTag } from '../types';
-import { Plus, Mail, Phone, ExternalLink, Calendar, CheckSquare, X, Building2, MapPin, Cake, Tag, ChevronDown, Trash2, Search, Clock } from 'lucide-react';
+import { Plus, Mail, Phone, ExternalLink, Calendar, CheckSquare, X, Building2, MapPin, Cake, Tag, ChevronDown, Trash2, Search, Clock, ArrowLeft } from 'lucide-react';
 import NewContactModal from '../components/NewContactModal';
 
 const TAG_COLORS = ['#6366f1','#10b981','#f59e0b','#ef4444','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f97316','#84cc16'];
@@ -374,7 +374,7 @@ export default function ContactsPage() {
   return (
     <div className="flex-1 flex overflow-hidden">
       {/* ── Left Panel: Contact List ── */}
-      <div className="w-72 border-r border-white/[0.06] flex flex-col">
+      <div className={`w-72 border-r border-white/[0.06] flex flex-col ${selected ? 'hidden md:flex' : 'flex'}`}>
         <div className="px-4 py-4 border-b border-white/[0.06]">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-white/80">Contacts</h2>
@@ -440,9 +440,13 @@ export default function ContactsPage() {
       </div>
 
       {/* ── Right Panel: Contact Detail ── */}
-      <div className="flex-1 min-w-0 overflow-y-auto scrollbar-hide">
+      <div className={`flex-1 min-w-0 overflow-y-auto scrollbar-hide ${!selected ? 'hidden md:block' : 'block'}`}>
         {activeContact ? (
           <div key={activeContact.id} className="px-8 py-8 max-w-2xl animate-fade-in">
+            {/* Mobile back button */}
+            <button onClick={() => setSelected(null)} className="flex md:hidden items-center gap-1.5 text-sm text-white/40 hover:text-white/70 transition-colors mb-4 -ml-1">
+              <ArrowLeft size={15} /> Contacts
+            </button>
             {/* Header */}
             <div className="flex items-start gap-4 mb-6">
               <div className="w-16 h-16 rounded-2xl bg-brand-600/30 flex items-center justify-center text-2xl font-semibold text-brand-300">
