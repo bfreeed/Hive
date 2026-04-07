@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getUserSettings, supabaseAdmin, requirePost } from './_lib/auth';
+import { getUserSettings, supabaseAdmin, requirePost } from './lib/auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!requirePost(req, res)) return;
