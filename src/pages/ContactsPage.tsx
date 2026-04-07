@@ -549,8 +549,14 @@ export default function ContactsPage() {
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-white/20">Select a contact</p>
+          <div className="flex flex-col items-center justify-center h-full gap-3">
+            <div className="w-10 h-10 rounded-full bg-white/[0.04] flex items-center justify-center">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-white/20"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-white/30">Select a contact to view details</p>
+              <p className="text-xs text-white/15 mt-1">or add a new one with the + button</p>
+            </div>
           </div>
         )}
       </div>
