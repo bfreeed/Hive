@@ -12,6 +12,7 @@ const STATUS_OPTIONS: { value: TaskStatus; label: string; active: string }[] = [
   { value: 'doing',   label: 'Doing',     active: 'bg-brand-500/20 text-brand-400 ring-1 ring-brand-500/30' },
   { value: 'waiting', label: 'Waiting',   active: 'bg-yellow-500/20 text-yellow-400 ring-1 ring-yellow-500/30' },
   { value: 'review',  label: 'In Review', active: 'bg-purple-500/20 text-purple-400 ring-1 ring-purple-500/30' },
+  { value: 'done',    label: 'Done',      active: 'bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/30' },
 ];
 
 const PRIORITY_OPTIONS: { value: Priority; label: string; dot: string; active: string }[] = [
