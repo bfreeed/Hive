@@ -1002,7 +1002,7 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search tasks..."
-              className="h-10 w-full bg-white/[0.04] border border-dashed border-white/40 hover:border-white/55 rounded-xl pl-8 pr-3 text-sm text-white/70 placeholder-white/30 focus:outline-none focus:border-brand-500/50 transition-colors"
+              className="h-10 w-full bg-white/[0.04] border border-white/40 hover:border-white/55 rounded-xl pl-8 pr-3 text-sm text-white/70 placeholder-white/30 focus:outline-none focus:border-brand-500/50 transition-colors"
             />
           </div>
           {/* New Task inline capture — expands on click */}
