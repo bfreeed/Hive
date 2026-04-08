@@ -887,9 +887,44 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
               ? projects.find(p => p.id === filterProject)?.name ?? 'Project'
               : 'My Tasks'}
           </h1>
-          {/* Search + View toggle + Sort */}
-          <div className="flex items-center gap-2 sm:gap-4">
-          <div className="hidden sm:flex items-center gap-1">
+        </div>
+
+        {/* Tabs + View/Sort controls on the same row */}
+        <div className="flex items-center justify-between mb-6 border-b border-white/[0.06] pb-0">
+          <div className="flex items-center gap-0.5">
+            <DndContext
+              sensors={tabSensors}
+              collisionDetection={closestCenter}
+              onDragEnd={(event: DragEndEvent) => {
+                const { active, over } = event;
+                if (over && active.id !== over.id) {
+                  setTabOrder(prev => {
+                    const oldIdx = prev.indexOf(active.id as ActiveTab);
+                    const newIdx = prev.indexOf(over.id as ActiveTab);
+                    const next = arrayMove(prev, oldIdx, newIdx);
+                    localStorage.setItem('hive_tasks_tabOrder', JSON.stringify(next));
+                    return next;
+                  });
+                }
+              }}
+            >
+              <SortableContext items={tabs.filter(t => t.id !== 'project' || !filterProject || filterProject === 'all').map(t => t.id)} strategy={horizontalListSortingStrategy}>
+                {tabs
+                  .filter(t => t.id !== 'project' || !filterProject || filterProject === 'all')
+                  .map(tab => (
+                    <SortableTab
+                      key={tab.id}
+                      id={tab.id}
+                      label={tab.label}
+                      active={activeTab === tab.id}
+                      onClick={() => handleSetActiveTab(tab.id)}
+                    />
+                  ))}
+              </SortableContext>
+            </DndContext>
+          </div>
+          {/* View toggle + Sort */}
+          <div className="hidden sm:flex items-center gap-1 pb-1">
             {([
               { id: 'list' as const,  icon: <List size={14} />,       label: 'List'  },
               { id: 'board' as const, icon: <LayoutGrid size={14} />, label: 'Board' },
@@ -920,41 +955,6 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
               {sortActive && <span className="w-1.5 h-1.5 rounded-full bg-brand-400" />}
             </button>
           </div>
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex items-center gap-0.5 mb-6 border-b border-white/[0.06] pb-0">
-          <DndContext
-            sensors={tabSensors}
-            collisionDetection={closestCenter}
-            onDragEnd={(event: DragEndEvent) => {
-              const { active, over } = event;
-              if (over && active.id !== over.id) {
-                setTabOrder(prev => {
-                  const oldIdx = prev.indexOf(active.id as ActiveTab);
-                  const newIdx = prev.indexOf(over.id as ActiveTab);
-                  const next = arrayMove(prev, oldIdx, newIdx);
-                  localStorage.setItem('hive_tasks_tabOrder', JSON.stringify(next));
-                  return next;
-                });
-              }
-            }}
-          >
-            <SortableContext items={tabs.filter(t => t.id !== 'project' || !filterProject || filterProject === 'all').map(t => t.id)} strategy={horizontalListSortingStrategy}>
-              {tabs
-                .filter(t => t.id !== 'project' || !filterProject || filterProject === 'all')
-                .map(tab => (
-                  <SortableTab
-                    key={tab.id}
-                    id={tab.id}
-                    label={tab.label}
-                    active={activeTab === tab.id}
-                    onClick={() => handleSetActiveTab(tab.id)}
-                  />
-                ))}
-            </SortableContext>
-          </DndContext>
         </div>
 
         {/* Sort panel */}
