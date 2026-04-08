@@ -994,19 +994,19 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
           </div>
         )}
 
-        <div className="flex items-stretch gap-6 mb-6">
-          {/* Search bar */}
+        <div className="flex items-start gap-6 mb-6">
+          {/* Search bar — fixed height, never expands */}
           <div className="relative flex-shrink-0 w-44">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search tasks..."
-              className="h-full w-full bg-white/[0.04] border border-dashed border-white/40 hover:border-white/55 rounded-xl pl-8 pr-3 text-sm text-white/70 placeholder-white/30 focus:outline-none focus:border-brand-500/50 transition-colors"
+              className="h-10 w-full bg-white/[0.04] border border-dashed border-white/40 hover:border-white/55 rounded-xl pl-8 pr-3 text-sm text-white/70 placeholder-white/30 focus:outline-none focus:border-brand-500/50 transition-colors"
             />
           </div>
-          {/* New Task inline capture */}
-          <div className="w-80 flex-shrink-0">
+          {/* New Task inline capture — expands on click */}
+          <div className="w-96 flex-shrink-0">
             <InlineCapture ref={captureRef} onOpenDetail={id => onOpenTask(id)} />
           </div>
         </div>
