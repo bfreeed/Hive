@@ -555,7 +555,8 @@ export default function MessagesPage() {
   const threadReplies = openThreadId ? messages.filter(m => m.parentId === openThreadId) : [];
   const threadParentMsg = openThreadId ? messages.find(m => m.id === openThreadId) : null;
 
-  const groupedChannels = channels.filter(c => c.type === 'channel' && !c.deletedAt);
+  // Project channels hidden from sidebar are excluded unless they're actively selected
+  const groupedChannels = channels.filter(c => c.type === 'channel' && !c.deletedAt && (!c.hiddenFromSidebar || c.id === activeChannelId));
   const dmChannels = channels.filter(c => c.type === 'dm' && !c.deletedAt);
   const deletedChannels = channels.filter(c => c.deletedAt);
   const userNames = users.map(u => u.name);

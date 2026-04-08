@@ -55,6 +55,9 @@ function dbToTask(row: any): Task {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at ?? undefined,
+    parentId: row.parent_id ?? undefined,
+    sectionId: row.section_id ?? undefined,
+    dependsOn: row.depends_on ?? [],
   };
 }
 
@@ -90,6 +93,9 @@ function taskToDb(t: Task) {
     completed_at: t.completedAt ?? null,
     created_at: t.createdAt,
     updated_at: t.updatedAt,
+    parent_id: t.parentId ?? null,
+    section_id: t.sectionId ?? null,
+    depends_on: t.dependsOn ?? [],
   };
 }
 
@@ -109,6 +115,7 @@ function dbToProject(row: any): Project {
     isFolder: row.is_folder ?? false,
     googleDriveFolderId: row.google_drive_folder_id ?? undefined,
     googleDriveFolderName: row.google_drive_folder_name ?? undefined,
+    hideFromSidebar: row.hide_from_sidebar ?? false,
     deletedAt: row.deleted_at ?? undefined,
   };
 }
@@ -129,6 +136,7 @@ function projectToDb(p: Project) {
     is_folder: p.isFolder ?? false,
     google_drive_folder_id: p.googleDriveFolderId ?? null,
     google_drive_folder_name: p.googleDriveFolderName ?? null,
+    hide_from_sidebar: p.hideFromSidebar ?? false,
   };
 }
 
@@ -173,6 +181,54 @@ function contactToDb(c: Contact, userId?: string) {
   };
 }
 
+function messageToDb(m: Message) {
+  return {
+    id: m.id,
+    channel_id: m.channelId,
+    author_id: m.authorId,
+    body: m.body,
+    created_at: m.createdAt,
+    reactions: m.reactions ?? {},
+    attachments: m.attachments ?? null,
+    edited_at: m.editedAt ?? null,
+    parent_id: m.parentId ?? null,
+    priority: m.priority ?? null,
+    receiver_priority: m.receiverPriority ?? null,
+  };
+}
+
+function channelToDb(c: Channel) {
+  return {
+    id: c.id,
+    name: c.name,
+    type: c.type,
+    member_ids: c.memberIds,
+    description: c.description ?? null,
+    last_read_at: c.lastReadAt ?? null,
+    pinned_message_ids: c.pinnedMessageIds ?? [],
+    muted: c.muted ?? false,
+    read_by: c.readBy ?? {},
+    deleted_at: c.deletedAt ?? null,
+    project_id: c.projectId ?? null,
+    hidden_from_sidebar: c.hiddenFromSidebar ?? false,
+  };
+}
+
+function notificationToDb(n: Notification) {
+  return {
+    id: n.id,
+    type: n.type,
+    title: n.title,
+    body: n.body,
+    task_id: n.taskId ?? null,
+    project_id: n.projectId ?? null,
+    user_id: n.userId ?? null,
+    invitation_id: n.invitationId ?? null,
+    read: n.read ?? false,
+    created_at: n.createdAt,
+  };
+}
+
 function dbToChannel(row: any): Channel {
   return {
     id: row.id,
@@ -185,6 +241,8 @@ function dbToChannel(row: any): Channel {
     muted: row.muted ?? false,
     readBy: row.read_by ?? {},
     deletedAt: row.deleted_at ?? undefined,
+    projectId: row.project_id ?? undefined,
+    hiddenFromSidebar: row.hidden_from_sidebar ?? false,
   };
 }
 
@@ -523,12 +581,14 @@ export const useStore = create<AppStore>()((set, get) => ({
         return r.value;
       }));
 
-      // Phase 2 — queries that depend on channel membership (must run after phase 1)
-      // Messages filtered to only the user's channels; profiles filtered to channel members only.
+      // Phase 2 — queries that depend on channel/project membership (must run after phase 1)
+      // Messages filtered to only the user's channels; profiles loaded for all collaborators.
       const phase1Channels = channelsRes.data ?? [];
       const phase1ChannelIds = phase1Channels.map((c: any) => c.id as string);
-      const allChannelMemberIds = new Set<string>([
+      const phase1Projects = projectsRes.data ?? [];
+      const allCollaboratorIds = new Set<string>([
         ...phase1Channels.flatMap((c: any) => c.member_ids ?? []),
+        ...phase1Projects.flatMap((p: any) => p.member_ids ?? []),
         uid,
       ]);
 
@@ -536,7 +596,7 @@ export const useStore = create<AppStore>()((set, get) => ({
         phase1ChannelIds.length > 0
           ? supabase.from('messages').select('*').in('channel_id', phase1ChannelIds).order('created_at', { ascending: true })
           : Promise.resolve({ data: [] as any[], error: null }),
-        supabase.from('profiles').select('*').in('id', Array.from(allChannelMemberIds)),
+        supabase.from('profiles').select('*').in('id', Array.from(allCollaboratorIds)),
       ]).then(results => results.map((r, i) => {
         if (r.status === 'rejected') { console.error(`loadData phase2 query ${i} failed:`, r.reason); return { data: null, error: r.reason }; }
         return r.value;
@@ -670,13 +730,8 @@ export const useStore = create<AppStore>()((set, get) => ({
   addChannel: (channel) => {
     const newChannel: Channel = { ...channel, id: uid() };
     set((s) => ({ channels: [...s.channels, newChannel] }));
-    supabase.from('channels').insert({
-      id: newChannel.id,
-      name: newChannel.name,
-      type: newChannel.type,
-      member_ids: newChannel.memberIds,
-      description: newChannel.description ?? null,
-    }).then(({ error }) => { if (error) console.error('addChannel error:', error); });
+    supabase.from('channels').insert(channelToDb(newChannel))
+      .then(({ error }) => { if (error) console.error('addChannel error:', error); });
   },
 
   updateChannel: (id, u) => {
@@ -892,11 +947,8 @@ export const useStore = create<AppStore>()((set, get) => ({
         .then(({ error }) => { if (error) console.error('addRecurring error:', error); });
     }
     if (nn.length > 0) {
-      supabase.from('notifications').insert(nn.map(n => ({
-        id: n.id, type: n.type, title: n.title, body: n.body,
-        task_id: n.taskId ?? null, project_id: n.projectId ?? null,
-        read: n.read, created_at: n.createdAt,
-      }))).then(({ error }) => { if (error) console.error('notification insert error:', error); });
+      supabase.from('notifications').insert(nn.map(notificationToDb))
+        .then(({ error }) => { if (error) console.error('notification insert error:', error); });
     }
 
     return { tasks: [...tasks, ...newRecurring], notifications: [...nn, ...s.notifications] };
@@ -941,6 +993,22 @@ export const useStore = create<AppStore>()((set, get) => ({
     set((s) => ({ projects: [...s.projects, newProject] }));
     supabase.from('projects').insert(projectToDb(newProject))
       .then(({ error }) => { if (error) console.error('addProject error:', error); });
+    // Auto-create a linked channel (skipped for folders and sub-projects)
+    if (!p.isFolder) {
+      const newChannel = {
+        id: uid(),
+        name: p.name,
+        type: 'channel' as const,
+        memberIds: p.memberIds ?? [],
+        projectId: newProject.id,
+        hiddenFromSidebar: false,
+        pinnedMessageIds: [],
+        readBy: {},
+      };
+      set((s) => ({ channels: [...s.channels, newChannel] }));
+      supabase.from('channels').insert(channelToDb(newChannel))
+        .then(({ error }) => { if (error) console.error('addChannel (auto) error:', error); });
+    }
   },
 
   updateProject: (id, u) => {
@@ -1128,12 +1196,8 @@ export const useStore = create<AppStore>()((set, get) => ({
   addNotification: (n) => {
     const newN: Notification = { ...n, id: uid(), createdAt: new Date().toISOString(), read: false };
     set((s) => ({ notifications: [newN, ...s.notifications] }));
-    supabase.from('notifications').insert({
-      id: newN.id, type: newN.type, title: newN.title, body: newN.body,
-      task_id: newN.taskId ?? null, project_id: newN.projectId ?? null,
-      user_id: newN.userId ?? null,
-      read: false, created_at: newN.createdAt,
-    }).then(({ error }) => { if (error) console.error('addNotification error:', error); });
+    supabase.from('notifications').insert(notificationToDb(newN))
+      .then(({ error }) => { if (error) console.error('addNotification error:', error); });
   },
 
   // -------------------------------------------------------------------------
@@ -1206,17 +1270,8 @@ export const useStore = create<AppStore>()((set, get) => ({
       ...(priority ? { priority } : {}),
     };
     set((st) => ({ messages: [...st.messages, newMsg] }));
-    supabase.from('messages').insert({
-      id: newMsg.id,
-      channel_id: newMsg.channelId,
-      author_id: newMsg.authorId,
-      body: newMsg.body,
-      reactions: newMsg.reactions,
-      attachments: newMsg.attachments ?? null,
-      parent_id: newMsg.parentId ?? null,
-      created_at: newMsg.createdAt,
-      priority: newMsg.priority ?? null,
-    }).then(({ error }) => { if (error) console.error('sendMessage error:', error); });
+    supabase.from('messages').insert(messageToDb(newMsg))
+      .then(({ error }) => { if (error) console.error('sendMessage error:', error); });
   },
 
   updateMessage: (id, body) => {
@@ -1270,15 +1325,8 @@ export const useStore = create<AppStore>()((set, get) => ({
       reactions: {},
     };
     set((st) => ({ messages: [...st.messages, newMsg] }));
-    supabase.from('messages').insert({
-      id: newMsg.id,
-      channel_id: newMsg.channelId,
-      author_id: newMsg.authorId,
-      body: newMsg.body,
-      reactions: newMsg.reactions,
-      parent_id: newMsg.parentId,
-      created_at: newMsg.createdAt,
-    }).then(({ error }) => { if (error) console.error('replyToMessage error:', error); });
+    supabase.from('messages').insert(messageToDb(newMsg))
+      .then(({ error }) => { if (error) console.error('replyToMessage error:', error); });
   },
 
   pinMessage: (messageId, channelId) => {

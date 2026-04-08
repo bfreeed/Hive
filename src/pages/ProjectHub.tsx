@@ -8,6 +8,7 @@ import BoardView from '../components/BoardView';
 import InlineCapture from '../components/InlineCapture';
 import DocEditor from '../components/DocEditor';
 import ProjectWorkspace from '../components/ProjectWorkspace';
+import ProjectChannelView from '../components/ProjectChannelView';
 import DriveFolderView from '../components/DriveFolderView';
 import { buildGroups, sortTasks } from '../utils/buildGroups';
 import type { BoardGroupBy, BoardSortBy, BoardSortOrder } from '../utils/buildGroups';
@@ -48,7 +49,7 @@ function SortableProjectTab({ id, label, active, onClick }: { id: string; label:
   );
 }
 
-const DEFAULT_MAIN_TABS = ['tasks', 'workspace', 'docs', 'contacts', 'meetings'] as const;
+const DEFAULT_MAIN_TABS = ['tasks', 'workspace', 'docs', 'contacts', 'meetings', 'messages'] as const;
 type MainTab = typeof DEFAULT_MAIN_TABS[number];
 
 function SortableMainTab({ id, label, active, onClick }: {
@@ -794,6 +795,13 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
             </div>
           );
         })()}
+
+        {/* Messages Tab */}
+        {activeTab === 'messages' && (
+          <div className="-mx-6 -mb-6 h-[calc(100vh-220px)] flex flex-col px-6 pt-4">
+            <ProjectChannelView projectId={projectId} />
+          </div>
+        )}
 
         {/* Docs Tab */}
         {activeTab === 'docs' && (() => {

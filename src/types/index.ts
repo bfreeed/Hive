@@ -259,6 +259,8 @@ export interface Channel {
   muted?: boolean;
   readBy?: Record<string, string>; // userId → ISO timestamp of last read
   deletedAt?: string; // soft delete — set when channel is "deleted", cleared on restore
+  projectId?: string; // linked project — channel lives on the project's Messages tab
+  hiddenFromSidebar?: boolean; // hide from main Messages sidebar (keeps project channels tidy)
 }
 
 export type MessagePriority = 'low' | 'medium' | 'high' | 'urgent';
