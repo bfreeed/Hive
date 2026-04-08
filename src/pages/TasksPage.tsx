@@ -1006,7 +1006,7 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
             />
           </div>
           {/* New Task inline capture */}
-          <div className="flex-1 min-w-0">
+          <div className="w-80 flex-shrink-0">
             <InlineCapture ref={captureRef} onOpenDetail={id => onOpenTask(id)} />
           </div>
         </div>
