@@ -994,9 +994,9 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
           </div>
         )}
 
-        <div className="max-w-3xl mx-auto flex items-stretch gap-2 mb-6">
+        <div className="flex items-stretch gap-6 mb-6">
           {/* Search bar */}
-          <div className="relative flex-shrink-0 w-48">
+          <div className="relative flex-shrink-0 w-44">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
             <input
               value={search}
