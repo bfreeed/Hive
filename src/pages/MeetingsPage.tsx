@@ -234,6 +234,19 @@ function MeetingDetail({ meeting, onOpenTask }: { meeting: Meeting; onOpenTask?:
   const [participantMenu, setParticipantMenu] = useState<number | null>(null);
   const [editingParticipant, setEditingParticipant] = useState<{ index: number; value: string } | null>(null);
 
+  // Close all dropdowns on Escape
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (participantMenu !== null) setParticipantMenu(null);
+      if (showProjectDropdown) { setShowProjectDropdown(false); setProjectSearch(''); }
+      if (showContactDropdown) { setShowContactDropdown(false); setContactSearch(''); }
+      if (editingParticipant) setEditingParticipant(null);
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [participantMenu, showProjectDropdown, showContactDropdown, editingParticipant]);
+
   const pendingItems = (meeting.actionItems ?? []).filter(a => !a.accepted && !a.dismissed);
   const acceptedItems = (meeting.actionItems ?? []).filter(a => a.accepted);
 
@@ -403,6 +416,7 @@ function MeetingDetail({ meeting, onOpenTask }: { meeting: Meeting; onOpenTask?:
                           autoFocus
                           value={projectSearch}
                           onChange={e => setProjectSearch(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Escape') { setShowProjectDropdown(false); setProjectSearch(''); } }}
                           placeholder="Search projects..."
                           className="w-full px-2.5 py-1.5 bg-white/[0.06] border border-white/[0.08] rounded-lg text-xs text-white/70 placeholder-white/25 focus:outline-none focus:border-brand-500/40"
                         />
@@ -453,6 +467,7 @@ function MeetingDetail({ meeting, onOpenTask }: { meeting: Meeting; onOpenTask?:
                           autoFocus
                           value={contactSearch}
                           onChange={e => setContactSearch(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Escape') { setShowContactDropdown(false); setContactSearch(''); } }}
                           placeholder="Search contacts..."
                           className="w-full px-2.5 py-1.5 bg-white/[0.06] border border-white/[0.08] rounded-lg text-xs text-white/70 placeholder-white/25 focus:outline-none focus:border-brand-500/40"
                         />
