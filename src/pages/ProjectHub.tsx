@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useStore } from '../store';
 import { LayoutGrid, List, Plus, ArrowUpDown, X, Lock, ChevronRight, FolderOpen, Eye, EyeOff } from 'lucide-react';
 import type { Task } from '../types';
-import { isPast } from 'date-fns';
+import { isPast, format } from 'date-fns';
 import TaskRow from '../components/TaskRow';
 import BoardView from '../components/BoardView';
 import InlineCapture from '../components/InlineCapture';
@@ -48,7 +48,7 @@ function SortableProjectTab({ id, label, active, onClick }: { id: string; label:
   );
 }
 
-const DEFAULT_MAIN_TABS = ['tasks', 'workspace', 'docs', 'contacts'] as const;
+const DEFAULT_MAIN_TABS = ['tasks', 'workspace', 'docs', 'contacts', 'meetings'] as const;
 type MainTab = typeof DEFAULT_MAIN_TABS[number];
 
 function SortableMainTab({ id, label, active, onClick }: {
@@ -73,7 +73,7 @@ function SortableMainTab({ id, label, active, onClick }: {
 const PROJECT_COLORS = ['#6366f1','#10b981','#f59e0b','#ef4444','#3b82f6','#8b5cf6','#ec4899','#14b8a6'];
 
 export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { projectId: string; onNavigate: (page: string, id?: string) => void; onOpenTask: (id: string) => void }) {
-  const { projects, tasks, users, contacts, addTask, updateProject, addUser, addProject, userSettings, currentUser, sendInvitation } = useStore();
+  const { projects, tasks, users, contacts, meetings, addTask, updateProject, addUser, addProject, userSettings, currentUser, sendInvitation } = useStore();
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteStatus, setInviteStatus] = useState<'idle' | 'loading' | 'sent' | 'notfound' | 'already'>('idle');
   const inviteRef = useRef<HTMLInputElement>(null);
@@ -157,8 +157,8 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
       name: newSubName.trim(),
       color: newSubColor,
       status: 'active',
-      memberIds: project?.memberIds ?? [currentUser.id],
-      isPrivate: project?.isPrivate ?? false,
+      memberIds: [currentUser.id],
+      isPrivate: false,
       parentId: projectId,
     });
     setNewSubName('');
@@ -445,13 +445,16 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
             </div>
 
             {!subProjectsCollapsed && <div className="flex flex-wrap gap-3">
-              {subProjects.map(sub => {
+              {(() => {
+                const cardW = subProjects.length <= 4 ? 'w-44' : subProjects.length <= 8 ? 'w-36' : 'w-28';
+                const cardH = subProjects.length <= 4 ? '' : subProjects.length <= 8 ? 'min-h-0' : 'min-h-0';
+                return subProjects.map(sub => {
                 const subActive = tasks.filter(t => (t.projectIds ?? []).includes(sub.id) && t.status !== 'done').length;
                 const subDone = tasks.filter(t => (t.projectIds ?? []).includes(sub.id) && t.status === 'done').length;
                 const subTotal = subActive + subDone;
                 const subProgress = subTotal > 0 ? Math.round((subDone / subTotal) * 100) : 0;
                 return (
-                  <div key={sub.id} className="relative flex flex-col gap-2 w-44 p-3 bg-white/[0.03] border border-white/[0.07] rounded-xl hover:border-white/[0.15] hover:bg-white/[0.05] transition-all group">
+                  <div key={sub.id} className={`relative flex flex-col gap-2 ${cardW} p-3 bg-white/[0.03] border border-white/[0.07] rounded-xl hover:border-white/[0.15] hover:bg-white/[0.05] transition-all group`}>
                     <button
                       onClick={() => onNavigate('project', sub.id)}
                       className="flex flex-col gap-2 text-left w-full"
@@ -460,15 +463,20 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                         <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: sub.color }} />
                         <span className="text-sm font-medium text-white/80 truncate flex-1 group-hover:text-white pr-4">{sub.name}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-white/30">
-                        <FolderOpen size={10} />
-                        <span>{subActive} active</span>
-                        {subDone > 0 && <span>· {subDone} done</span>}
-                      </div>
-                      {subTotal > 0 && (
+                      {subProjects.length <= 8 && (
+                        <div className="flex items-center gap-2 text-xs text-white/30">
+                          <FolderOpen size={10} />
+                          <span>{subActive} active</span>
+                          {subDone > 0 && <span>· {subDone} done</span>}
+                        </div>
+                      )}
+                      {subTotal > 0 && subProjects.length <= 8 && (
                         <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
                           <div className="h-full rounded-full bg-brand-500/60" style={{ width: `${subProgress}%` }} />
                         </div>
+                      )}
+                      {subProjects.length > 8 && subTotal > 0 && (
+                        <span className="text-[10px] text-white/25">{subActive}a · {subDone}d</span>
                       )}
                     </button>
                     {/* Sidebar visibility toggle — always visible */}
@@ -481,7 +489,8 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                     </button>
                   </div>
                 );
-              })}
+              });
+              })()}
 
               {/* Inline new sub-project form */}
               {showAddSub && (
@@ -747,6 +756,44 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
             <ProjectWorkspace projectId={projectId} />
           </div>
         )}
+
+        {/* Meetings Tab */}
+        {activeTab === 'meetings' && (() => {
+          const projectMeetings = meetings
+            .filter(m => (m.linkedProjectIds ?? []).includes(projectId))
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          return (
+            <div className="space-y-2 pt-4">
+              {projectMeetings.length === 0 ? (
+                <p className="text-white/20 text-sm py-8 text-center">No meetings linked to this project</p>
+              ) : projectMeetings.map(m => {
+                const pending = (m.actionItems ?? []).filter(a => !a.accepted && !a.dismissed).length;
+                const total = (m.actionItems ?? []).length;
+                return (
+                  <div
+                    key={m.id}
+                    className="flex items-center gap-3 px-4 py-3 bg-white/[0.03] rounded-xl border border-white/[0.06] hover:border-white/10 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white/80 truncate">{m.title}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs text-white/30">{format(new Date(m.date), 'MMM d, yyyy')}</span>
+                        {(m.participantNames ?? []).length > 1 && (
+                          <span className="text-xs text-white/25">{m.participantNames!.length} people</span>
+                        )}
+                      </div>
+                    </div>
+                    {total > 0 && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${pending > 0 ? 'bg-amber-500/15 text-amber-400' : 'bg-white/[0.06] text-white/25'}`}>
+                        {pending > 0 ? `${pending} pending` : `${total} done`}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
 
         {/* Docs Tab */}
         {activeTab === 'docs' && (() => {

@@ -224,10 +224,12 @@ function buildMailto(participantName: string, participantEmail: string, meetingT
 // Meeting Detail
 // ---------------------------------------------------------------------------
 function MeetingDetail({ meeting, onOpenTask }: { meeting: Meeting; onOpenTask?: (id: string) => void }) {
-  const { currentUser, projects, contacts, updateMeeting, addContact } = useStore();
+  const { currentUser, projects, contacts, updateMeeting, addContact, addProject } = useStore();
   const myName = currentUser?.name?.toLowerCase() ?? '';
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
   const [projectSearch, setProjectSearch] = useState('');
+  const [showNewProjectInput, setShowNewProjectInput] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
   const [showContactDropdown, setShowContactDropdown] = useState(false);
   const [contactSearch, setContactSearch] = useState('');
   const [showNewContactModal, setShowNewContactModal] = useState(false);
@@ -443,6 +445,45 @@ function MeetingDetail({ meeting, onOpenTask }: { meeting: Meeting; onOpenTask?:
                           ))}
                         {projects.filter(p => !(meeting.linkedProjectIds ?? []).includes(p.id)).filter(p => !projectSearch.trim() || p.name.toLowerCase().includes(projectSearch.toLowerCase())).length === 0 && (
                           <p className="px-3 py-2 text-xs text-white/30">{projectSearch.trim() ? 'No matches' : 'All projects linked'}</p>
+                        )}
+                      </div>
+                      <div className="border-t border-white/[0.06] p-1">
+                        {showNewProjectInput ? (
+                          <div className="px-2 py-1.5 flex items-center gap-1.5">
+                            <input
+                              autoFocus
+                              value={newProjectName}
+                              onChange={e => setNewProjectName(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter' && newProjectName.trim()) {
+                                  const name = newProjectName.trim();
+                                  addProject({ name, color: '#6366f1', status: 'active', isPrivate: false, memberIds: [currentUser.id] });
+                                  // addProject is synchronous for state — find immediately
+                                  const created = useStore.getState().projects.find(p => p.name === name);
+                                  if (created) updateMeeting(meeting.id, { linkedProjectIds: [...(meeting.linkedProjectIds ?? []), created.id] });
+                                  setShowNewProjectInput(false);
+                                  setNewProjectName('');
+                                  setShowProjectDropdown(false);
+                                }
+                                if (e.key === 'Escape') { setShowNewProjectInput(false); setNewProjectName(''); }
+                              }}
+                              placeholder="Project name…"
+                              className="flex-1 bg-transparent text-xs text-white/70 placeholder-white/25 focus:outline-none"
+                            />
+                            <button
+                              onClick={() => { setShowNewProjectInput(false); setNewProjectName(''); }}
+                              className="text-white/25 hover:text-white/50 transition-colors"
+                            >
+                              <X size={11} />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setShowNewProjectInput(true)}
+                            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-white/30 hover:text-white/60 hover:bg-white/[0.04] transition-colors"
+                          >
+                            <Plus size={11} /> New project
+                          </button>
                         )}
                       </div>
                     </div>
@@ -728,7 +769,7 @@ function AllActionItemsView({ onOpenTask }: { onOpenTask?: (id: string) => void 
 // Main Page
 // ---------------------------------------------------------------------------
 export default function MeetingsPage({ onOpenTask }: { onOpenTask?: (id: string) => void } = {}) {
-  const { meetings, projects, contacts } = useStore();
+  const { meetings, projects, contacts, users, currentUser, updateProject, sendInvitation } = useStore();
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(() =>
     localStorage.getItem('hive_meetings_selectedId')
@@ -750,6 +791,9 @@ export default function MeetingsPage({ onOpenTask }: { onOpenTask?: (id: string)
   const [draggingTab, setDraggingTab] = useState<string | null>(null);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set());
+  const [sharePopoverProjectId, setSharePopoverProjectId] = useState<string | null>(null);
+  const [shareInviteEmail, setShareInviteEmail] = useState('');
+  const [shareInviteStatus, setShareInviteStatus] = useState<'idle' | 'loading' | 'sent' | 'notfound' | 'already'>('idle');
 
   const toggleMonth = (label: string) => {
     setCollapsedMonths(prev => {
@@ -777,6 +821,24 @@ export default function MeetingsPage({ onOpenTask }: { onOpenTask?: (id: string)
   };
 
   const tabLabels: Record<string, string> = { byDate: 'By Date', byProject: 'By Project' };
+
+  const handleShareInvite = async (projId: string) => {
+    const email = shareInviteEmail.trim().toLowerCase();
+    if (!email) return;
+    setShareInviteStatus('loading');
+    try {
+      const { supabase } = await import('../lib/supabase');
+      const { data } = await supabase.from('profiles').select('id').eq('email', email).maybeSingle();
+      if (!data?.id) { setShareInviteStatus('notfound'); return; }
+      const proj = projects.find(p => p.id === projId);
+      if (proj?.memberIds.includes(data.id)) { setShareInviteStatus('already'); setShareInviteEmail(''); return; }
+      await sendInvitation('project', projId, proj?.name ?? '', data.id);
+      setShareInviteStatus('sent');
+      setShareInviteEmail('');
+    } catch {
+      setShareInviteStatus('notfound');
+    }
+  };
 
   const toggleExpanded = (id: string) => {
     setExpandedProjects(prev => {
@@ -967,29 +1029,103 @@ export default function MeetingsPage({ onOpenTask }: { onOpenTask?: (id: string)
                   <p className="text-white/20 text-xs">No meetings yet</p>
                 </div>
               )}
-              {projectGroups.map(({ projectId, projectName, projectColor, meetings: pMeetings }) => {
-                const key = projectId ?? '__none';
+              {projectGroups.map(({ projectId: pId, projectName, projectColor, meetings: pMeetings }) => {
+                const key = pId ?? '__none';
                 const isExpanded = expandedProjects.has(key);
+                const isShareOpen = sharePopoverProjectId === pId;
+                const proj = pId ? projects.find(p => p.id === pId) : null;
                 return (
                   <div key={key}>
-                    <button
-                      onClick={() => toggleExpanded(key)}
-                      className="w-full flex items-center gap-2 px-4 py-2 hover:bg-white/[0.04] transition-colors"
-                    >
-                      <ChevronRight
-                        size={12}
-                        className={`text-white/25 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
-                      />
-                      <FolderOpen
-                        size={14}
-                        className="flex-shrink-0"
-                        style={{ color: projectColor ?? 'rgba(255,255,255,0.2)' }}
-                      />
-                      <span className="text-sm text-white/70 truncate flex-1 text-left">{projectName}</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/[0.06] text-white/30 flex-shrink-0">
-                        {pMeetings.length}
-                      </span>
-                    </button>
+                    <div className="flex items-center group/projrow">
+                      <button
+                        onClick={() => toggleExpanded(key)}
+                        className="flex-1 flex items-center gap-2 px-4 py-2 hover:bg-white/[0.04] transition-colors min-w-0"
+                      >
+                        <ChevronRight
+                          size={12}
+                          className={`text-white/25 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
+                        />
+                        <FolderOpen
+                          size={14}
+                          className="flex-shrink-0"
+                          style={{ color: projectColor ?? 'rgba(255,255,255,0.2)' }}
+                        />
+                        <span className="text-sm text-white/70 truncate flex-1 text-left">{projectName}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/[0.06] text-white/30 flex-shrink-0">
+                          {pMeetings.length}
+                        </span>
+                      </button>
+                      {pId && (
+                        <button
+                          onClick={() => { setSharePopoverProjectId(isShareOpen ? null : pId); setShareInviteEmail(''); setShareInviteStatus('idle'); }}
+                          className="opacity-0 group-hover/projrow:opacity-100 mr-2 p-1 rounded text-white/30 hover:text-white/60 transition-all flex-shrink-0"
+                          title="Sharing settings"
+                        >
+                          <MoreHorizontal size={13} />
+                        </button>
+                      )}
+                    </div>
+                    {/* Inline share panel */}
+                    {isShareOpen && proj && (
+                      <div className="mx-3 mb-2 p-3 bg-[#1a1a2e] border border-white/[0.10] rounded-xl text-xs">
+                        <p className="font-semibold text-white/40 uppercase tracking-wider mb-2">Sharing · {proj.name}</p>
+                        <div className="space-y-1 mb-2">
+                          {[...new Set(proj.memberIds)].map(mid => {
+                            const u = users.find(u => u.id === mid);
+                            const isOwner = mid === currentUser.id;
+                            return (
+                              <div key={mid} className="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-white/[0.04]">
+                                <span className="w-5 h-5 rounded-full bg-brand-600/40 flex items-center justify-center text-[10px] font-semibold text-white/70 flex-shrink-0">
+                                  {u ? u.name[0] : '?'}
+                                </span>
+                                <span className="flex-1 text-white/60 truncate">{u ? u.name : <span className="text-white/30 italic">Invited</span>}</span>
+                                {isOwner
+                                  ? <span className="text-white/20">Owner</span>
+                                  : <button onClick={() => updateProject(proj.id, { memberIds: proj.memberIds.filter(id => id !== mid) })} className="text-white/20 hover:text-red-400 transition-colors"><X size={11} /></button>
+                                }
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {users.filter(u => !proj.memberIds.includes(u.id)).length > 0 && (
+                          <div className="space-y-1 mb-2">
+                            {users.filter(u => !proj.memberIds.includes(u.id)).map(u => (
+                              <button
+                                key={u.id}
+                                onClick={() => updateProject(proj.id, { memberIds: [...new Set([...proj.memberIds, u.id])] })}
+                                className="w-full flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-white/[0.06] transition-colors group"
+                              >
+                                <span className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[10px] text-white/40 flex-shrink-0">{u.name[0]}</span>
+                                <span className="flex-1 text-white/40 group-hover:text-white/70 text-left truncate">{u.name}</span>
+                                <Plus size={11} className="text-white/20 group-hover:text-brand-400 flex-shrink-0" />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        <div className="border-t border-white/[0.06] pt-2">
+                          <div className="flex gap-1.5">
+                            <input
+                              type="email"
+                              value={shareInviteEmail}
+                              onChange={e => { setShareInviteEmail(e.target.value); setShareInviteStatus('idle'); }}
+                              onKeyDown={e => { if (e.key === 'Enter') handleShareInvite(proj.id); }}
+                              placeholder="Invite by email…"
+                              className="flex-1 min-w-0 px-2 py-1 bg-white/[0.04] border border-white/[0.08] rounded-lg text-white/60 placeholder-white/20 focus:outline-none focus:border-brand-500/40"
+                            />
+                            <button
+                              onClick={() => handleShareInvite(proj.id)}
+                              disabled={!shareInviteEmail.trim() || shareInviteStatus === 'loading'}
+                              className="px-2 py-1 bg-brand-600 hover:bg-brand-500 text-white rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              {shareInviteStatus === 'loading' ? '…' : 'Invite'}
+                            </button>
+                          </div>
+                          {shareInviteStatus === 'sent' && <p className="text-emerald-400 mt-1 px-0.5">Sent.</p>}
+                          {shareInviteStatus === 'notfound' && <p className="text-white/40 mt-1 px-0.5">No Hive account found.</p>}
+                          {shareInviteStatus === 'already' && <p className="text-white/40 mt-1 px-0.5">Already a member.</p>}
+                        </div>
+                      </div>
+                    )}
                     {isExpanded && pMeetings.map((m, i) => renderMeetingRow(m, true, i))}
                   </div>
                 );
