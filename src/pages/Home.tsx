@@ -423,7 +423,9 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
           </div>
         )}
 
-        <InlineCapture ref={captureRef} onOpenDetail={id => onOpenTask(id)} />
+        <div className="mb-4">
+          <InlineCapture ref={captureRef} onOpenDetail={id => onOpenTask(id)} />
+        </div>
 
         {/* Sections — rendered in user-defined order */}
         {sections.filter(s => s.enabled).map(s => (
