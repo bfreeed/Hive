@@ -200,6 +200,45 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
   }, [showSharePopover]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const project = projects.find((p) => p.id === projectId);
+
+  // Assignee-first grouping for shared projects — must be before early return (rules of hooks)
+  const assigneeFirstGroups = useMemo(() => {
+    const proj = projects.find(p => p.id === projectId);
+    if (!proj || (proj.memberIds?.length ?? 0) <= 1 || taskViewTab === 'completed') return null;
+    const todayStr2 = new Date().toISOString().slice(0, 10);
+    const allProj = tasks.filter(t => (t.projectIds ?? []).includes(projectId) && !t.deletedAt && t.status !== 'done');
+    let tasksPool =
+      taskViewTab === 'today' ? allProj.filter(t => t.dueDate === todayStr2) :
+      taskViewTab === 'flag'  ? allProj.filter(t => (t.flags?.length ?? 0) > 0) :
+      allProj;
+    if (filterFlag) tasksPool = tasksPool.filter(t => t.flags?.some(tf => tf.flagId === filterFlag));
+    const vgb: BoardGroupBy = taskViewTab === 'priority' ? 'priority' : taskViewTab === 'date' ? 'date' : taskViewTab === 'assignee' ? 'assignee' : taskViewTab === 'flag' ? 'flag' : 'status';
+    const subGroupBy: BoardGroupBy = (vgb === 'assignee' || taskViewTab === 'today') ? 'none' : vgb;
+    const memberOrder = [
+      currentUser.id,
+      ...users
+        .filter(u => u.id !== currentUser.id && proj.memberIds.includes(u.id))
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(u => u.id),
+    ];
+    const assignedIds = new Set<string>();
+    const result = memberOrder.map(uid => {
+      const u = users.find(x => x.id === uid);
+      const memberTasks = tasksPool.filter(t => t.assigneeIds.includes(uid));
+      memberTasks.forEach(t => assignedIds.add(t.id));
+      const sorted = sortTasks(memberTasks, sortBy, sortOrder, projects, users);
+      return { userId: uid, userName: uid === currentUser.id ? 'You' : (u?.name ?? 'Unknown'), isMe: uid === currentUser.id, subGroups: buildGroups(sorted, subGroupBy, projects, users), count: memberTasks.length };
+    });
+    const unassigned = tasksPool.filter(t => !assignedIds.has(t.id));
+    if (unassigned.length > 0) {
+      const sorted = sortTasks(unassigned, sortBy, sortOrder, projects, users);
+      result.push({ userId: '__unassigned', userName: 'Unassigned', isMe: false, subGroups: buildGroups(sorted, subGroupBy, projects, users), count: unassigned.length });
+    }
+    return result.filter(g => g.count > 0);
+  }, [projectId, projects, tasks, taskViewTab, filterFlag, currentUser.id, users, sortBy, sortOrder]);
+
+  const isSharedProject = (project?.memberIds?.length ?? 0) > 1;
+
   if (!project) return <div className="flex-1 flex items-center justify-center text-white/30">Project not found</div>;
 
   const parentProject = project.parentId ? projects.find(p => p.id === project.parentId) : null;
@@ -246,46 +285,6 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
   );
   // List groups
   const listGroups = buildGroups(sortedDisplay, taskViewTab === 'today' || taskViewTab === 'completed' ? 'none' : viewGroupBy, projects, users);
-
-  // Assignee-first grouping — active for shared projects in list view (non-completed tab)
-  const isSharedProject = (project?.memberIds?.length ?? 0) > 1;
-  const assigneeFirstGroups = useMemo(() => {
-    if (!isSharedProject || taskViewTab === 'completed') return null;
-    const projectMemberIds = project?.memberIds ?? [];
-    // Current user first, then other members alphabetically
-    const memberOrder = [
-      currentUser.id,
-      ...users
-        .filter(u => u.id !== currentUser.id && projectMemberIds.includes(u.id))
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map(u => u.id),
-    ];
-    // Inner sub-groupBy: fall back to 'status' when outer is already 'assignee'
-    const subGroupBy: BoardGroupBy = (viewGroupBy === 'assignee' || taskViewTab === 'today') ? 'none' : viewGroupBy;
-    const tasksPool = displayTasks.filter(t => t.status !== 'done');
-    const assignedToMember = new Set<string>();
-    const result = memberOrder.map(uid => {
-      const u = users.find(x => x.id === uid);
-      // Task belongs here if this member is listed as an assignee
-      const memberTasks = tasksPool.filter(t => t.assigneeIds.includes(uid));
-      memberTasks.forEach(t => assignedToMember.add(t.id));
-      const sorted = sortTasks(memberTasks, sortBy, sortOrder, projects, users);
-      return {
-        userId: uid,
-        userName: uid === currentUser.id ? 'You' : (u?.name ?? 'Unknown'),
-        isMe: uid === currentUser.id,
-        subGroups: buildGroups(sorted, subGroupBy, projects, users),
-        count: memberTasks.length,
-      };
-    });
-    // Unassigned tasks (not in any member's list)
-    const unassigned = tasksPool.filter(t => !assignedToMember.has(t.id));
-    if (unassigned.length > 0) {
-      const sorted = sortTasks(unassigned, sortBy, sortOrder, projects, users);
-      result.push({ userId: '__unassigned', userName: 'Unassigned', isMe: false, subGroups: buildGroups(sorted, subGroupBy, projects, users), count: unassigned.length });
-    }
-    return result.filter(g => g.count > 0);
-  }, [isSharedProject, taskViewTab, displayTasks, sortBy, sortOrder, viewGroupBy, currentUser.id, users, project, projects]);
 
   const SelectFilter = ({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: React.ReactNode }) => (
     <select
