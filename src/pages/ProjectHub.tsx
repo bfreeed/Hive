@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useStore } from '../store';
 import { LayoutGrid, List, Plus, ArrowUpDown, X, Lock, ChevronRight, FolderOpen, Eye, EyeOff } from 'lucide-react';
 import type { Task } from '../types';
@@ -17,13 +17,14 @@ import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type D
 import { SortableContext, horizontalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-type TaskViewTab = 'status' | 'priority' | 'date' | 'assignee' | 'today' | 'completed';
+type TaskViewTab = 'status' | 'priority' | 'date' | 'assignee' | 'today' | 'completed' | 'flag';
 
 const ALL_TASK_VIEW_TABS = [
   { id: 'status'    as TaskViewTab, label: 'By Status'   },
   { id: 'priority'  as TaskViewTab, label: 'By Priority' },
   { id: 'date'      as TaskViewTab, label: 'By Date'     },
   { id: 'assignee'  as TaskViewTab, label: 'By Assignee' },
+  { id: 'flag'      as TaskViewTab, label: 'By Flag'     },
   { id: 'today'     as TaskViewTab, label: 'Today'       },
   { id: 'completed' as TaskViewTab, label: 'Completed'   },
 ];
@@ -115,6 +116,11 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
   const [sortBy, setSortBy] = useState<BoardSortBy>('date');
   const [sortOrder, setSortOrder] = useState<BoardSortOrder>('asc');
   const [showAddTask, setShowAddTask] = useState(false);
+  const [filterFlag, setFilterFlag] = useState('');
+  const allFlags = useMemo(() => {
+    const seen = new Set<string>();
+    return users.flatMap(u => u.flags).filter(f => { if (seen.has(f.id)) return false; seen.add(f.id); return true; });
+  }, [users]);
   const [showSharePopover, setShowSharePopover] = useState(false);
   const shareRef = useRef<HTMLDivElement>(null);
 
@@ -216,13 +222,18 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
     taskViewTab === 'priority' ? 'priority' :
     taskViewTab === 'date'     ? 'date'     :
     taskViewTab === 'assignee' ? 'assignee' :
+    taskViewTab === 'flag'     ? 'flag'     :
     'status';
 
   // Which tasks to show
+  const flaggedBase = filterFlag
+    ? (t: typeof projectTasks[0]) => t.flags?.some(tf => tf.flagId === filterFlag) ?? false
+    : () => true;
   const displayTasks =
-    taskViewTab === 'today'     ? projectTasks.filter(t => t.dueDate === todayStr) :
-    taskViewTab === 'completed' ? doneTasks :
-    projectTasks;
+    taskViewTab === 'today'     ? projectTasks.filter(t => t.dueDate === todayStr && flaggedBase(t)) :
+    taskViewTab === 'completed' ? doneTasks.filter(flaggedBase) :
+    taskViewTab === 'flag'      ? projectTasks.filter(t => (t.flags?.length ?? 0) > 0 && flaggedBase(t)) :
+    projectTasks.filter(flaggedBase);
 
   const sortedDisplay = sortTasks(displayTasks, sortBy, sortOrder, projects, users);
 
@@ -602,6 +613,12 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
               {/* List/Board + Sort */}
               {taskViewTab !== 'completed' && (
                 <div className="ml-auto flex items-center gap-1">
+                  {allFlags.length > 0 && (
+                    <SelectFilter value={filterFlag} onChange={v => setFilterFlag(v)}>
+                      <option value="">All Flags</option>
+                      {allFlags.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                    </SelectFilter>
+                  )}
                   {([
                     { id: 'list' as const,  icon: <List size={14} />,       label: 'List'  },
                     { id: 'board' as const, icon: <LayoutGrid size={14} />, label: 'Board' },
@@ -639,6 +656,7 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                   <SelectFilter value={sortBy} onChange={v => setSortBy(v as BoardSortBy)}>
                     <option value="date">Date</option>
                     <option value="priority">Priority</option>
+                    <option value="flag">Flag</option>
                     <option value="assignee">Assignee</option>
                     <option value="status">Status</option>
                   </SelectFilter>

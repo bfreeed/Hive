@@ -107,8 +107,6 @@ export function buildGroups(
     const grps = uniqueFlags
       .map(flag => ({ label: flag.name, color: flag.color, tasks: taskList.filter(t => t.flags?.some(tf => tf.flagId === flag.id)) }))
       .filter(g => g.tasks.length > 0);
-    const noFlag = taskList.filter(t => !t.flags?.length);
-    if (noFlag.length > 0) grps.push({ label: 'No Flag', color: undefined, tasks: noFlag });
     return grps;
   }
 

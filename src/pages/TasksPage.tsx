@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useStore } from '../store';
 import {
   Plus, Search, ArrowUpDown, GripVertical, List, LayoutGrid,
@@ -144,7 +144,14 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
 
   // Filters
   const [search, setSearch] = useState('');
+  const [filterFlag, setFilterFlag] = useState('');
   const filterProject = filterProjectProp ?? 'all';
+
+  // All unique flags across all users (for the flag filter dropdown)
+  const allFlags = useMemo(() => {
+    const seen = new Set<string>();
+    return users.flatMap(u => u.flags).filter(f => { if (seen.has(f.id)) return false; seen.add(f.id); return true; });
+  }, [users]);
 
   // Per-tab settings: each tab stores its own viewMode + sort
   type TabSettings = { viewMode: 'list' | 'board'; sortBy: BoardSortBy; sortOrder: BoardSortOrder };
@@ -240,12 +247,14 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
   const baseFilter = (t: Task) => {
     if (filterProject !== 'all' && !(t.projectIds ?? []).includes(filterProject)) return false;
     if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false;
+    if (filterFlag && !t.flags?.some(tf => tf.flagId === filterFlag)) return false;
     return true;
   };
 
   const filtered = tasks.filter((t) => {
     if (!baseFilter(t)) return false;
     if (activeTab === 'completed') return t.status === 'done';
+    if (activeTab === 'flag') return t.status !== 'done' && (t.flags?.length ?? 0) > 0;
     if (filterToday) {
       if (t.status === 'done' || !t.dueDate) return false;
       const d = new Date(t.dueDate);
@@ -998,7 +1007,20 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
           </div>
         )}
 
-        <div className="flex items-start gap-6 mb-6">
+        <div className="flex items-start gap-3 mb-6">
+          {/* Flag filter dropdown */}
+          {allFlags.length > 0 && (
+            <div className="flex-shrink-0">
+              <select
+                value={filterFlag}
+                onChange={e => setFilterFlag(e.target.value)}
+                className="h-10 px-3 bg-white/[0.04] border border-white/40 hover:border-white/55 rounded-xl text-sm text-white/60 focus:outline-none focus:border-brand-500/50 transition-colors cursor-pointer"
+              >
+                <option value="">All Flags</option>
+                {allFlags.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
+            </div>
+          )}
           {/* Search bar — fixed height, never expands */}
           <div className="relative flex-shrink-0 w-44">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
