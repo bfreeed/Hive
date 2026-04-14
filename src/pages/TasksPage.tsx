@@ -1009,7 +1009,7 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
 
         <div className="flex items-start gap-3 mb-6">
           {/* Flag filter dropdown */}
-          {allFlags.length > 0 && (
+          {activeTab === 'flag' && allFlags.length > 0 && (
             <div className="flex-shrink-0">
               <select
                 value={filterFlag}

@@ -652,7 +652,7 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
               {/* List/Board + Sort */}
               {taskViewTab !== 'completed' && (
                 <div className="ml-auto flex items-center gap-1">
-                  {allFlags.length > 0 && (
+                  {taskViewTab === 'flag' && allFlags.length > 0 && (
                     <SelectFilter value={filterFlag} onChange={v => setFilterFlag(v)}>
                       <option value="">All Flags</option>
                       {allFlags.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
