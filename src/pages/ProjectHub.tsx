@@ -247,6 +247,46 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
   // List groups
   const listGroups = buildGroups(sortedDisplay, taskViewTab === 'today' || taskViewTab === 'completed' ? 'none' : viewGroupBy, projects, users);
 
+  // Assignee-first grouping — active for shared projects in list view (non-completed tab)
+  const isSharedProject = (project?.memberIds?.length ?? 0) > 1;
+  const assigneeFirstGroups = useMemo(() => {
+    if (!isSharedProject || taskViewTab === 'completed') return null;
+    const projectMemberIds = project?.memberIds ?? [];
+    // Current user first, then other members alphabetically
+    const memberOrder = [
+      currentUser.id,
+      ...users
+        .filter(u => u.id !== currentUser.id && projectMemberIds.includes(u.id))
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(u => u.id),
+    ];
+    // Inner sub-groupBy: fall back to 'status' when outer is already 'assignee'
+    const subGroupBy: BoardGroupBy = (viewGroupBy === 'assignee' || taskViewTab === 'today') ? 'none' : viewGroupBy;
+    const tasksPool = displayTasks.filter(t => t.status !== 'done');
+    const assignedToMember = new Set<string>();
+    const result = memberOrder.map(uid => {
+      const u = users.find(x => x.id === uid);
+      // Task belongs here if this member is listed as an assignee
+      const memberTasks = tasksPool.filter(t => t.assigneeIds.includes(uid));
+      memberTasks.forEach(t => assignedToMember.add(t.id));
+      const sorted = sortTasks(memberTasks, sortBy, sortOrder, projects, users);
+      return {
+        userId: uid,
+        userName: uid === currentUser.id ? 'You' : (u?.name ?? 'Unknown'),
+        isMe: uid === currentUser.id,
+        subGroups: buildGroups(sorted, subGroupBy, projects, users),
+        count: memberTasks.length,
+      };
+    });
+    // Unassigned tasks (not in any member's list)
+    const unassigned = tasksPool.filter(t => !assignedToMember.has(t.id));
+    if (unassigned.length > 0) {
+      const sorted = sortTasks(unassigned, sortBy, sortOrder, projects, users);
+      result.push({ userId: '__unassigned', userName: 'Unassigned', isMe: false, subGroups: buildGroups(sorted, subGroupBy, projects, users), count: unassigned.length });
+    }
+    return result.filter(g => g.count > 0);
+  }, [isSharedProject, taskViewTab, displayTasks, sortBy, sortOrder, viewGroupBy, currentUser.id, users, project, projects]);
+
   const SelectFilter = ({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: React.ReactNode }) => (
     <select
       value={value}
@@ -698,22 +738,60 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
             {taskViewTab !== 'completed' && viewType === 'list' && (
               <div className="space-y-0.5">
                 <div className="space-y-6">
-                  {listGroups.filter(g => g.tasks.length > 0).map((group, gi) => (
-                    <div key={gi}>
-                      {group.label && (
-                        <div className="flex items-center gap-2 mb-1 px-1">
-                          {group.color && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: group.color }} />}
-                          <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">{group.label}</span>
-                          <span className="text-xs text-white/20">{group.tasks.length}</span>
+                  {isSharedProject && assigneeFirstGroups ? (
+                    // Shared project: assignee-first, then sub-grouped by current view
+                    assigneeFirstGroups.length === 0 && !showAddTask ? (
+                      <p className="text-white/20 text-sm py-8 text-center">No tasks</p>
+                    ) : assigneeFirstGroups.map(({ userId, userName, isMe, subGroups, count }) => (
+                      <div key={userId} className="mb-6">
+                        {/* Assignee header */}
+                        <div className="flex items-center gap-2 mb-2 px-1">
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold text-white flex-shrink-0 ${isMe ? 'bg-brand-600' : 'bg-white/[0.12]'}`}>
+                            {userName[0]}
+                          </div>
+                          <span className={`text-sm font-semibold ${isMe ? 'text-white/80' : 'text-white/50'}`}>{userName}</span>
+                          <span className="text-xs text-white/20">{count}</span>
                         </div>
-                      )}
-                      <div className="space-y-0.5">
-                        {group.tasks.map(t => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} showProject={false} />)}
+                        {/* Sub-groups */}
+                        <div className="space-y-4 pl-8">
+                          {subGroups.filter(g => g.tasks.length > 0).map((group, gi) => (
+                            <div key={gi}>
+                              {group.label && (
+                                <div className="flex items-center gap-2 mb-1 px-1">
+                                  {group.color && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: group.color }} />}
+                                  <span className="text-xs font-semibold text-white/30 uppercase tracking-wider">{group.label}</span>
+                                  <span className="text-xs text-white/15">{group.tasks.length}</span>
+                                </div>
+                              )}
+                              <div className="space-y-0.5">
+                                {group.tasks.map(t => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} showProject={false} />)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                  {listGroups.every(g => g.tasks.length === 0) && !showAddTask && (
-                    <p className="text-white/20 text-sm py-8 text-center">No tasks</p>
+                    ))
+                  ) : (
+                    // Solo project or completed tab: existing flat groups
+                    <>
+                      {listGroups.filter(g => g.tasks.length > 0).map((group, gi) => (
+                        <div key={gi}>
+                          {group.label && (
+                            <div className="flex items-center gap-2 mb-1 px-1">
+                              {group.color && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: group.color }} />}
+                              <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">{group.label}</span>
+                              <span className="text-xs text-white/20">{group.tasks.length}</span>
+                            </div>
+                          )}
+                          <div className="space-y-0.5">
+                            {group.tasks.map(t => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} showProject={false} />)}
+                          </div>
+                        </div>
+                      ))}
+                      {listGroups.every(g => g.tasks.length === 0) && !showAddTask && (
+                        <p className="text-white/20 text-sm py-8 text-center">No tasks</p>
+                      )}
+                    </>
                   )}
                 </div>
                 {/* Inline add-task */}
