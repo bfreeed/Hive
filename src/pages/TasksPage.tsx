@@ -22,7 +22,7 @@ import { CSS } from '@dnd-kit/utilities';
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-type ActiveTab = 'status' | 'priority' | 'project' | 'date' | 'today' | 'completed';
+type ActiveTab = 'status' | 'priority' | 'project' | 'date' | 'today' | 'completed' | 'flag';
 
 // ---------------------------------------------------------------------------
 // Sortable task row (used in manual DnD mode)
@@ -153,6 +153,7 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
     priority:  { viewMode: 'board', sortBy: 'date',     sortOrder: 'asc' },
     project:   { viewMode: 'board', sortBy: 'priority', sortOrder: 'asc' },
     date:      { viewMode: 'list',  sortBy: 'date',     sortOrder: 'asc' },
+    flag:      { viewMode: 'list',  sortBy: 'flag',     sortOrder: 'asc' },
     today:     { viewMode: 'list',  sortBy: 'priority', sortOrder: 'asc' },
     completed: { viewMode: 'list',  sortBy: 'date',     sortOrder: 'desc' },
   };
@@ -204,6 +205,7 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
     activeTab === 'priority' ? 'priority' :
     activeTab === 'project' ? 'project' :
     activeTab === 'date' ? 'date' :
+    activeTab === 'flag' ? 'flag' :
     'status';
   const filterToday = activeTab === 'today';
   // Tab definitions
@@ -212,6 +214,7 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
     { id: 'priority' as ActiveTab,  label: 'By Priority' },
     { id: 'project' as ActiveTab,   label: 'By Project'  },
     { id: 'date' as ActiveTab,      label: 'By Date'     },
+    { id: 'flag' as ActiveTab,      label: 'By Flag'     },
     { id: 'today' as ActiveTab,     label: 'Today'       },
     { id: 'completed' as ActiveTab, label: 'Done'        },
   ];
@@ -965,6 +968,7 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
               <SelectFilter value={sortBy} onChange={v => setSortBy(v as BoardSortBy)}>
                 <option value="date">Date</option>
                 <option value="priority">Priority</option>
+                <option value="flag">Flag</option>
                 <option value="assignee">Assignee</option>
                 <option value="status">Status</option>
                 <option value="project">Project</option>

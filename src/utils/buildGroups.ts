@@ -1,8 +1,8 @@
 import { isPast, isToday, isThisWeek } from 'date-fns';
 import type { Task, Priority, TaskStatus, Project, User } from '../types';
 
-export type BoardGroupBy = 'none' | 'priority' | 'status' | 'project' | 'assignee' | 'date';
-export type BoardSortBy = 'date' | 'priority' | 'status' | 'assignee' | 'project';
+export type BoardGroupBy = 'none' | 'priority' | 'status' | 'project' | 'assignee' | 'date' | 'flag';
+export type BoardSortBy = 'date' | 'priority' | 'status' | 'assignee' | 'project' | 'flag';
 export type BoardSortOrder = 'asc' | 'desc';
 
 export interface TaskGroup { label: string; color?: string; tasks: Task[] }
@@ -38,6 +38,14 @@ export function sortTasks(
       const aP = projects.find(p => p.id === a.projectIds?.[0])?.name || '';
       const bP = projects.find(p => p.id === b.projectIds?.[0])?.name || '';
       cmp = aP.localeCompare(bP);
+    } else if (sortBy === 'flag') {
+      const allFlags = users.flatMap(u => u.flags);
+      const getFlagName = (task: Task) => {
+        const first = task.flags?.[0];
+        if (!first) return '\uffff'; // sort unflagged tasks last
+        return allFlags.find(f => f.id === first.flagId)?.name ?? '\uffff';
+      };
+      cmp = getFlagName(a).localeCompare(getFlagName(b));
     }
     return sortOrder === 'asc' ? cmp : -cmp;
   });
@@ -91,6 +99,17 @@ export function buildGroups(
       { label: 'Later', tasks: later },
       { label: 'No Date', tasks: noDate },
     ].filter(g => g.tasks.length > 0);
+  }
+
+  if (groupBy === 'flag') {
+    const seen = new Set<string>();
+    const uniqueFlags = users.flatMap(u => u.flags).filter(f => { if (seen.has(f.id)) return false; seen.add(f.id); return true; });
+    const grps = uniqueFlags
+      .map(flag => ({ label: flag.name, color: flag.color, tasks: taskList.filter(t => t.flags?.some(tf => tf.flagId === flag.id)) }))
+      .filter(g => g.tasks.length > 0);
+    const noFlag = taskList.filter(t => !t.flags?.length);
+    if (noFlag.length > 0) grps.push({ label: 'No Flag', color: undefined, tasks: noFlag });
+    return grps;
   }
 
   return [{ label: '', tasks: taskList }];
