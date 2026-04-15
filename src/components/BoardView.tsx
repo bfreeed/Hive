@@ -40,7 +40,7 @@ function BoardColumn({
   onOpenTask: (id: string) => void;
   onAddTask: (title: string) => void;
 }) {
-  const { updateTask } = useStore();
+  const { updateTask, users, currentUser } = useStore();
   const [showAdd, setShowAdd] = useState(false);
   const [newTitle, setNewTitle] = useState('');
 
@@ -100,11 +100,32 @@ function BoardColumn({
                 const d = new Date(task.dueDate);
                 const overdue = isPast(d) && task.status !== 'done' && !isToday(d);
                 return (
-                  <span className={`text-[11px] ml-auto ${overdue ? 'text-red-400' : 'text-white/40'}`}>
+                  <span className={`text-[11px] ${overdue ? 'text-red-400' : 'text-white/40'}`}>
                     {isToday(d) ? 'Today' : isTomorrow(d) ? 'Tomorrow' : format(d, 'MMM d')}
                   </span>
                 );
               })()}
+              {/* Assignee avatars — always shown when assigned */}
+              {(task.assigneeIds ?? []).length > 0 && (
+                <span className="ml-auto flex items-center gap-0.5">
+                  {(task.assigneeIds ?? []).slice(0, 2).map(id => {
+                    const u = users.find(x => x.id === id) ?? (id === currentUser.id ? currentUser : null);
+                    if (!u) return null;
+                    return (
+                      <span
+                        key={id}
+                        className="w-5 h-5 rounded-full bg-brand-600/40 border border-brand-500/30 flex items-center justify-center text-[9px] font-semibold text-brand-300"
+                        title={u.name}
+                      >
+                        {u.name.charAt(0).toUpperCase()}
+                      </span>
+                    );
+                  })}
+                  {(task.assigneeIds ?? []).length > 2 && (
+                    <span className="text-[10px] text-white/30">+{(task.assigneeIds ?? []).length - 2}</span>
+                  )}
+                </span>
+              )}
             </div>
           </div>
         ))}

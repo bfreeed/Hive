@@ -1167,6 +1167,44 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
           renderCompletedLog()
         ) : showSectionsView ? (
           renderSectionsView()
+        ) : activeTab === 'priority' ? (
+          // By Priority — grouped list (Urgent → High → Medium → Low)
+          filteredTopLevel.length === 0 ? (
+            <div className="py-16 text-center"><p className="text-white/20">No tasks found</p></div>
+          ) : (
+            <div className="space-y-6">
+              {([
+                { value: 'urgent', label: 'Urgent',      color: '#f87171' },
+                { value: 'high',   label: 'High',        color: '#fb923c' },
+                { value: 'medium', label: 'Medium',      color: '#facc15' },
+                { value: 'low',    label: 'Low',         color: undefined  },
+              ] as { value: string; label: string; color?: string }[]).map(pg => {
+                const groupTasks = sorted.filter(t => (t.priority ?? 'low') === pg.value);
+                if (groupTasks.length === 0) return null;
+                return (
+                  <div key={pg.value}>
+                    <div className="flex items-center gap-2 mb-1 px-1">
+                      {pg.color && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: pg.color }} />}
+                      <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">{pg.label}</span>
+                      <span className="text-xs text-white/20">{groupTasks.length}</span>
+                      <div className="flex-1 h-px bg-white/[0.05]" />
+                    </div>
+                    <div className="space-y-1">
+                      {groupTasks.map(task => {
+                        const idx = sorted.findIndex(t => t.id === task.id);
+                        const isFocused = focusedIdx === idx;
+                        return renderTaskWithSubtasks(task, {
+                          focused: isFocused,
+                          focusRef: isFocused ? focusedRowRef : undefined,
+                          showProject: true,
+                        });
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
         ) : activeTab === 'date' ? (
           // By Date — grouped list, with assignee super-groups when multi-user
           filteredTopLevel.length === 0 ? (
