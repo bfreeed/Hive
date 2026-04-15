@@ -117,6 +117,7 @@ function dbToProject(row: any): Project {
     googleDriveFolderName: row.google_drive_folder_name ?? undefined,
     hideFromSidebar: row.hide_from_sidebar ?? false,
     deletedAt: row.deleted_at ?? undefined,
+    docContent: row.doc_content ?? undefined,
   };
 }
 
@@ -137,6 +138,7 @@ function projectToDb(p: Project) {
     google_drive_folder_id: p.googleDriveFolderId ?? null,
     google_drive_folder_name: p.googleDriveFolderName ?? null,
     hide_from_sidebar: p.hideFromSidebar ?? false,
+    doc_content: p.docContent ?? null,
   };
 }
 
