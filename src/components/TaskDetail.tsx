@@ -254,15 +254,30 @@ export default function TaskDetail({ taskId, draftInitial, onClose, inline = fal
       }>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-white/[0.06] flex-shrink-0 pt-safe">
-          <div className="flex items-center gap-2">
-            {taskProjects.map(p => (
-              <span key={p.id} className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: p.color + '22', color: p.color }}>
-                {p.name}
-              </span>
-            ))}
-            {task.isPrivate && <span className="flex items-center gap-1 text-xs text-white/50"><Lock size={10} /> Private</span>}
-          </div>
+        <div className="flex items-center justify-between gap-3 px-4 md:px-6 py-3 md:py-4 border-b border-white/[0.06] flex-shrink-0 pt-safe">
+          {isDraft ? (
+            <input
+              autoFocus
+              type="text"
+              value={task.title}
+              onChange={(e) => update('title', e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') onClose();
+                if (e.key === 'Enter') { e.preventDefault(); handleCreateDraft(); }
+              }}
+              placeholder="Task title…"
+              className="flex-1 min-w-0 bg-transparent text-base md:text-lg font-semibold text-white placeholder-white/25 focus:outline-none"
+            />
+          ) : (
+            <div className="flex items-center gap-2">
+              {taskProjects.map(p => (
+                <span key={p.id} className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: p.color + '22', color: p.color }}>
+                  {p.name}
+                </span>
+              ))}
+              {task.isPrivate && <span className="flex items-center gap-1 text-xs text-white/50"><Lock size={10} /> Private</span>}
+            </div>
+          )}
           <div className="flex items-center gap-1">
             {isDraft ? (
               <button
@@ -293,19 +308,17 @@ export default function TaskDetail({ taskId, draftInitial, onClose, inline = fal
         <div className={inline ? "max-h-[70vh] overflow-y-auto scrollbar-hide" : "flex-1 overflow-y-auto scrollbar-hide"}>
           <div className="px-4 md:px-6 py-4 md:py-5 pb-20 md:pb-5">
 
-            {/* Title */}
-            <textarea
-              autoFocus={isDraft}
-              className="w-full bg-transparent text-xl md:text-2xl font-semibold text-white resize-none focus:outline-none placeholder-white/20 leading-snug mt-2 mb-1"
-              value={task.title}
-              onChange={(e) => update('title', e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') (e.target as HTMLElement).blur();
-                if (e.key === 'Enter' && isDraft) { e.preventDefault(); handleCreateDraft(); }
-              }}
-              rows={task.title.length > 55 ? 2 : 1}
-              placeholder="Task title..."
-            />
+            {/* Title — shown only in edit mode (draft mode puts title in the header) */}
+            {!isDraft && (
+              <textarea
+                className="w-full bg-transparent text-xl md:text-2xl font-semibold text-white resize-none focus:outline-none placeholder-white/20 leading-snug mt-2 mb-1"
+                value={task.title}
+                onChange={(e) => update('title', e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Escape') (e.target as HTMLElement).blur(); }}
+                rows={task.title.length > 55 ? 2 : 1}
+                placeholder="Task title..."
+              />
+            )}
 
             {/* Properties table */}
             <div className="mt-4 space-y-0.5">
