@@ -596,8 +596,8 @@ export const useStore = create<AppStore>()((set, get) => ({
         pagesRes,
         invitationsRes,
       ] = await Promise.allSettled([
-        supabase.from('tasks').select('*').contains('assignee_ids', [uid]).is('deleted_at', null).order('created_at', { ascending: true }),
-        supabase.from('tasks').select('*').contains('assignee_ids', [uid]).not('deleted_at', 'is', null).order('deleted_at', { ascending: false }),
+        supabase.from('tasks').select('*').is('deleted_at', null).order('created_at', { ascending: true }),
+        supabase.from('tasks').select('*').not('deleted_at', 'is', null).order('deleted_at', { ascending: false }),
         supabase.from('projects').select('*').contains('member_ids', [uid]).is('deleted_at', null).order('created_at', { ascending: true }),
         supabase.from('projects').select('*').contains('member_ids', [uid]).not('deleted_at', 'is', null).order('deleted_at', { ascending: false }),
         supabase.from('contacts').select('*').eq('user_id', uid),
