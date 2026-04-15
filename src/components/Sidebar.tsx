@@ -253,7 +253,7 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
     <aside className={`flex flex-col h-full bg-[#111113] border-r border-white/[0.06] transition-all duration-200 ${sidebarOpen ? 'w-60' : 'w-14'} flex-shrink-0`}>
       {/* Header */}
       <div className="flex items-center justify-between px-3 h-14 border-b border-white/[0.06]">
-        {sidebarOpen && <span className="text-sm font-semibold text-white tracking-tight">Hive</span>}
+        {sidebarOpen && <button onClick={() => onNavigate('home')} className="text-sm font-semibold text-white tracking-tight hover:text-white/70 transition-colors">Hive</button>}
         <button onClick={toggleSidebar} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-white/40 hover:text-white/80 hover:bg-white/[0.06] transition-colors ml-auto">
           <Menu size={16} />
         </button>
