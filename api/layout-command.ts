@@ -7,7 +7,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const ctx = await getUserSettings(req, res);
   if (!ctx) return;
 
-  const apiKey = ctx.settings?.anthropic_api_key;
+  const apiKey = ctx.settings?.anthropic_api_key || process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(503).json({ error: 'No Anthropic API key configured. Add it in Settings.' });
 
   const { command, sections } = req.body;
