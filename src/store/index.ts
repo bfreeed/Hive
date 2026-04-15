@@ -1243,7 +1243,7 @@ export const useStore = create<AppStore>()((set, get) => ({
   // Invitations
   // -------------------------------------------------------------------------
   sendInvitation: async (type, resourceId, resourceName, invitedUserId) => {
-    const res = await apiFetch('/api/send-invitation', { type, resourceId, resourceName, invitedUserId });
+    const res = await apiFetch('/api/invitations', { action: 'send', type, resourceId, resourceName, invitedUserId });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       console.error('sendInvitation error:', err);
@@ -1266,13 +1266,13 @@ export const useStore = create<AppStore>()((set, get) => ({
     // This is necessary because the user is not yet a project/channel member
     // when they accept, so client-side updates would fail the members-only RLS policy.
     try {
-      const res = await apiFetch('/api/accept-invitation', { invitationId, accept });
+      const res = await apiFetch('/api/invitations', { action: 'respond', invitationId, accept });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        console.error('accept-invitation error:', err);
+        console.error('respondToInvitation error:', err);
       }
     } catch (e) {
-      console.error('accept-invitation fetch error:', e);
+      console.error('respondToInvitation fetch error:', e);
     }
 
     if (accept) {
