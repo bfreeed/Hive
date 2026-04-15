@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useStore } from '../store';
 import { flattenProjects } from '../lib/projectUtils';
+import type { TaskFlag } from '../types';
 
 export interface InlineCaptureHandle {
   open: () => void;
@@ -36,6 +37,12 @@ const InlineCapture = forwardRef<InlineCaptureHandle, InlineCaptureProps>(functi
   const [priority, setPriority] = useState<'urgent' | 'high' | 'medium' | 'low'>('medium');
   const [dueDate, setDueDate] = useState('');
   const [assigneeId, setAssigneeId] = useState(initialAssigneeId ?? currentUser.id);
+  const [showMore, setShowMore] = useState(false);
+  const [description, setDescription] = useState('');
+  const [dueTime, setDueTime] = useState('');
+  const [dueTimeEnd, setDueTimeEnd] = useState('');
+  const [reminderMinutes, setReminderMinutes] = useState<string>('');
+  const [selectedFlagIds, setSelectedFlagIds] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const dateInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,14 +50,21 @@ const InlineCapture = forwardRef<InlineCaptureHandle, InlineCaptureProps>(functi
 
   const buildTask = () => {
     const selectedProject = projects.find(p => p.id === project);
+    const taskFlags: TaskFlag[] = selectedFlagIds.map(flagId => ({ flagId, appliedBy: currentUser.id }));
+    const parsedReminder = reminderMinutes.trim() ? parseInt(reminderMinutes, 10) : undefined;
     return {
       title: title.trim() || 'New task',
+      description: description.trim() || undefined,
       projectIds: project ? [project] : [],
       status: 'todo' as const,
       priority,
       assigneeIds: [assigneeId],
       dueDate: dueDate || undefined,
-      flags: [], isPrivate: selectedProject?.isPrivate ?? false,
+      dueTime: dueTime || undefined,
+      dueTimeEnd: dueTimeEnd || undefined,
+      reminderMinutes: Number.isFinite(parsedReminder) ? parsedReminder : undefined,
+      flags: taskFlags,
+      isPrivate: selectedProject?.isPrivate ?? false,
       linkedContactIds: [], linkedDocIds: [],
     };
   };
@@ -62,16 +76,6 @@ const InlineCapture = forwardRef<InlineCaptureHandle, InlineCaptureProps>(functi
     resetFields();
   };
 
-  const handleOpenDetail = async () => {
-    const taskData = buildTask();
-    await addTask(taskData);
-    // Find the task we just created by title (most recent match)
-    const all = useStore.getState().tasks;
-    const created = [...all].reverse().find(t => t.title === taskData.title);
-    resetFields();
-    if (created) onOpenDetail?.(created.id);
-  };
-
   const resetFields = () => {
     setShow(false);
     setTitle(initialTitle ?? '');
@@ -79,6 +83,12 @@ const InlineCapture = forwardRef<InlineCaptureHandle, InlineCaptureProps>(functi
     setPriority('medium');
     setDueDate('');
     setAssigneeId(initialAssigneeId ?? currentUser.id);
+    setShowMore(false);
+    setDescription('');
+    setDueTime('');
+    setDueTimeEnd('');
+    setReminderMinutes('');
+    setSelectedFlagIds([]);
   };
 
   const handleCancel = () => {
@@ -167,15 +177,91 @@ const InlineCapture = forwardRef<InlineCaptureHandle, InlineCaptureProps>(functi
           ))}
         </select>
 
-        {onOpenDetail && (
-          <button
-            onClick={handleOpenDetail}
-            className="ml-auto text-xs text-white/30 hover:text-white/60 transition-colors underline underline-offset-2"
-          >
-            See detailed view
-          </button>
-        )}
+        <button
+          onClick={() => setShowMore(v => !v)}
+          className="ml-auto flex items-center gap-1 text-xs text-white/30 hover:text-white/60 transition-colors"
+        >
+          {showMore ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          {showMore ? 'Less' : 'More options'}
+        </button>
       </div>
+
+      {/* Expanded "more" section */}
+      {showMore && (
+        <div className="px-3 py-2.5 border-t border-white/[0.06] space-y-3">
+          {/* Description */}
+          <div>
+            <label className="block text-[10px] text-white/30 mb-1 uppercase tracking-wide">Description</label>
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="Add more details…"
+              rows={3}
+              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-2.5 py-1.5 text-xs text-white/80 placeholder-white/25 focus:outline-none focus:border-brand-500/40 resize-y"
+            />
+          </div>
+
+          {/* Time range */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[10px] text-white/30 mb-1 uppercase tracking-wide">Start time</label>
+              <input
+                type="time"
+                value={dueTime}
+                onChange={e => setDueTime(e.target.value)}
+                className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-1.5 text-xs text-white/60 focus:outline-none focus:border-brand-500/40"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] text-white/30 mb-1 uppercase tracking-wide">End time</label>
+              <input
+                type="time"
+                value={dueTimeEnd}
+                onChange={e => setDueTimeEnd(e.target.value)}
+                className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-1.5 text-xs text-white/60 focus:outline-none focus:border-brand-500/40"
+              />
+            </div>
+          </div>
+
+          {/* Reminder */}
+          <div>
+            <label className="block text-[10px] text-white/30 mb-1 uppercase tracking-wide">Reminder (minutes before)</label>
+            <input
+              type="number"
+              min="0"
+              value={reminderMinutes}
+              onChange={e => setReminderMinutes(e.target.value)}
+              placeholder="e.g. 15"
+              className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-1.5 text-xs text-white/60 placeholder-white/25 focus:outline-none focus:border-brand-500/40"
+            />
+          </div>
+
+          {/* Flags */}
+          {currentUser.flags && currentUser.flags.length > 0 && (
+            <div>
+              <label className="block text-[10px] text-white/30 mb-1.5 uppercase tracking-wide">Flags</label>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {currentUser.flags.map(f => {
+                  const sel = selectedFlagIds.includes(f.id);
+                  return (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setSelectedFlagIds(prev => sel ? prev.filter(id => id !== f.id) : [...prev, f.id])}
+                      className="text-xs px-2.5 py-1 rounded-full border transition-colors"
+                      style={sel
+                        ? { backgroundColor: f.color + '22', borderColor: f.color + '66', color: f.color }
+                        : { borderColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.4)' }}
+                    >
+                      {f.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 });
