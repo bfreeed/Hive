@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import {
   Plus, Search, ArrowUpDown, GripVertical, List, LayoutGrid,
   ChevronDown, ChevronRight, X, Trash2, Pencil, Lock, RotateCcw,
+  Users, Check,
 } from 'lucide-react';
 import type { Task, Priority, Section } from '../types';
 import TaskRow from '../components/TaskRow';
@@ -145,6 +146,9 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
   // Filters
   const [search, setSearch] = useState('');
   const [filterFlag, setFilterFlag] = useState('');
+  const [filterAssigneeIds, setFilterAssigneeIds] = useState<string[]>([]);
+  const [showAssigneePicker, setShowAssigneePicker] = useState(false);
+  const assigneePickerRef = useRef<HTMLDivElement>(null);
   const filterProject = filterProjectProp ?? 'all';
 
   // All unique flags across all users (for the flag filter dropdown)
@@ -244,12 +248,52 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
   // ---------------------------------------------------------------------------
   // Filter helpers
   // ---------------------------------------------------------------------------
-  const baseFilter = (t: Task) => {
+  // Base filter without assignee — used to compute which assignees are available
+  const baseFilterNoAssignee = (t: Task) => {
     if (filterProject !== 'all' && !(t.projectIds ?? []).includes(filterProject)) return false;
     if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false;
     if (filterFlag && !t.flags?.some(tf => tf.flagId === filterFlag)) return false;
     return true;
   };
+
+  const baseFilter = (t: Task) => {
+    if (!baseFilterNoAssignee(t)) return false;
+    if (filterAssigneeIds.length > 0 && !filterAssigneeIds.some(id => (t.assigneeIds ?? []).includes(id))) return false;
+    return true;
+  };
+
+  // Relevant assignees = unique users with tasks in the current view (ignoring assignee filter)
+  const relevantAssignees = useMemo(() => {
+    const seen = new Set<string>();
+    const result: typeof users = [];
+    tasks.forEach(t => {
+      if (!baseFilterNoAssignee(t)) return;
+      (t.assigneeIds ?? []).forEach(id => {
+        if (seen.has(id)) return;
+        seen.add(id);
+        const user = users.find(u => u.id === id) ?? (id === currentUser.id ? currentUser : null);
+        if (user) result.push(user as typeof users[0]);
+      });
+    });
+    return result.sort((a, b) => {
+      if (a.id === currentUser.id) return -1;
+      if (b.id === currentUser.id) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, filterProject, search, filterFlag, users, currentUser]);
+
+  // Close assignee picker on outside click
+  useEffect(() => {
+    if (!showAssigneePicker) return;
+    const handler = (e: MouseEvent) => {
+      if (assigneePickerRef.current && !assigneePickerRef.current.contains(e.target as Node)) {
+        setShowAssigneePicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showAssigneePicker]);
 
   const filtered = tasks.filter((t) => {
     if (!baseFilter(t)) return false;
@@ -961,6 +1005,56 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
           </div>
           {/* View toggle + Sort */}
           <div className="hidden sm:flex items-center gap-1 pb-1">
+            {/* Assignee filter */}
+            <div className="relative" ref={assigneePickerRef}>
+              <button
+                onClick={() => setShowAssigneePicker(v => !v)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                  filterAssigneeIds.length > 0
+                    ? 'bg-brand-600/20 text-brand-300'
+                    : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
+                }`}
+              >
+                <Users size={13} />
+                Assignee
+                {filterAssigneeIds.length > 0 && (
+                  <span className="w-4 h-4 rounded-full bg-brand-500/30 text-brand-300 text-[10px] flex items-center justify-center font-semibold">
+                    {filterAssigneeIds.length}
+                  </span>
+                )}
+                <ChevronDown size={11} className="opacity-50" />
+              </button>
+              {showAssigneePicker && (
+                <div className="absolute top-full left-0 mt-1 w-44 bg-[#1c1c1f] border border-white/[0.08] rounded-xl shadow-xl z-30 py-1">
+                  <button
+                    onClick={() => setFilterAssigneeIds([])}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/[0.06] ${filterAssigneeIds.length === 0 ? 'text-white/90' : 'text-white/50'}`}
+                  >
+                    <span className="flex-1 text-left">All</span>
+                    {filterAssigneeIds.length === 0 && <Check size={11} className="text-brand-400 flex-shrink-0" />}
+                  </button>
+                  {relevantAssignees.map(u => (
+                    <button
+                      key={u.id}
+                      onClick={() => setFilterAssigneeIds(prev =>
+                        prev.includes(u.id) ? prev.filter(id => id !== u.id) : [...prev, u.id]
+                      )}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/[0.06] ${filterAssigneeIds.includes(u.id) ? 'text-white/90' : 'text-white/50'}`}
+                    >
+                      <span className="w-5 h-5 rounded-full bg-brand-600/40 border border-brand-500/30 flex items-center justify-center text-[9px] font-semibold text-brand-300 flex-shrink-0">
+                        {u.name.charAt(0).toUpperCase()}
+                      </span>
+                      <span className="flex-1 text-left truncate">{u.id === currentUser.id ? 'Me' : u.name}</span>
+                      {filterAssigneeIds.includes(u.id) && <Check size={11} className="text-brand-400 flex-shrink-0" />}
+                    </button>
+                  ))}
+                  {relevantAssignees.length === 0 && (
+                    <p className="text-xs text-white/30 px-3 py-2.5">No assignees</p>
+                  )}
+                </div>
+              )}
+            </div>
+            <span className="w-px h-4 bg-white/[0.08] mx-1" />
             {([
               { id: 'list' as const,  icon: <List size={14} />,       label: 'List'  },
               { id: 'board' as const, icon: <LayoutGrid size={14} />, label: 'Board' },
