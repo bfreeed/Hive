@@ -231,17 +231,21 @@ function notificationToDb(n: Notification) {
   };
 }
 
-function dbToChannel(row: any): Channel {
+function dbToChannel(row: any, userId?: string): Channel {
+  // Per-user read position: prefer read_by[userId] (set by setActiveChannel),
+  // fall back to last_read_at for backward compat with old rows.
+  const readBy: Record<string, string> = row.read_by ?? {};
+  const lastReadAt = (userId && readBy[userId]) ? readBy[userId] : (row.last_read_at ?? undefined);
   return {
     id: row.id,
     name: row.name,
     type: row.type,
     memberIds: row.member_ids ?? [],
     description: row.description ?? undefined,
-    lastReadAt: row.last_read_at ?? undefined,
+    lastReadAt,
     pinnedMessageIds: row.pinned_message_ids ?? [],
     muted: row.muted ?? false,
-    readBy: row.read_by ?? {},
+    readBy,
     deletedAt: row.deleted_at ?? undefined,
     projectId: row.project_id ?? undefined,
     hiddenFromSidebar: row.hidden_from_sidebar ?? false,
@@ -702,7 +706,7 @@ export const useStore = create<AppStore>()((set, get) => ({
           userChannels = [existingGeneral];
         }
       }
-      updates.channels = userChannels.map(dbToChannel);
+      updates.channels = userChannels.map((row: any) => dbToChannel(row, uid));
 
       // Reset activeChannelId if it points to a channel not in the list
       const channelIds = new Set(userChannels.map((c: any) => c.id));
