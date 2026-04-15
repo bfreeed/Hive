@@ -150,6 +150,7 @@ export function useGranolaSync() {
 
         // --- 3. Match contacts & upsert each note ---
         const projectsForAI = projects.map(p => ({ id: p.id, name: p.name }));
+        const needsLinking: Array<{ meeting: Meeting; note: NormalizedNote }> = [];
 
         for (const note of notes) {
           const matchedContactIds = matchParticipantsToContacts(
@@ -164,28 +165,40 @@ export function useGranolaSync() {
             provider: note.provider,
           });
 
-          // --- 4. AI linking — run for new notes OR existing notes with no action items yet ---
           const isNew = !existingIds.has(`${note.provider}:${note.externalId}`);
           const hasNoActionItems = !meeting.actionItems || meeting.actionItems.length === 0;
           if ((isNew || hasNoActionItems) && (note.notes || note.transcript)) {
-            apiFetch('/api/link-meeting', {
+            needsLinking.push({ meeting, note });
+          }
+        }
+
+        // --- 4. AI linking — sequential with delay to stay under rate limits ---
+        for (const { meeting, note } of needsLinking) {
+          try {
+            const linkRes = await apiFetch('/api/link-meeting', {
               meetingId: meeting.id,
               title: note.title,
               notes: note.notes,
               transcript: note.transcript,
               projects: projectsForAI,
-            })
-              .then(r => r.json())
-              .then((linked: { linkedProjectIds?: string[]; suggestedProjectIds?: string[]; actionItems?: Meeting['actionItems'] }) => {
-                updateMeeting(meeting.id, {
-                  linkedProjectIds: linked.linkedProjectIds ?? [],
-                  suggestedProjectIds: linked.suggestedProjectIds ?? [],
-                  actionItems: linked.actionItems ?? [],
-                  hasProjectLinks: (linked.linkedProjectIds?.length ?? 0) > 0,
-                });
-              })
-              .catch(e => console.error('[useGranolaSync] link-meeting error:', e));
+            });
+            if (linkRes.ok) {
+              const linked = await linkRes.json() as { linkedProjectIds?: string[]; suggestedProjectIds?: string[]; actionItems?: Meeting['actionItems'] };
+              updateMeeting(meeting.id, {
+                linkedProjectIds: linked.linkedProjectIds ?? [],
+                suggestedProjectIds: linked.suggestedProjectIds ?? [],
+                actionItems: linked.actionItems ?? [],
+                hasProjectLinks: (linked.linkedProjectIds?.length ?? 0) > 0,
+              });
+            } else {
+              const errBody = await linkRes.json().catch(() => ({})) as { error?: string };
+              console.error(`[useGranolaSync] link-meeting failed for "${note.title}":`, errBody.error || linkRes.status);
+            }
+          } catch (linkErr) {
+            console.error(`[useGranolaSync] link-meeting error for "${note.title}":`, linkErr);
           }
+          // Small delay to stay under Anthropic rate limits
+          await new Promise(r => setTimeout(r, 1500));
         }
 
         // --- 5. Update last-synced timestamp ---

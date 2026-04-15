@@ -146,23 +146,54 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
       const res = await apiFetch('/api/sync-granola', { since: null, limit: 30 });
       if (!res.ok) { setSyncing(false); return; }
       const { notes } = await res.json() as { notes: any[]; count: number };
-      const { upsertMeeting, updateMeeting, meetings: currentMeetings, contacts, projects } = useStore.getState();
+      const { upsertMeeting, updateMeeting, meetings: currentMeetings, projects } = useStore.getState();
       const existingIds = new Set(currentMeetings.filter(m => m.externalId).map(m => `${m.provider}:${m.externalId}`));
+
+      // Step 1: upsert all meetings first (fast, no external API calls)
+      const needsLinking: Array<{ meeting: any; note: any }> = [];
       for (const note of notes) {
         try {
           const meeting = await upsertMeeting({ ...note, contactId: '', linkedContactIds: [], linkedProjectIds: [], suggestedProjectIds: [], actionItems: [], hasProjectLinks: false, reviewed: false });
           const isNew = !existingIds.has(`${note.provider}:${note.externalId}`);
           const hasNoItems = !meeting.actionItems || meeting.actionItems.length === 0;
-          if ((isNew || hasNoItems) && note.notes) {
-            apiFetch('/api/link-meeting', { meetingId: meeting.id, title: note.title, notes: note.notes, transcript: note.transcript, projects: projects.map((p: any) => ({ id: p.id, name: p.name })) }).then(r => r.json()).then((linked: any) => {
-              updateMeeting(meeting.id, { linkedProjectIds: linked.linkedProjectIds ?? [], suggestedProjectIds: linked.suggestedProjectIds ?? [], actionItems: linked.actionItems ?? [], hasProjectLinks: (linked.linkedProjectIds?.length ?? 0) > 0 });
-            }).catch(() => {});
+          if ((isNew || hasNoItems) && (note.notes || note.transcript)) {
+            needsLinking.push({ meeting, note });
           }
         } catch (noteErr) {
           console.error('Granola sync: failed to upsert note', note.externalId, noteErr);
-          // Continue processing remaining notes
         }
       }
+
+      // Step 2: run AI linking sequentially with a small delay to avoid rate limits
+      const projectList = projects.map((p: any) => ({ id: p.id, name: p.name }));
+      for (const { meeting, note } of needsLinking) {
+        try {
+          const linkRes = await apiFetch('/api/link-meeting', {
+            meetingId: meeting.id,
+            title: note.title,
+            notes: note.notes,
+            transcript: note.transcript,
+            projects: projectList,
+          });
+          if (linkRes.ok) {
+            const linked = await linkRes.json() as any;
+            updateMeeting(meeting.id, {
+              linkedProjectIds: linked.linkedProjectIds ?? [],
+              suggestedProjectIds: linked.suggestedProjectIds ?? [],
+              actionItems: linked.actionItems ?? [],
+              hasProjectLinks: (linked.linkedProjectIds?.length ?? 0) > 0,
+            });
+          } else {
+            const errBody = await linkRes.json().catch(() => ({})) as { error?: string };
+            console.error(`[granola sync] link-meeting failed for "${note.title}":`, errBody.error || linkRes.status);
+          }
+        } catch (linkErr) {
+          console.error(`[granola sync] link-meeting error for "${note.title}":`, linkErr);
+        }
+        // Small delay to stay under Anthropic rate limits (~12 req/min = 5s each)
+        await new Promise(r => setTimeout(r, 1500));
+      }
+
       await saveUserSettings({ granolaLastSyncedAt: new Date().toISOString() });
     } catch (e) {
       console.error('Sync failed:', e);
