@@ -37,7 +37,7 @@ const InlineCapture = forwardRef<InlineCaptureHandle, InlineCaptureProps>(functi
   const [priority, setPriority] = useState<'urgent' | 'high' | 'medium' | 'low'>('medium');
   const [dueDate, setDueDate] = useState('');
   const [assigneeId, setAssigneeId] = useState(initialAssigneeId ?? currentUser.id);
-  const [showMore, setShowMore] = useState(false);
+  const [showMore, setShowMore] = useState(true);
   const [description, setDescription] = useState('');
   const [dueTime, setDueTime] = useState('');
   const [dueTimeEnd, setDueTimeEnd] = useState('');
@@ -83,7 +83,7 @@ const InlineCapture = forwardRef<InlineCaptureHandle, InlineCaptureProps>(functi
     setPriority('medium');
     setDueDate('');
     setAssigneeId(initialAssigneeId ?? currentUser.id);
-    setShowMore(false);
+    setShowMore(true);
     setDescription('');
     setDueTime('');
     setDueTimeEnd('');
