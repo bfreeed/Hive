@@ -345,7 +345,7 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
           <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 space-y-4">
             <p className="text-xs text-white/40 leading-relaxed">
               Connect Google Drive to attach files from your Drive directly to tasks. Requires a free Google Cloud project.{' '}
-              <span className="text-white/25">Setup: console.cloud.google.com → New Project → Enable "Google Drive API" + "Google Picker API" + "Google Calendar API" → Credentials → Create OAuth 2.0 Client ID (Web) → add http://localhost:5173 to Authorized JavaScript Origins → also create an API Key.</span>
+              <span className="text-white/25">Setup: console.cloud.google.com → New Project → Enable "Google Drive API" + "Google Picker API" + "Google Calendar API" → Credentials → Create OAuth 2.0 Client ID (Web) → add https://www.hivenow.app and http://localhost:5173 to Authorized JavaScript Origins → also create an API Key.</span>
             </p>
             <div>
               <label className="text-xs text-white/40 block mb-1.5">OAuth Client ID</label>
