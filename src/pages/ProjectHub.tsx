@@ -723,6 +723,19 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
               </div>
             )}
 
+            {/* Inline add-task — at top, near where the header button is */}
+            {showAddTask && taskViewTab !== 'today' && taskViewTab !== 'completed' && (
+              <div className="max-w-3xl mb-4">
+                <InlineCapture
+                  initialProjectId={projectId}
+                  showCollapsedButton={false}
+                  onCreated={() => setShowAddTask(false)}
+                  onCancel={() => setShowAddTask(false)}
+                  onOpenDetail={id => { setShowAddTask(false); onOpenTask(id); }}
+                />
+              </div>
+            )}
+
             {/* Completed view */}
             {taskViewTab === 'completed' && (
               <div className="space-y-0.5">
@@ -793,26 +806,14 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
                     </>
                   )}
                 </div>
-                {/* Inline add-task */}
-                {taskViewTab !== 'today' && (
-                  showAddTask ? (
-                    <div className="max-w-3xl mx-auto">
-                      <InlineCapture
-                        initialProjectId={projectId}
-                        showCollapsedButton={false}
-                        onCreated={() => setShowAddTask(false)}
-                        onCancel={() => setShowAddTask(false)}
-                        onOpenDetail={id => { setShowAddTask(false); onOpenTask(id); }}
-                      />
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setShowAddTask(true)}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-white/20 hover:text-white/50 hover:bg-white/[0.03] rounded-lg text-sm transition-colors"
-                    >
-                      <Plus size={13} /> Add task
-                    </button>
-                  )
+                {/* Inline add-task button — bottom of list, just triggers the top form */}
+                {taskViewTab !== 'today' && !showAddTask && (
+                  <button
+                    onClick={() => setShowAddTask(true)}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-white/20 hover:text-white/50 hover:bg-white/[0.03] rounded-lg text-sm transition-colors"
+                  >
+                    <Plus size={13} /> Add task
+                  </button>
                 )}
               </div>
             )}
