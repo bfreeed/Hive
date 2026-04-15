@@ -51,7 +51,7 @@ const InlineCapture = forwardRef<InlineCaptureHandle, InlineCaptureProps>(functi
 
   return (
     <>
-      {showCollapsedButton && (
+      {!show && showCollapsedButton && (
         <button
           onClick={() => setShow(true)}
           className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl border border-white/40 hover:border-white/55 text-white/40 hover:text-white/60 text-sm transition-colors"
@@ -62,11 +62,10 @@ const InlineCapture = forwardRef<InlineCaptureHandle, InlineCaptureProps>(functi
       )}
       {show && (
         <TaskDetail
+          inline
           draftInitial={draftInitial}
           onClose={() => {
             handleClose();
-            // Signal creation if a task was added (onCreated is called after TaskDetail's Add task button)
-            // We can't easily tell here, but onCreated on close is close enough for the parent
             onCreated?.();
           }}
         />

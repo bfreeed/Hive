@@ -38,9 +38,11 @@ export interface TaskDetailProps {
   taskId?: string;
   draftInitial?: Partial<Task>;
   onClose: () => void;
+  /** When true, render inline (no backdrop, no fixed positioning, no slide animation). Default: false */
+  inline?: boolean;
 }
 
-export default function TaskDetail({ taskId, draftInitial, onClose }: TaskDetailProps) {
+export default function TaskDetail({ taskId, draftInitial, onClose, inline = false }: TaskDetailProps) {
   const { tasks, projects, users, currentUser, sections, updateTask, deleteTask, addComment, addTask } = useStore();
   const isDraft = !taskId && !!draftInitial;
   const storeTask = taskId ? tasks.find(t => t.id === taskId) : undefined;
@@ -239,11 +241,17 @@ export default function TaskDetail({ taskId, draftInitial, onClose }: TaskDetail
 
   return (
     <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      {/* Backdrop — only in slide-over mode */}
+      {!inline && (
+        <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      )}
 
-      {/* Slide-over panel */}
-      <div className="fixed inset-0 md:inset-auto md:right-0 md:top-0 md:bottom-0 z-50 w-full md:w-[600px] bg-[#111113] md:border-l border-white/[0.08] flex flex-col shadow-2xl animate-slide-in">
+      {/* Panel — slide-over by default, inline when inline=true */}
+      <div className={
+        inline
+          ? "w-full bg-[#111113] border border-white/[0.08] rounded-2xl flex flex-col shadow-xl overflow-hidden"
+          : "fixed inset-0 md:inset-auto md:right-0 md:top-0 md:bottom-0 z-50 w-full md:w-[600px] bg-[#111113] md:border-l border-white/[0.08] flex flex-col shadow-2xl animate-slide-in"
+      }>
 
         {/* Header */}
         <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-white/[0.06] flex-shrink-0 pt-safe">
@@ -282,15 +290,19 @@ export default function TaskDetail({ taskId, draftInitial, onClose }: TaskDetail
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto scrollbar-hide">
+        <div className={inline ? "max-h-[70vh] overflow-y-auto scrollbar-hide" : "flex-1 overflow-y-auto scrollbar-hide"}>
           <div className="px-4 md:px-6 py-4 md:py-5 pb-20 md:pb-5">
 
             {/* Title */}
             <textarea
+              autoFocus={isDraft}
               className="w-full bg-transparent text-xl md:text-2xl font-semibold text-white resize-none focus:outline-none placeholder-white/20 leading-snug mt-2 mb-1"
               value={task.title}
               onChange={(e) => update('title', e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Escape') (e.target as HTMLElement).blur(); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') (e.target as HTMLElement).blur();
+                if (e.key === 'Enter' && isDraft) { e.preventDefault(); handleCreateDraft(); }
+              }}
               rows={task.title.length > 55 ? 2 : 1}
               placeholder="Task title..."
             />
