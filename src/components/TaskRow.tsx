@@ -66,7 +66,7 @@ const TaskRow = forwardRef<HTMLDivElement, TaskRowProps>(function TaskRow({ task
         );
       })}
       {/* Priority */}
-      {task.priority && task.priority !== 'normal' && (
+      {task.priority && task.priority !== 'low' && (
         <span className={`flex-shrink-0 text-[11px] font-medium ${PRIORITY_LABEL[task.priority]?.className ?? 'text-white/25'}`}>
           {PRIORITY_LABEL[task.priority]?.text}
         </span>
