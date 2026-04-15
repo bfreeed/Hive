@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useStore } from './store';
+import type { Toast } from './store';
 import { DEFAULT_HOME_SECTIONS } from './types';
 import { useAuth } from './hooks/useAuth';
 import { apiFetch } from './lib/apiFetch';
@@ -744,6 +745,25 @@ function MobileBottomNav({ activePage, onNavigate, unreviewedMeetingCount }: { a
   );
 }
 
+function ToastStack() {
+  const { toasts, dismissToast } = useStore();
+  if (!toasts.length) return null;
+  return (
+    <div className="fixed bottom-20 md:bottom-6 right-4 z-[9999] flex flex-col gap-2 items-end pointer-events-none">
+      {toasts.map(t => (
+        <div
+          key={t.id}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium pointer-events-auto max-w-sm
+            ${t.type === 'error' ? 'bg-red-500/90 text-white' : t.type === 'success' ? 'bg-emerald-500/90 text-white' : 'bg-white/10 text-white border border-white/10'}`}
+        >
+          <span>{t.message}</span>
+          <button onClick={() => dismissToast(t.id)} className="ml-1 opacity-70 hover:opacity-100 transition-opacity text-base leading-none">×</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function AuthenticatedApp() {
   const { sidebarOpen, currentUser, isLoading, darkMode, toggleDarkMode } = useStore();
   const [page, setPage] = useState<Page>(() => hashToPage(window.location.hash));
@@ -880,6 +900,7 @@ function AuthenticatedApp() {
           onClose={() => setQuickCaptureText(null)}
         />
       )}
+      <ToastStack />
     </div>
   );
 }

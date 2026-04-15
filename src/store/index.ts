@@ -402,6 +402,12 @@ function dbToPage(row: any): HivePage {
 // Store interface (unchanged from original)
 // ---------------------------------------------------------------------------
 
+export interface Toast {
+  id: string;
+  type: 'error' | 'success' | 'info';
+  message: string;
+}
+
 interface AppStore {
   currentUser: User;
   users: User[];
@@ -424,6 +430,9 @@ interface AppStore {
   triggerGranolaSync: () => void;
   firefliesManualSyncTrigger: number;
   triggerFirefliesSync: () => void;
+  toasts: Toast[];
+  addToast: (type: Toast['type'], message: string) => void;
+  dismissToast: (id: string) => void;
 
   loadData: () => Promise<void>;
 
@@ -532,6 +541,13 @@ export const useStore = create<AppStore>()((set, get) => ({
   firefliesManualSyncTrigger: 0,
   triggerFirefliesSync: () => set(s => ({ firefliesManualSyncTrigger: s.firefliesManualSyncTrigger + 1 })),
   userStatuses: {},
+  toasts: [],
+  addToast: (type, message) => {
+    const id = Math.random().toString(36).slice(2);
+    set(s => ({ toasts: [...s.toasts, { id, type, message }] }));
+    setTimeout(() => get().dismissToast(id), 4000);
+  },
+  dismissToast: (id) => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })),
 
   // -------------------------------------------------------------------------
   // loadData — fetch everything from Supabase and replace local state
@@ -870,6 +886,7 @@ export const useStore = create<AppStore>()((set, get) => ({
       .then(({ error }) => {
         if (error) {
           console.error('addTask error:', error);
+          get().addToast('error', 'Failed to save task. Check your connection and try again.');
         }
       });
   },
@@ -960,7 +977,7 @@ export const useStore = create<AppStore>()((set, get) => ({
     const updatedTask = tasks.find(t => t.id === id);
     if (updatedTask) {
       supabase.from('tasks').update(taskToDb(updatedTask)).eq('id', id)
-        .then(({ error }) => { if (error) console.error('updateTask error:', error); });
+        .then(({ error }) => { if (error) { console.error('updateTask error:', error); get().addToast('error', 'Failed to save task changes.'); } });
     }
     if (newRecurring.length > 0) {
       supabase.from('tasks').insert(newRecurring.map(taskToDb))
@@ -1012,7 +1029,7 @@ export const useStore = create<AppStore>()((set, get) => ({
     const newProject: Project = { ...p, id: uid(), createdAt: new Date().toISOString() };
     set((s) => ({ projects: [...s.projects, newProject] }));
     supabase.from('projects').insert(projectToDb(newProject))
-      .then(({ error }) => { if (error) console.error('addProject error:', error); });
+      .then(({ error }) => { if (error) { console.error('addProject error:', error); get().addToast('error', 'Failed to save project. Check your connection.'); } });
     // Auto-create a linked channel (skipped for folders and sub-projects).
     // Only add the creator — collaborators are added when they accept their project invitation.
     if (!p.isFolder) {
@@ -1175,7 +1192,7 @@ export const useStore = create<AppStore>()((set, get) => ({
     const newContact: Contact = { relationshipTagIds: [], ...c, id: uid(), meetings: [], linkedTaskIds: [] };
     set((s) => ({ contacts: [...s.contacts, newContact] }));
     supabase.from('contacts').insert(contactToDb(newContact, currentUserId))
-      .then(({ error }) => { if (error) console.error('addContact error:', error); });
+      .then(({ error }) => { if (error) { console.error('addContact error:', error); get().addToast('error', 'Failed to save contact.'); } });
   },
 
   updateContact: (id, u) => {
@@ -1183,7 +1200,7 @@ export const useStore = create<AppStore>()((set, get) => ({
     const updated = get().contacts.find(c => c.id === id);
     if (updated) {
       supabase.from('contacts').update(contactToDb(updated)).eq('id', id)
-        .then(({ error }) => { if (error) console.error('updateContact error:', error); });
+        .then(({ error }) => { if (error) { console.error('updateContact error:', error); get().addToast('error', 'Failed to save contact changes.'); } });
     }
   },
 
@@ -1282,7 +1299,7 @@ export const useStore = create<AppStore>()((set, get) => ({
     };
     set((st) => ({ messages: [...st.messages, newMsg] }));
     supabase.from('messages').insert(messageToDb(newMsg))
-      .then(({ error }) => { if (error) console.error('sendMessage error:', error); });
+      .then(({ error }) => { if (error) { console.error('sendMessage error:', error); get().addToast('error', 'Message failed to send. Check your connection.'); } });
   },
 
   updateMessage: (id, body) => {
@@ -1337,7 +1354,7 @@ export const useStore = create<AppStore>()((set, get) => ({
     };
     set((st) => ({ messages: [...st.messages, newMsg] }));
     supabase.from('messages').insert(messageToDb(newMsg))
-      .then(({ error }) => { if (error) console.error('replyToMessage error:', error); });
+      .then(({ error }) => { if (error) { console.error('replyToMessage error:', error); get().addToast('error', 'Reply failed to send.'); } });
   },
 
   pinMessage: (messageId, channelId) => {
