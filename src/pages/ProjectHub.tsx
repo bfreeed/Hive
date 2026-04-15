@@ -131,11 +131,12 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
   const [showAddSub, setShowAddSub] = useState(false);
   const [newSubName, setNewSubName] = useState('');
   const [newSubColor, setNewSubColor] = useState(PROJECT_COLORS[0]);
+  const [showInheritConfirm, setShowInheritConfirm] = useState(false);
   const newSubRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (showAddSub) newSubRef.current?.focus();
-  }, [showAddSub]);
+    if (showAddSub && !showInheritConfirm) newSubRef.current?.focus();
+  }, [showAddSub, showInheritConfirm]);
 
   const handleInvite = async () => {
     const email = inviteEmail.trim().toLowerCase();
@@ -158,19 +159,39 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
     setInviteEmail('');
   };
 
-  const handleAddSubProject = () => {
-    if (!newSubName.trim()) { setShowAddSub(false); return; }
+  const parentOtherMembers = useMemo(() => {
+    const p = projects.find(pr => pr.id === projectId);
+    if (!p) return [];
+    return p.memberIds.filter(mid => mid !== currentUser.id)
+      .map(mid => users.find(u => u.id === mid))
+      .filter(Boolean) as typeof users;
+  }, [projects, projectId, currentUser.id, users]);
+
+  const doCreateSubProject = (inheritMembers: boolean) => {
+    const memberIds = inheritMembers && parentOtherMembers.length > 0
+      ? [currentUser.id, ...parentOtherMembers.map(u => u.id)]
+      : [currentUser.id];
     addProject({
       name: newSubName.trim(),
       color: newSubColor,
       status: 'active',
-      memberIds: [currentUser.id],
+      memberIds,
       isPrivate: false,
       parentId: projectId,
     });
     setNewSubName('');
     setNewSubColor(PROJECT_COLORS[0]);
     setShowAddSub(false);
+    setShowInheritConfirm(false);
+  };
+
+  const handleAddSubProject = () => {
+    if (!newSubName.trim()) { setShowAddSub(false); return; }
+    if (parentOtherMembers.length > 0) {
+      setShowInheritConfirm(true);
+    } else {
+      doCreateSubProject(false);
+    }
   };
 
   // Close share popover on outside click or Escape
@@ -545,32 +566,48 @@ export default function ProjectHub({ projectId, onNavigate, onOpenTask }: { proj
 
               {/* Inline new sub-project form */}
               {showAddSub && (
-                <div className="w-44 p-3 bg-white/[0.04] border border-white/[0.10] rounded-xl space-y-2">
-                  <input
-                    ref={newSubRef}
-                    value={newSubName}
-                    onChange={e => setNewSubName(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') handleAddSubProject();
-                      if (e.key === 'Escape') { setShowAddSub(false); setNewSubName(''); }
-                    }}
-                    placeholder="Sub-project name"
-                    className="w-full bg-transparent text-sm text-white/80 placeholder-white/25 focus:outline-none"
-                  />
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {PROJECT_COLORS.map(c => (
-                      <button key={c} onClick={() => setNewSubColor(c)}
-                        className="w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center hover:scale-110 transition-transform"
-                        style={{ backgroundColor: c }}
-                      >
-                        {newSubColor === c && <span className="block w-1.5 h-1.5 rounded-full bg-white/80" />}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex gap-1.5">
-                    <button onClick={handleAddSubProject} className="flex-1 py-1 bg-brand-600 hover:bg-brand-500 text-white text-xs rounded-lg transition-colors">Create</button>
-                    <button onClick={() => { setShowAddSub(false); setNewSubName(''); }} className="flex-1 py-1 text-white/30 hover:text-white/60 text-xs transition-colors">Cancel</button>
-                  </div>
+                <div className="w-52 p-3 bg-white/[0.04] border border-white/[0.10] rounded-xl space-y-2">
+                  {!showInheritConfirm ? (
+                    <>
+                      <input
+                        ref={newSubRef}
+                        value={newSubName}
+                        onChange={e => setNewSubName(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') handleAddSubProject();
+                          if (e.key === 'Escape') { setShowAddSub(false); setNewSubName(''); }
+                        }}
+                        placeholder="Sub-project name"
+                        className="w-full bg-transparent text-sm text-white/80 placeholder-white/25 focus:outline-none"
+                      />
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {PROJECT_COLORS.map(c => (
+                          <button key={c} onClick={() => setNewSubColor(c)}
+                            className="w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center hover:scale-110 transition-transform"
+                            style={{ backgroundColor: c }}
+                          >
+                            {newSubColor === c && <span className="block w-1.5 h-1.5 rounded-full bg-white/80" />}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex gap-1.5">
+                        <button onClick={handleAddSubProject} className="flex-1 py-1 bg-brand-600 hover:bg-brand-500 text-white text-xs rounded-lg transition-colors">Create</button>
+                        <button onClick={() => { setShowAddSub(false); setNewSubName(''); }} className="flex-1 py-1 text-white/30 hover:text-white/60 text-xs transition-colors">Cancel</button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs text-white/60 leading-snug">
+                        Share <span className="text-white/80 font-medium">"{newSubName}"</span> with{' '}
+                        {parentOtherMembers.map(u => u.name).join(', ')}?
+                      </p>
+                      <p className="text-[10px] text-white/30">They already have access to the parent project.</p>
+                      <div className="flex gap-1.5">
+                        <button onClick={() => doCreateSubProject(true)} className="flex-1 py-1 bg-brand-600 hover:bg-brand-500 text-white text-xs rounded-lg transition-colors">Share</button>
+                        <button onClick={() => doCreateSubProject(false)} className="flex-1 py-1 text-white/30 hover:text-white/60 text-xs transition-colors">Just me</button>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
