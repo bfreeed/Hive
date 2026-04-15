@@ -34,9 +34,39 @@ function PropRow({ icon, label, children }: { icon: React.ReactNode; label: stri
   );
 }
 
-export default function TaskDetail({ taskId, onClose }: { taskId: string; onClose: () => void }) {
+export interface TaskDetailProps {
+  taskId?: string;
+  draftInitial?: Partial<Task>;
+  onClose: () => void;
+}
+
+export default function TaskDetail({ taskId, draftInitial, onClose }: TaskDetailProps) {
   const { tasks, projects, users, currentUser, sections, updateTask, deleteTask, addComment, addTask } = useStore();
-  const task = tasks.find(t => t.id === taskId);
+  const isDraft = !taskId && !!draftInitial;
+  const storeTask = taskId ? tasks.find(t => t.id === taskId) : undefined;
+
+  // Draft state used when creating a new task
+  const [draftTask, setDraftTask] = useState<Task>(() => ({
+    id: '__draft__',
+    title: '',
+    description: '',
+    projectIds: [],
+    status: 'todo' as const,
+    priority: 'medium' as const,
+    assigneeIds: [currentUser.id],
+    flags: [],
+    isPrivate: false,
+    linkedContactIds: [],
+    linkedDocIds: [],
+    comments: [],
+    audioNotes: [],
+    attachments: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    ...(draftInitial ?? {}),
+  } as Task));
+
+  const task = isDraft ? draftTask : storeTask;
   const [commentText, setCommentText] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showSubtasks, setShowSubtasks] = useState(true);
@@ -80,6 +110,7 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
   }, [onClose, showStatusPicker, showPriorityPicker, showProjectPicker, showCalPicker, showDepPicker, showNewSubtask, confirmDelete]);
 
   const { open: openDrivePicker, loading: driveLoading } = useGooglePicker((file) => {
+    if (isDraft || !taskId) return; // Drive attachments require existing task
     const att = {
       id: Math.random().toString(36).slice(2, 9),
       name: file.name,
@@ -93,6 +124,7 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
   });
 
   const doSync = useCallback(async (forcePrompt = false) => {
+    if (isDraft || !taskId) return; // Calendar sync requires existing task
     if (!task || !task.calendarSync) return;
     const clientId = localStorage.getItem('google_client_id')?.trim();
     if (!clientId) return;
@@ -112,7 +144,7 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
     } finally {
       setCalSyncing(false);
     }
-  }, [task, taskId, updateTask]);
+  }, [task, taskId, updateTask, isDraft]);
 
   const openCalPicker = useCallback(async () => {
     setShowCalPicker(true);
@@ -130,6 +162,7 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
 
   // Auto-sync when dueDate changes (if calendarSync is on and token is cached)
   useEffect(() => {
+    if (isDraft || !taskId) return; // Calendar sync requires existing task
     if (!task) return;
     const prev = prevDueDateRef.current;
     const curr = task.dueDate;
@@ -158,15 +191,23 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
   const taskProjects = projects.filter(p => task.projectIds?.includes(p.id));
   const project = taskProjects[0];
 
-  const update = (field: keyof Task, value: any) => updateTask(taskId, { [field]: value });
+  const update = (field: keyof Task, value: any) => {
+    if (isDraft) {
+      setDraftTask(d => ({ ...d, [field]: value, updatedAt: new Date().toISOString() }));
+    } else if (taskId) {
+      updateTask(taskId, { [field]: value });
+    }
+  };
 
   const handleAddComment = () => {
+    if (isDraft || !taskId) return;
     if (!commentText.trim()) return;
     addComment(taskId, commentText.trim());
     setCommentText('');
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isDraft || !taskId) return;
     const files = Array.from(e.target.files || []);
     files.forEach(file => {
       const reader = new FileReader();
@@ -177,6 +218,20 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
       reader.readAsDataURL(file);
     });
     e.target.value = '';
+  };
+
+  const handleCreateDraft = () => {
+    if (!isDraft) return;
+    const title = draftTask.title.trim();
+    if (!title) return;
+    // Strip the placeholder id and timestamps — addTask will generate real ones
+    const { id: _id, createdAt: _c, updatedAt: _u, comments: _cm, audioNotes: _an, ...rest } = draftTask;
+    addTask({
+      ...rest,
+      title,
+      attachments: draftTask.attachments ?? [],
+    } as any);
+    onClose();
   };
 
   const currentStatus = STATUS_OPTIONS.find(s => s.value === task.status);
@@ -201,10 +256,18 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
             {task.isPrivate && <span className="flex items-center gap-1 text-xs text-white/50"><Lock size={10} /> Private</span>}
           </div>
           <div className="flex items-center gap-1">
-            {confirmDelete ? (
+            {isDraft ? (
+              <button
+                onClick={handleCreateDraft}
+                disabled={!task.title.trim()}
+                className="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 disabled:bg-white/[0.06] disabled:text-white/30 text-white text-xs font-semibold rounded-lg transition-colors"
+              >
+                Add task
+              </button>
+            ) : confirmDelete ? (
               <>
                 <span className="text-xs text-white/40 mr-2">Delete this task?</span>
-                <button onClick={() => { deleteTask(taskId); onClose(); }} className="px-3 py-1.5 bg-red-500/20 text-red-400 text-xs rounded-lg hover:bg-red-500/30 transition-colors">Yes, delete</button>
+                <button onClick={() => { if (taskId) { deleteTask(taskId); onClose(); } }} className="px-3 py-1.5 bg-red-500/20 text-red-400 text-xs rounded-lg hover:bg-red-500/30 transition-colors">Yes, delete</button>
                 <button onClick={() => setConfirmDelete(false)} className="px-3 py-1.5 text-white/50 text-xs rounded-lg hover:text-white/80 transition-colors">Cancel</button>
               </>
             ) : (
@@ -703,7 +766,8 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
               className="w-full px-4 py-3 bg-white/[0.03] border border-white/[0.06] rounded-xl text-sm text-white/70 placeholder-white/20 focus:outline-none focus:border-brand-500/30 resize-none"
             />
 
-            {/* Attachments */}
+            {/* Attachments — only show for existing tasks */}
+            {!isDraft && (
             <div className="mt-4">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-white/50 uppercase tracking-wider">Attachments</p>
@@ -756,9 +820,10 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                 </div>
               )}
             </div>
+            )}
 
-            {/* Subtasks */}
-            {!task.parentId && (() => {
+            {/* Subtasks — only show for existing tasks */}
+            {!isDraft && !task.parentId && (() => {
               const subtasks = tasks.filter(t => t.parentId === taskId);
               const doneCount = subtasks.filter(t => t.status === 'done').length;
               return (
@@ -828,8 +893,8 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
               );
             })()}
 
-            {/* Dependencies */}
-            {(() => {
+            {/* Dependencies — only show for existing tasks */}
+            {!isDraft && (() => {
               const deps = (task.dependsOn ?? []).map(id => tasks.find(t => t.id === id)).filter(Boolean) as typeof tasks;
               const depSearchLower = depSearch.toLowerCase();
               const depCandidates = tasks.filter(t =>
@@ -904,7 +969,8 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
               );
             })()}
 
-            {/* Comments */}
+            {/* Comments — only show for existing tasks */}
+            {!isDraft && (
             <div className="mt-6 pt-5 border-t border-white/[0.06]">
               <p className="text-xs text-white/50 uppercase tracking-wider mb-3">
                 Comments {task.comments.length > 0 && <span className="opacity-50 ml-1">{task.comments.length}</span>}
@@ -957,6 +1023,7 @@ export default function TaskDetail({ taskId, onClose }: { taskId: string; onClos
                 </div>
               </div>
             </div>
+            )}
 
             {/* Footer space */}
             <div className="h-4" />
