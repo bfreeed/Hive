@@ -99,10 +99,13 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
     return order.map(id => projects.find(p => p.id === id)!).filter(Boolean);
   }, [projects, projectOrder]);
 
-  // Top-level: no parentId, no folderId
+  // Top-level: no parentId, and either no folderId OR the folder isn't
+  // visible to this user (shared projects whose parent folder wasn't shared).
   const topLevelProjects = useMemo(
-    () => orderedProjects.filter(p => !p.parentId && !p.folderId),
-    [orderedProjects],
+    () => orderedProjects.filter(p =>
+      !p.parentId && (!p.folderId || !projects.find(f => f.id === p.folderId))
+    ),
+    [orderedProjects, projects],
   );
 
   // Track active drag for the DragOverlay visual
