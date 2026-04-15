@@ -569,6 +569,14 @@ export const useStore = create<AppStore>()((set, get) => ({
 
       const uid = authUser.id;
 
+      // Optimistically set currentUser from auth metadata immediately.
+      // This unblocks the UI so it can render before Supabase queries complete.
+      // The profile will be refined with DB data once Phase 1 finishes.
+      const derivedNameEarly = authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User';
+      if (get().currentUser.id === '__loading__') {
+        set({ currentUser: { id: uid, name: derivedNameEarly, email: authUser.email ?? '', role: 'owner', flags: DEFAULT_FLAGS } });
+      }
+
       // Phase 1 — user-scoped queries with no cross-table dependencies
       const [
         tasksRes,

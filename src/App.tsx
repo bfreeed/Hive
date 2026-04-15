@@ -805,10 +805,10 @@ function AuthenticatedApp() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  // Block the full layout until the first data load is done.
-  // This prevents the placeholder user (id: '__loading__') from briefly
-  // appearing in the sidebar while Supabase hydrates the store.
-  if (isLoading || currentUser.id === '__loading__') {
+  // Block only until auth is resolved (localStorage read, ~0ms).
+  // Once currentUser.id is a real UUID the app renders immediately and data
+  // fills in as Supabase queries complete — no more 5-second logo screen.
+  if (currentUser.id === '__loading__') {
     return (
       <div className="min-h-screen bg-[#0d0d0f] flex items-center justify-center">
         <span className="text-2xl font-bold text-white tracking-tight opacity-60">Hive</span>

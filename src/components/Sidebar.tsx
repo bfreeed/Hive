@@ -307,6 +307,15 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
             <div className="px-2 py-1"><FolderOpen size={14} className="text-white/30" /></div>
           )}
 
+          {/* Skeleton shimmer while data is loading */}
+          {isLoading && topLevelProjects.length === 0 && sidebarOpen && (
+            <div className="px-2 py-1 space-y-1">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="h-7 rounded-md bg-white/[0.04] animate-pulse" style={{ opacity: 1 - i * 0.2 }} />
+              ))}
+            </div>
+          )}
+
           {(projectsExpanded || !sidebarOpen) && (
             <DndContext sensors={sensors} collisionDetection={collisionDetection}
               onDragStart={e => setActiveDragId(e.active.id as string)}
