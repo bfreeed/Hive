@@ -755,11 +755,11 @@ function ProjectNode({
         {/* Expand chevron */}
         {visibleChildren.length > 0 ? (
           <button onClick={e => { e.stopPropagation(); setChildrenExpanded(v => !v); }}
-            className="flex-shrink-0 w-4 h-6 flex items-center justify-center text-white/20 hover:text-white/50 transition-colors">
+            className="flex-shrink-0 w-6 h-6 flex items-center justify-center text-white/20 hover:text-white/50 transition-colors">
             {childrenExpanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
           </button>
         ) : (
-          <span className="flex-shrink-0 w-4" />
+          <span className="flex-shrink-0 w-6" />
         )}
         {/* Project button */}
         <button onClick={() => onNavigate('project', project.id)}

@@ -64,7 +64,7 @@ export default function TodayPage({ onOpenTask }: TodayPageProps) {
       <div className="flex items-center gap-3 px-6 h-14 border-b border-white/[0.06] flex-shrink-0">
         <CalendarDays size={18} className="text-brand-400" />
         <div>
-          <h1 className="text-sm font-semibold text-white">Today</h1>
+          <h1 className="text-base font-semibold text-white">Today</h1>
           <p className="text-xs text-white/30">{todayLabel}</p>
         </div>
         <div className="ml-auto flex items-center gap-2 text-xs text-white/30">

@@ -377,7 +377,7 @@ export default function ContactsPage() {
       <div className={`w-72 border-r border-white/[0.06] flex flex-col ${selected ? 'hidden md:flex' : 'flex'}`}>
         <div className="px-4 py-4 border-b border-white/[0.06]">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-white/80">Contacts</h2>
+            <h2 className="text-base font-semibold text-white">Contacts</h2>
             <button onClick={() => setShowNew(true)} className="p-1 rounded text-white/30 hover:text-white/60 hover:bg-white/[0.06] transition-colors"><Plus size={14} /></button>
           </div>
 
