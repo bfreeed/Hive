@@ -50,7 +50,7 @@ const InlineCapture = forwardRef<InlineCaptureHandle, InlineCaptureProps>(functi
   };
 
   return (
-    <>
+    <div className="relative w-full">
       {!show && showCollapsedButton && (
         <button
           onClick={() => setShow(true)}
@@ -61,16 +61,18 @@ const InlineCapture = forwardRef<InlineCaptureHandle, InlineCaptureProps>(functi
         </button>
       )}
       {show && (
-        <TaskDetail
-          inline
-          draftInitial={draftInitial}
-          onClose={() => {
-            handleClose();
-            onCreated?.();
-          }}
-        />
+        <div className="absolute left-0 top-0 z-20 w-[min(640px,calc(100vw-3rem))]">
+          <TaskDetail
+            inline
+            draftInitial={draftInitial}
+            onClose={() => {
+              handleClose();
+              onCreated?.();
+            }}
+          />
+        </div>
       )}
-    </>
+    </div>
   );
 });
 
