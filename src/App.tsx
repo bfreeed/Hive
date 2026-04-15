@@ -385,7 +385,7 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
                 <input
                   ref={clientIdRef}
                   type={showClientId ? 'text' : 'password'}
-                  defaultValue={localStorage.getItem(GOOGLE_CLIENT_ID_KEY) || ''}
+                  defaultValue={localStorage.getItem(GOOGLE_CLIENT_ID_KEY) || userSettings?.googleClientId || ''}
                   placeholder="xxxxxxxx.apps.googleusercontent.com"
                   className="w-full px-3 py-2 pr-9 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white/60 placeholder-white/20 focus:outline-none focus:border-brand-500/40 font-mono"
                 />

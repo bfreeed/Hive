@@ -732,6 +732,14 @@ export const useStore = create<AppStore>()((set, get) => ({
 
       if (settingsRes.data) {
         updates.userSettings = dbToUserSettings(settingsRes.data);
+        // Sync to localStorage so calendar/drive hooks can read them
+        // without needing access to the Zustand store.
+        if (settingsRes.data.google_client_id) {
+          localStorage.setItem('google_client_id', settingsRes.data.google_client_id);
+        }
+        if (settingsRes.data.anthropic_api_key) {
+          localStorage.setItem('anthropic_api_key', settingsRes.data.anthropic_api_key);
+        }
       }
 
       updates.pages = (pagesRes.data ?? []).map(dbToPage);

@@ -83,6 +83,7 @@ export default function TaskDetail({ taskId, draftInitial, onClose, inline = fal
   const [showCalPicker, setShowCalPicker] = useState(false);
   const [calList, setCalList] = useState<CalendarEntry[]>([]);
   const [calListLoading, setCalListLoading] = useState(false);
+  const [calPickerNeedsAuth, setCalPickerNeedsAuth] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [showPriorityPicker, setShowPriorityPicker] = useState(false);
   const [showProjectPicker, setShowProjectPicker] = useState(false);
@@ -152,15 +153,34 @@ export default function TaskDetail({ taskId, draftInitial, onClose, inline = fal
     setShowCalPicker(true);
     if (calList.length > 0) return; // already loaded
     setCalListLoading(true);
+    setCalPickerNeedsAuth(false);
     try {
       const entries = await listCalendars(false);
-      setCalList(entries);
+      if (entries.length === 0) {
+        setCalPickerNeedsAuth(true);
+      } else {
+        setCalList(entries);
+      }
     } catch {
-      // token needed — will show empty, user can still dismiss
+      setCalPickerNeedsAuth(true);
     } finally {
       setCalListLoading(false);
     }
   }, [calList.length]);
+
+  const authorizeCalendar = useCallback(async () => {
+    setCalListLoading(true);
+    setCalPickerNeedsAuth(false);
+    try {
+      const entries = await listCalendars(true); // force consent popup
+      setCalList(entries);
+      if (entries.length === 0) setCalPickerNeedsAuth(true);
+    } catch {
+      setCalPickerNeedsAuth(true);
+    } finally {
+      setCalListLoading(false);
+    }
+  }, []);
 
   // Auto-sync when dueDate changes (if calendarSync is on and token is cached)
   useEffect(() => {
@@ -485,8 +505,20 @@ export default function TaskDetail({ taskId, draftInitial, onClose, inline = fal
                                 <RefreshCw size={13} className="animate-spin text-white/50" />
                               </div>
                             )}
-                            {!calListLoading && calList.length === 0 && (
-                              <p className="text-xs text-white/50 px-3 py-3">No calendars found. Make sure you're signed in.</p>
+                            {!calListLoading && calPickerNeedsAuth && (
+                              <div className="px-3 py-3 space-y-2">
+                                <p className="text-xs text-white/40">Google Calendar authorization required.</p>
+                                <button
+                                  onClick={authorizeCalendar}
+                                  className="w-full py-1.5 px-2 bg-[#4285F4]/20 hover:bg-[#4285F4]/30 text-[#4285F4] text-xs rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                                >
+                                  <Calendar size={11} />
+                                  Connect Google Calendar
+                                </button>
+                              </div>
+                            )}
+                            {!calListLoading && !calPickerNeedsAuth && calList.length === 0 && (
+                              <p className="text-xs text-white/50 px-3 py-3">No calendars found.</p>
                             )}
                             {calList.map(cal => (
                               <button
