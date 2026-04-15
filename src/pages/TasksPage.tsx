@@ -1205,6 +1205,38 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
               })}
             </div>
           )
+        ) : activeTab === 'project' ? (
+          // By Project — grouped list, one section per project
+          filteredTopLevel.length === 0 ? (
+            <div className="py-16 text-center"><p className="text-white/20">No tasks found</p></div>
+          ) : (
+            <div className="space-y-6">
+              {boardGroups.map((group, gi) => {
+                if (group.tasks.length === 0) return null;
+                return (
+                  <div key={gi}>
+                    <div className="flex items-center gap-2 mb-1 px-1">
+                      {group.color && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: group.color }} />}
+                      <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">{group.label || 'No Project'}</span>
+                      <span className="text-xs text-white/20">{group.tasks.length}</span>
+                      <div className="flex-1 h-px bg-white/[0.05]" />
+                    </div>
+                    <div className="space-y-1">
+                      {group.tasks.map(task => {
+                        const idx = sorted.findIndex(t => t.id === task.id);
+                        const isFocused = focusedIdx === idx;
+                        return renderTaskWithSubtasks(task, {
+                          focused: isFocused,
+                          focusRef: isFocused ? focusedRowRef : undefined,
+                          showProject: false,
+                        });
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
         ) : activeTab === 'date' ? (
           // By Date — grouped list, with assignee super-groups when multi-user
           filteredTopLevel.length === 0 ? (
