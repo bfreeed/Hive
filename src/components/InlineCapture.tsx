@@ -20,7 +20,7 @@ export interface InlineCaptureProps {
 }
 
 const InlineCapture = forwardRef<InlineCaptureHandle, InlineCaptureProps>(function InlineCapture(props, ref) {
-  const { initialTitle, initialProjectId, initialAssigneeId, onCreated, onCancel, onOpenDetail, showCollapsedButton = true } = props;
+  const { initialTitle, initialProjectId, initialAssigneeId, onCreated, onCancel, showCollapsedButton = true } = props;
   const { projects, users, currentUser, addTask } = useStore();
   const [show, setShow] = useState(!showCollapsedButton);
   const containerRef = useRef<HTMLDivElement>(null);
