@@ -763,6 +763,7 @@ function ProjectNode({
         )}
         {/* Project button */}
         <button onClick={() => onNavigate('project', project.id)}
+          onDoubleClick={e => { e.stopPropagation(); e.preventDefault(); setEditing(true); }}
           className={`flex-1 flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors min-w-0 ${isActive ? 'bg-white/[0.08] text-white' : 'text-white/60 hover:text-white hover:bg-white/[0.04]'}`}>
           <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: project.color }} />
           {editing ? (

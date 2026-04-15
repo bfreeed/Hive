@@ -535,6 +535,8 @@ export const useStore = create<AppStore>()((set, get) => ({
   // loadData — fetch everything from Supabase and replace local state
   // -------------------------------------------------------------------------
   loadData: async () => {
+    // Prevent concurrent loadData calls (e.g. SIGNED_IN + INITIAL_SESSION firing together)
+    if (get().isLoading) return;
     set({ isLoading: true });
     try {
       // Use getSession (reads from localStorage, no network call) to reliably get the current user
@@ -647,16 +649,32 @@ export const useStore = create<AppStore>()((set, get) => ({
       }
       let userChannels = channelsRes.data ?? [];
 
-      // If no channels returned, ensure a default general channel exists for this user
+      // If no channels returned, ensure a default general channel exists for this user.
+      // Use ignoreDuplicates: true so we never overwrite member_ids on an existing general channel.
       if (userChannels.length === 0) {
-        await supabase.from('channels').upsert({
-          id: 'general',
-          name: 'general',
-          type: 'channel',
-          member_ids: [uid],
-          description: 'General updates and announcements',
-        }, { onConflict: 'id' });
-        userChannels = [{ id: 'general', name: 'general', type: 'channel', member_ids: [uid], description: 'General updates and announcements', pinned_message_ids: [], muted: false, read_by: {} }];
+        const { data: existingGeneral } = await supabase.from('channels').select('id, member_ids').eq('id', 'general').maybeSingle();
+        if (!existingGeneral) {
+          // Channel doesn't exist yet — create it
+          await supabase.from('channels').insert({
+            id: 'general',
+            name: 'general',
+            type: 'channel',
+            member_ids: [uid],
+            description: 'General updates and announcements',
+            pinned_message_ids: [],
+            muted: false,
+            read_by: {},
+          });
+          userChannels = [{ id: 'general', name: 'general', type: 'channel', member_ids: [uid], description: 'General updates and announcements', pinned_message_ids: [], muted: false, read_by: {} }];
+        } else if (!existingGeneral.member_ids.includes(uid)) {
+          // Channel exists but user is not a member — add them
+          const updated = [...existingGeneral.member_ids, uid];
+          await supabase.from('channels').update({ member_ids: updated }).eq('id', 'general');
+          userChannels = [{ ...existingGeneral, member_ids: updated }];
+        } else {
+          // Already a member — just use the existing channel
+          userChannels = [existingGeneral];
+        }
       }
       updates.channels = userChannels.map(dbToChannel);
 
@@ -993,13 +1011,15 @@ export const useStore = create<AppStore>()((set, get) => ({
     set((s) => ({ projects: [...s.projects, newProject] }));
     supabase.from('projects').insert(projectToDb(newProject))
       .then(({ error }) => { if (error) console.error('addProject error:', error); });
-    // Auto-create a linked channel (skipped for folders and sub-projects)
+    // Auto-create a linked channel (skipped for folders and sub-projects).
+    // Only add the creator — collaborators are added when they accept their project invitation.
     if (!p.isFolder) {
+      const creatorId = get().currentUser.id;
       const newChannel = {
         id: uid(),
         name: p.name,
         type: 'channel' as const,
-        memberIds: p.memberIds ?? [],
+        memberIds: creatorId && creatorId !== '__loading__' ? [creatorId] : (p.memberIds ?? []),
         projectId: newProject.id,
         hiddenFromSidebar: false,
         pinnedMessageIds: [],
@@ -1215,39 +1235,28 @@ export const useStore = create<AppStore>()((set, get) => ({
     const invitation = get().invitations.find(i => i.id === invitationId);
     if (!invitation) return;
 
-    const status = accept ? 'accepted' : 'declined';
-
-    // Remove from local state
+    // Optimistically remove from local state so the notification disappears immediately
     set(s => ({ invitations: s.invitations.filter(i => i.id !== invitationId) }));
-
-    // Update DB
-    await supabase.from('invitations').update({ status }).eq('id', invitationId);
-
-    // Mark linked notification as read
     set(s => ({
       notifications: s.notifications.map(n =>
         n.invitationId === invitationId ? { ...n, read: true } : n
       ),
     }));
-    supabase.from('notifications').update({ read: true }).eq('invitation_id', invitationId);
+
+    // Delegate to server endpoint which uses service-role key to bypass RLS.
+    // This is necessary because the user is not yet a project/channel member
+    // when they accept, so client-side updates would fail the members-only RLS policy.
+    try {
+      const res = await apiFetch('/api/accept-invitation', { invitationId, accept });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error('accept-invitation error:', err);
+      }
+    } catch (e) {
+      console.error('accept-invitation fetch error:', e);
+    }
 
     if (accept) {
-      const s = get();
-      if (invitation.type === 'project') {
-        const project = s.projects.find(p => p.id === invitation.resourceId);
-        if (project) {
-          get().updateProject(invitation.resourceId, {
-            memberIds: [...new Set([...project.memberIds, s.currentUser.id])],
-          });
-        }
-      } else {
-        const channel = s.channels.find(c => c.id === invitation.resourceId);
-        if (channel) {
-          get().updateChannel(invitation.resourceId, {
-            memberIds: [...new Set([...channel.memberIds, s.currentUser.id])],
-          });
-        }
-      }
       // Reload so the newly joined project/channel appears in sidebar
       get().loadData();
     }
@@ -1593,9 +1602,12 @@ supabase.auth.getSession().then(({ data: { session } }) => {
   }
 });
 
-// Re-load when auth state changes (login/logout)
+// Re-load when auth state changes (login/logout/session restore).
+// INITIAL_SESSION fires on hard refresh when the session is restored from localStorage.
+// isLoading guard in loadData prevents concurrent calls if both the module-level getSession()
+// and this handler fire at the same time.
 supabase.auth.onAuthStateChange((event) => {
-  if (event === 'SIGNED_IN') {
+  if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
     useStore.getState().loadData();
   }
   if (event === 'SIGNED_OUT') {
