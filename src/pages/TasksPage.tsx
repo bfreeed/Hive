@@ -304,6 +304,30 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
   const boardGroups = buildGroups(sorted, boardGroupBy, projects, users);
 
   // ---------------------------------------------------------------------------
+  // Assignee grouping — current user first, then teammates
+  // Only active when tasks from multiple assignees are present.
+  // ---------------------------------------------------------------------------
+  const assigneeGroups = useMemo(() => {
+    const myTasks = sorted.filter(t => (t.assigneeIds ?? []).includes(currentUser.id));
+    const otherTasks = sorted.filter(t => !(t.assigneeIds ?? []).includes(currentUser.id));
+    // Group other tasks by their first non-current-user assignee
+    const otherMap = new Map<string, Task[]>();
+    otherTasks.forEach(t => {
+      const aid = (t.assigneeIds ?? []).find(id => id !== currentUser.id) ?? '__none__';
+      if (!otherMap.has(aid)) otherMap.set(aid, []);
+      otherMap.get(aid)!.push(t);
+    });
+    const groups: { userId: string; name: string; tasks: Task[] }[] = [];
+    if (myTasks.length > 0) groups.push({ userId: currentUser.id, name: 'My Tasks', tasks: myTasks });
+    otherMap.forEach((tasks, userId) => {
+      const u = users.find(x => x.id === userId);
+      groups.push({ userId, name: u ? `${u.name}'s Tasks` : 'Unassigned', tasks });
+    });
+    return groups;
+  }, [sorted, currentUser.id, users]);
+  const isMultiAssignee = assigneeGroups.length > 1;
+
+  // ---------------------------------------------------------------------------
   // Dependency blocked helper
   // ---------------------------------------------------------------------------
   const isBlocked = (task: Task): boolean =>
@@ -1050,10 +1074,48 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
         ) : showSectionsView ? (
           renderSectionsView()
         ) : activeTab === 'date' ? (
-          // By Date — grouped list
+          // By Date — grouped list, with assignee super-groups when multi-user
           filteredTopLevel.length === 0 ? (
             <div className="py-16 text-center">
               <p className="text-white/20">No tasks found</p>
+            </div>
+          ) : isMultiAssignee ? (
+            <div className="space-y-8">
+              {assigneeGroups.map(ag => {
+                const agDateGroups = buildGroups(ag.tasks, 'date', projects, users);
+                return (
+                  <div key={ag.userId}>
+                    <div className="flex items-center gap-2 mb-3 px-1">
+                      <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">{ag.name}</span>
+                      <span className="text-xs text-white/20">{ag.tasks.length}</span>
+                    </div>
+                    <div className="space-y-6 pl-0">
+                      {agDateGroups.map((group, gi) => (
+                        <div key={gi}>
+                          {group.label && (
+                            <div className="flex items-center gap-2 mb-1 px-1 pl-3">
+                              {group.color && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: group.color }} />}
+                              <span className="text-xs font-semibold text-white/30 uppercase tracking-wider">{group.label}</span>
+                              <span className="text-xs text-white/15">{group.tasks.length}</span>
+                            </div>
+                          )}
+                          <div className="space-y-1">
+                            {group.tasks.map(task => {
+                              const idx = sorted.findIndex(t => t.id === task.id);
+                              const isFocused = focusedIdx === idx;
+                              return renderTaskWithSubtasks(task, {
+                                focused: isFocused,
+                                focusRef: isFocused ? focusedRowRef : undefined,
+                                showProject: true,
+                              });
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="space-y-6">
@@ -1105,6 +1167,28 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
               </div>
             </SortableContext>
           </DndContext>
+        ) : isMultiAssignee ? (
+          <div className="space-y-6">
+            {assigneeGroups.map(group => (
+              <div key={group.userId}>
+                <div className="flex items-center gap-2 mb-1 px-1">
+                  <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">{group.name}</span>
+                  <span className="text-xs text-white/20">{group.tasks.length}</span>
+                </div>
+                <div className="space-y-1">
+                  {group.tasks.map(task => {
+                    const idx = sorted.findIndex(t => t.id === task.id);
+                    const isFocused = focusedIdx === idx;
+                    return renderTaskWithSubtasks(task, {
+                      focused: isFocused,
+                      focusRef: isFocused ? focusedRowRef : undefined,
+                      showProject: true,
+                    });
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
           <div className="space-y-1">
             {sorted.map((task, idx) => {

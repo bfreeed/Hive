@@ -19,11 +19,14 @@ interface TaskRowProps {
 }
 
 const TaskRow = forwardRef<HTMLDivElement, TaskRowProps>(function TaskRow({ task, onOpenTask, showProject = false, focused = false }, ref) {
-  const { projects, users, tasks, updateTask } = useStore();
+  const { projects, users, tasks, updateTask, currentUser } = useStore();
   const subtaskCount = tasks.filter(t => t.parentId === task.id).length;
   const subtaskDoneCount = tasks.filter(t => t.parentId === task.id && t.status === 'done').length;
   const project = projects.find((p) => p.id === task.projectIds?.[0]);
   const isOverdue = task.dueDate && isPast(new Date(task.dueDate)) && task.status !== 'done';
+  const assignees = (task.assigneeIds ?? [])
+    .map(id => users.find(u => u.id === id) ?? (id === currentUser.id ? currentUser : null))
+    .filter(Boolean) as typeof users;
 
   return (
     <div
@@ -62,17 +65,35 @@ const TaskRow = forwardRef<HTMLDivElement, TaskRowProps>(function TaskRow({ task
           </span>
         );
       })}
-      {task.priority && task.priority !== 'low' && (
+      {/* Priority */}
+      {task.priority && task.priority !== 'normal' && (
         <span className={`flex-shrink-0 text-[11px] font-medium ${PRIORITY_LABEL[task.priority]?.className ?? 'text-white/25'}`}>
           {PRIORITY_LABEL[task.priority]?.text}
         </span>
       )}
+      {/* Due date */}
       {task.dueDate && (
         <span className={`flex-shrink-0 text-[11px] ${isOverdue ? 'text-red-400' : 'text-white/35'}`}>
           {isOverdue && <AlertTriangle size={10} className="inline mr-0.5" />}
           {isToday(new Date(task.dueDate)) ? 'Today' : isTomorrow(new Date(task.dueDate)) ? 'Tomorrow' : format(new Date(task.dueDate), 'MMM d')}
         </span>
       )}
+      {/* Assignees */}
+      {assignees.length > 0 && (
+        <span className="flex-shrink-0 flex items-center gap-0.5">
+          {assignees.slice(0, 2).map(u => (
+            <span
+              key={u.id}
+              className="w-4 h-4 rounded-full bg-brand-600/40 border border-brand-500/30 flex items-center justify-center text-[8px] font-semibold text-brand-300"
+              title={u.name}
+            >
+              {u.name.charAt(0).toUpperCase()}
+            </span>
+          ))}
+          {assignees.length > 2 && <span className="text-[10px] text-white/30">+{assignees.length - 2}</span>}
+        </span>
+      )}
+      {/* Project */}
       {showProject && project && (
         <span className="flex-shrink-0 text-[11px]" style={{ color: project.color + 'bb' }}>
           {project.name}
