@@ -17,13 +17,14 @@ import {
   List, ListOrdered, CheckSquare, Quote, Table2,
   AlignLeft, AlignCenter, AlignRight,
   Code, Minus, Undo2, Redo2, Highlighter,
-  TableRowsSplit, Columns2, Trash2,
+  TableRowsSplit, Columns2, Trash2, Paperclip,
 } from 'lucide-react';
 import type { HivePage } from '../../types';
 import { CalloutNode } from './CalloutNode';
 import { ToggleNode } from './ToggleNode';
 import { SLASH_COMMANDS, applySlashCommand, SlashMenu } from './SlashCommands';
 import { EmojiPicker } from './EmojiPicker';
+import { uploadToStorage } from '../../lib/supabase';
 
 function Divider() {
   return <div className="w-px h-4 bg-white/10 mx-0.5 flex-shrink-0" />;
@@ -52,8 +53,12 @@ export function SpaceEditor({ page, onUpdate }: { page: HivePage; onUpdate: (u: 
   const [title, setTitle] = useState(page.title);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [slashMenu, setSlashMenu] = useState<{ open: boolean; pos: { x: number; y: number }; query: string } | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const slashQueryRef = useRef('');
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<ReturnType<typeof useEditor>>(null);
 
   useEffect(() => { setTitle(page.title); }, [page.id, page.title]);
 
@@ -61,6 +66,53 @@ export function SpaceEditor({ page, onUpdate }: { page: HivePage; onUpdate: (u: 
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
     saveTimeout.current = setTimeout(() => onUpdate(updates), 600);
   }, [onUpdate]);
+
+  const uploadFile = useCallback(async (file: File, ed = editorRef.current) => {
+    const ext = file.name.split('.').pop() ?? 'bin';
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `workspace/${page.id}/${Date.now()}-${safeName}`;
+    try {
+      const url = await uploadToStorage('hive-attachments', path, file);
+      if (!ed) return;
+      if (file.type.startsWith('image/')) {
+        ed.chain().focus().setImage({ src: url, alt: file.name }).run();
+      } else {
+        ed.chain().focus().insertContent(
+          `<a href="${url}" target="_blank" rel="noopener noreferrer">${file.name}</a> `
+        ).run();
+      }
+    } catch (err) {
+      console.error('File upload failed:', err);
+    }
+  }, [page.id]);
+
+  const handleFiles = useCallback(async (files: File[]) => {
+    if (files.length === 0) return;
+    setIsUploading(true);
+    try {
+      for (const file of files) await uploadFile(file, editorRef.current);
+    } finally {
+      setIsUploading(false);
+    }
+  }, [uploadFile]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length) handleFiles(files);
+  }, [handleFiles]);
+
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const files = Array.from(e.clipboardData.files).filter(f => f.type.startsWith('image/'));
+    if (files.length) { e.preventDefault(); handleFiles(files); }
+  }, [handleFiles]);
+
+  const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    handleFiles(files);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, [handleFiles]);
 
   const editor = useEditor({
     extensions: [
@@ -106,6 +158,8 @@ export function SpaceEditor({ page, onUpdate }: { page: HivePage; onUpdate: (u: 
       attributes: { class: 'workspace-editor prose prose-invert max-w-none focus:outline-none' },
     },
   }, [page.id]);
+
+  useEffect(() => { (editorRef as any).current = editor; }, [editor]);
 
   useEffect(() => {
     if (!editor) return;
@@ -255,17 +309,36 @@ export function SpaceEditor({ page, onUpdate }: { page: HivePage; onUpdate: (u: 
 
           <ToolBtn onClick={() => editor.chain().focus().undo().run()} active={false} disabled={!editor.can().undo()} title="Undo"><Undo2 size={14} /></ToolBtn>
           <ToolBtn onClick={() => editor.chain().focus().redo().run()} active={false} disabled={!editor.can().redo()} title="Redo"><Redo2 size={14} /></ToolBtn>
+          <Divider />
+          <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileInput} />
+          <ToolBtn onClick={() => fileInputRef.current?.click()} active={false} title="Attach file">
+            <Paperclip size={14} />
+          </ToolBtn>
         </div>
       )}
 
       {/* Editor */}
       <div
-        className="flex-1 overflow-y-auto px-8 py-6"
+        className={`flex-1 overflow-y-auto px-8 py-6 relative transition-colors ${isDragOver ? 'bg-brand-500/[0.04]' : ''}`}
         onClick={() => editor?.commands.focus()}
+        onDrop={handleDrop}
+        onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+        onDragLeave={() => setIsDragOver(false)}
+        onPaste={handlePaste}
       >
+        {isDragOver && (
+          <div className="absolute inset-0 border-2 border-dashed border-brand-500/30 rounded-lg pointer-events-none flex items-center justify-center z-10">
+            <span className="text-brand-400/50 text-sm">Drop files to attach</span>
+          </div>
+        )}
         <div className="max-w-3xl">
           <EditorContent editor={editor} />
         </div>
+        {isUploading && (
+          <div className="absolute bottom-4 right-4 text-xs text-white/30 bg-[#111113] px-2 py-1 rounded">
+            Uploading...
+          </div>
+        )}
       </div>
 
       {/* Slash menu */}
