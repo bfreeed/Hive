@@ -367,7 +367,7 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
               value={claudeInput}
               onChange={e => { setClaudeInput(e.target.value); setClaudeAnswer(''); setClaudeError(''); }}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); askClaude(); } }}
-              placeholder="Ask Claude anything about your tasks, projects, or messages…"
+              placeholder="Ask Claude about your tasks, projects, or messages…"
               className="flex-1 bg-transparent text-sm text-white placeholder-white/20 focus:outline-none"
             />
             {claudeInput && !claudeLoading && (

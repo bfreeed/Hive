@@ -1031,7 +1031,7 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
                     const needsSep = prevTab && GROUPING_TABS.includes(prevTab.id) && QUICKVIEW_TABS.includes(tab.id);
                     return (
                       <React.Fragment key={tab.id}>
-                        {needsSep && <span className="w-px h-4 bg-white/[0.1] mx-1 self-center flex-shrink-0" />}
+                        {needsSep && <span role="none" aria-hidden="true" className="w-px h-4 bg-white/[0.1] mx-1 self-center flex-shrink-0" />}
                         <SortableTab
                           id={tab.id}
                           label={tab.label}

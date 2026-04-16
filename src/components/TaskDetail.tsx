@@ -670,24 +670,28 @@ export default function TaskDetail({ taskId, draftInitial, onClose, inline = fal
                         }}
                         className="w-16 px-2.5 py-1 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/60 focus:outline-none focus:border-brand-500/40"
                       />
-                      <select
-                        value={reminderUnit}
-                        onChange={e => {
-                          const unit = e.target.value as typeof reminderUnit;
-                          setReminderUnit(unit);
-                          const n = parseInt(reminderValue);
-                          if (!isNaN(n) && n > 0) {
-                            const multipliers = { minutes: 1, hours: 60, days: 1440, weeks: 10080 };
-                            update('reminderMinutes', n * multipliers[unit]);
-                          }
-                        }}
-                        className="px-2.5 py-1 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/60 focus:outline-none focus:border-brand-500/40"
-                      >
-                        <option value="minutes">minutes</option>
-                        <option value="hours">hours</option>
-                        <option value="days">days</option>
-                        <option value="weeks">weeks</option>
-                      </select>
+                      <div className="flex items-center gap-0 bg-white/[0.04] border border-white/[0.06] rounded-xl p-0.5">
+                        {(['minutes', 'hours', 'days', 'weeks'] as const).map(unit => {
+                          const labels: Record<string, string> = { minutes: 'min', hours: 'hr', days: 'day', weeks: 'wk' };
+                          const isActive = reminderUnit === unit;
+                          return (
+                            <button
+                              key={unit}
+                              onClick={() => {
+                                setReminderUnit(unit);
+                                const n = parseInt(reminderValue);
+                                if (!isNaN(n) && n > 0) {
+                                  const multipliers = { minutes: 1, hours: 60, days: 1440, weeks: 10080 };
+                                  update('reminderMinutes', n * multipliers[unit]);
+                                }
+                              }}
+                              className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${isActive ? 'bg-white/[0.10] text-white' : 'text-white/40 hover:text-white/70'}`}
+                            >
+                              {labels[unit]}
+                            </button>
+                          );
+                        })}
+                      </div>
                       <span className="text-xs text-white/45">before</span>
                       <button onClick={() => update('reminderMinutes', undefined)} className="text-white/50 hover:text-white/80 transition-colors"><X size={12} /></button>
                     </>
@@ -713,7 +717,15 @@ export default function TaskDetail({ taskId, draftInitial, onClose, inline = fal
                       <BellOff size={10} /> Snooze
                     </button>
                     <button
-                      onClick={() => { if (task.snoozeDate) update('snoozeDate', undefined); }}
+                      onClick={() => {
+                        update('snoozeDate', undefined);
+                        if (!task.waitDate) {
+                          // Enter waiting mode: set default date 7 days out
+                          const d = new Date();
+                          d.setDate(d.getDate() + 7);
+                          update('waitDate', new Date(d.toISOString().slice(0, 10) + 'T00:00:00').toISOString());
+                        }
+                      }}
                       className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium transition-colors ${task.waitDate ? 'bg-white/[0.08] text-white/70' : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'}`}
                     >
                       <Clock size={10} /> Waiting for
@@ -820,7 +832,7 @@ export default function TaskDetail({ taskId, draftInitial, onClose, inline = fal
               onKeyDown={(e) => { if (e.key === 'Escape') (e.target as HTMLElement).blur(); }}
               placeholder="Add notes, context, links..."
               rows={4}
-              className="w-full px-4 py-3 bg-white/[0.03] border border-white/[0.06] rounded-xl text-sm text-white/70 placeholder-white/20 focus:outline-none focus:border-brand-500/30 resize-none"
+              className="w-full px-4 py-3 bg-white/[0.04] border border-white/[0.10] rounded-xl text-sm text-white/70 placeholder-white/25 focus:outline-none focus:border-brand-500/40 resize-none"
             />
 
             {/* Attachments — only show for existing tasks */}
@@ -1030,7 +1042,7 @@ export default function TaskDetail({ taskId, draftInitial, onClose, inline = fal
             {!isDraft && (
             <div className="mt-6 pt-5 border-t border-white/[0.06]">
               <p className="text-xs text-white/50 uppercase tracking-wider mb-3">
-                Comments {task.comments.length > 0 && <span className="opacity-50 ml-1">{task.comments.length}</span>}
+                Comments {task.comments.length > 0 && <span className="text-white/25 ml-1">{task.comments.length}</span>}
               </p>
 
               {task.comments.length > 0 && (

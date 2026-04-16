@@ -261,8 +261,8 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
           <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3">
               <span className="text-sm text-white/70">Dark Mode</span>
-              <button onClick={toggleDarkMode} className={`w-10 h-6 rounded-full transition-colors flex items-center ${darkMode ? 'bg-brand-600' : 'bg-white/20'}`}>
-                <span className={`block w-4 h-4 rounded-full bg-white mx-1 transition-transform ${darkMode ? 'translate-x-4' : 'translate-x-0'}`} />
+              <button onClick={toggleDarkMode} className={`w-10 h-5 rounded-full transition-colors flex-shrink-0 ml-4 ${darkMode ? 'bg-brand-500' : 'bg-white/[0.12]'}`}>
+                <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform mx-0.5 ${darkMode ? 'translate-x-5' : 'translate-x-0'}`} />
               </button>
             </div>
           </div>

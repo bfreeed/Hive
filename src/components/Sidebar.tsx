@@ -445,7 +445,7 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
               return (
                 <button key={u.id} onClick={() => onNavigate('team-member', u.id)}
                   className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm transition-colors ${activePage === `team-member-${u.id}` ? 'bg-white/[0.08] text-white' : 'text-white/60 hover:text-white hover:bg-white/[0.04]'}`}>
-                  <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: color + '33' }}>
+                  <div aria-hidden="true" className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: color + '33' }}>
                     <span className="text-[10px] font-medium" style={{ color }}>{u.name[0].toUpperCase()}</span>
                   </div>
                   <span>{u.name.split(' ')[0]}</span>
@@ -468,7 +468,7 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
           <div className="relative flex-shrink-0">
             <Trash2 size={16} />
             {(trashedProjects.length + trashedTasks.length) > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500/70 text-white text-[9px] rounded-full w-3.5 h-3.5 flex items-center justify-center font-medium leading-none">
+              <span aria-hidden="true" className="absolute -top-1 -right-1 bg-red-500/70 text-white text-[9px] rounded-full w-3.5 h-3.5 flex items-center justify-center font-medium leading-none">
                 {trashedProjects.length + trashedTasks.length > 9 ? '9+' : trashedProjects.length + trashedTasks.length}
               </span>
             )}
@@ -528,7 +528,7 @@ function SortableNavBtn({ icon, label, id, active, expanded, onClick, badge }: {
   return (
     <div ref={setNodeRef} style={style} className="flex items-center group/nav">
       {expanded && (
-        <span {...attributes} {...listeners}
+        <span {...attributes} {...listeners} aria-hidden="true" tabIndex={-1}
           className="flex-shrink-0 w-4 flex items-center justify-center text-white/0 group-hover/nav:text-white/20 hover:!text-white/40 cursor-grab active:cursor-grabbing transition-colors mr-0.5">
           <GripVertical size={12} />
         </span>
@@ -538,7 +538,7 @@ function SortableNavBtn({ icon, label, id, active, expanded, onClick, badge }: {
         <span className="flex-shrink-0">{icon}</span>
         {expanded && <span className="flex-1 text-left">{label}</span>}
         {expanded && badge ? (
-          <span className="bg-brand-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium">{badge}</span>
+          <span aria-hidden="true" className="bg-brand-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium">{badge}</span>
         ) : null}
       </button>
     </div>
