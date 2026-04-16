@@ -460,7 +460,7 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
       <div className="border-t border-white/[0.06] p-2 space-y-0.5">
         <button onClick={toggleVoice}
           className="w-full flex items-center gap-2.5 px-2 py-2 rounded-md text-sm text-white/60 hover:text-white hover:bg-white/[0.04] transition-colors">
-          <Mic size={16} className="text-brand-400" />
+          <Mic size={16} />
           {sidebarOpen && <span>Voice AI</span>}
         </button>
         <button onClick={() => onNavigate('trash')}

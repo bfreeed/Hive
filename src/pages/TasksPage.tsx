@@ -221,13 +221,13 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
   const filterToday = activeTab === 'today';
   // Tab definitions
   const ALL_TABS = [
-    { id: 'status' as ActiveTab,    label: 'By Status'   },
-    { id: 'priority' as ActiveTab,  label: 'By Priority' },
-    { id: 'project' as ActiveTab,   label: 'By Project'  },
-    { id: 'date' as ActiveTab,      label: 'By Date'     },
-    { id: 'flag' as ActiveTab,      label: 'By Flag'     },
-    { id: 'today' as ActiveTab,     label: 'Today'       },
-    { id: 'completed' as ActiveTab, label: 'Done'        },
+    { id: 'status' as ActiveTab,    label: 'Status'   },
+    { id: 'priority' as ActiveTab,  label: 'Priority' },
+    { id: 'project' as ActiveTab,   label: 'Project'  },
+    { id: 'date' as ActiveTab,      label: 'Date'     },
+    { id: 'flag' as ActiveTab,      label: 'Flag'     },
+    { id: 'today' as ActiveTab,     label: 'Today'    },
+    { id: 'completed' as ActiveTab, label: 'Done'     },
   ];
   const DEFAULT_TAB_ORDER = ALL_TABS.map(t => t.id);
   const [tabOrder, setTabOrder] = useState<ActiveTab[]>(() => {
@@ -1023,15 +1023,24 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
               <SortableContext items={tabs.filter(t => t.id !== 'project' || !filterProject || filterProject === 'all').map(t => t.id)} strategy={horizontalListSortingStrategy}>
                 {tabs
                   .filter(t => t.id !== 'project' || !filterProject || filterProject === 'all')
-                  .map(tab => (
-                    <SortableTab
-                      key={tab.id}
-                      id={tab.id}
-                      label={tab.label}
-                      active={activeTab === tab.id}
-                      onClick={() => handleSetActiveTab(tab.id)}
-                    />
-                  ))}
+                  .map((tab, idx, arr) => {
+                    // Visual separator before the quick-view tabs (today / done)
+                    const GROUPING_TABS = ['status', 'priority', 'project', 'date', 'flag'];
+                    const QUICKVIEW_TABS = ['today', 'completed'];
+                    const prevTab = arr[idx - 1];
+                    const needsSep = prevTab && GROUPING_TABS.includes(prevTab.id) && QUICKVIEW_TABS.includes(tab.id);
+                    return (
+                      <React.Fragment key={tab.id}>
+                        {needsSep && <span className="w-px h-4 bg-white/[0.1] mx-1 self-center flex-shrink-0" />}
+                        <SortableTab
+                          id={tab.id}
+                          label={tab.label}
+                          active={activeTab === tab.id}
+                          onClick={() => handleSetActiveTab(tab.id)}
+                        />
+                      </React.Fragment>
+                    );
+                  })}
               </SortableContext>
             </DndContext>
           </div>

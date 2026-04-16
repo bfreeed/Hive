@@ -90,38 +90,38 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-3">
           {mode === 'signup' && (
             <div>
-              <label className="block text-xs text-white/40 mb-1.5">Name</label>
+              <label className="block text-xs text-white/55 mb-1.5">Name</label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Your name"
-                className="w-full px-3 py-2.5 bg-white/[0.05] border border-white/[0.08] rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-brand-500/50 transition-colors"
+                className="w-full px-3 py-2.5 bg-white/[0.05] border border-white/[0.14] rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-brand-500/50 transition-colors"
               />
             </div>
           )}
 
           <div>
-            <label className="block text-xs text-white/40 mb-1.5">Email</label>
+            <label className="block text-xs text-white/55 mb-1.5">Email</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               required
-              className="w-full px-3 py-2.5 bg-white/[0.05] border border-white/[0.08] rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-brand-500/50 transition-colors"
+              className="w-full px-3 py-2.5 bg-white/[0.05] border border-white/[0.14] rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-brand-500/50 transition-colors"
             />
           </div>
 
           <div>
-            <label className="block text-xs text-white/40 mb-1.5">Password</label>
+            <label className="block text-xs text-white/55 mb-1.5">Password</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               required
-              className="w-full px-3 py-2.5 bg-white/[0.05] border border-white/[0.08] rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-brand-500/50 transition-colors"
+              className="w-full px-3 py-2.5 bg-white/[0.05] border border-white/[0.14] rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-brand-500/50 transition-colors"
             />
           </div>
 

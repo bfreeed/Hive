@@ -105,7 +105,7 @@ function Section({ title, icon, count, color = 'text-white/50', children }: {
 }
 
 export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: string, id?: string) => void; onOpenTask: (id: string) => void }) {
-  const { tasks, projects, messages, channels, userSettings, saveUserSettings, currentUser, invitations, respondToInvitation } = useStore();
+  const { tasks, projects, messages, channels, userSettings, saveUserSettings, currentUser, invitations, respondToInvitation, isLoading } = useStore();
   const [isSpeaking, setIsSpeaking] = useState(false);
   const captureRef = useRef<InlineCaptureHandle>(null);
 
@@ -335,7 +335,11 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
           <p className="text-white/30 text-xs font-medium tracking-wide uppercase mb-3">{today}</p>
           <div className="flex items-center justify-between gap-3">
             <p className="text-white/50 text-sm whitespace-nowrap">
-              {activeTasks.length} active tasks · {new Set(activeTasks.flatMap(t => t.projectIds ?? [])).size} projects
+              {isLoading ? (
+                <span className="inline-block w-28 h-4 rounded bg-white/[0.06] animate-pulse" />
+              ) : (
+                <>{activeTasks.length} active task{activeTasks.length !== 1 ? 's' : ''} · {new Set(activeTasks.flatMap(t => t.projectIds ?? [])).size} project{new Set(activeTasks.flatMap(t => t.projectIds ?? [])).size !== 1 ? 's' : ''}</>
+              )}
             </p>
             <div className="flex items-center gap-2 flex-shrink-0">
               <button
@@ -437,8 +441,8 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
         {/* All clear */}
         {totalSignal === 0 && (
           <div className="text-center py-16">
-            <p className="text-white/20 text-lg">All clear.</p>
-            <p className="text-white/10 text-sm mt-1">Nothing urgent today.</p>
+            <p className="text-white/40 text-lg font-medium">All clear.</p>
+            <p className="text-white/25 text-sm mt-1">Nothing urgent today.</p>
           </div>
         )}
       </div>
