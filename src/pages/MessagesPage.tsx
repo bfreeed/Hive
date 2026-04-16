@@ -1203,7 +1203,7 @@ export default function MessagesPage() {
                         )}
                         <button
                           onClick={() => { selectChannel(c.id); setChannelMenuId(null); setShowSaved(false); }}
-                          className={`flex-1 flex items-center gap-2 py-1.5 text-sm transition-colors rounded-md ${indent ? 'pl-12 pr-3' : 'pl-1 pr-3'} ${
+                          className={`flex-1 flex items-center gap-2 py-1.5 text-sm transition-colors rounded-md ${indent ? 'pl-10 pr-3' : 'pl-1 pr-3'} ${
                             !showSaved && isActive ? 'bg-white/[0.08] text-white' : unread ? 'text-white font-medium hover:bg-white/[0.04]' : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'
                           }`}
                         >
