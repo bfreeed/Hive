@@ -755,7 +755,7 @@ export const useStore = create<AppStore>()((set, get) => ({
 
       // Query ALL channels by project_id OR name to catch both linked and unlinked duplicates.
       const sharedProjects = allProjects.filter(
-        (p) => !p.isFolder && p.memberIds.length > 1
+        (p) => !p.isFolder && (p.memberIds ?? []).length > 1
       );
       const sharedProjectIds = sharedProjects.map((p) => p.id);
       const sharedProjectNames = sharedProjects.map((p) => p.name);
@@ -808,7 +808,7 @@ export const useStore = create<AppStore>()((set, get) => ({
 
       // Remove channels linked to solo projects (1 member — no one to chat with)
       const soloProjectIds = new Set(
-        allProjects.filter((p) => !p.isFolder && p.memberIds.length <= 1).map((p) => p.id)
+        allProjects.filter((p) => !p.isFolder && (p.memberIds ?? []).length <= 1).map((p) => p.id)
       );
       const channelsToRemove = existingChannels.filter(
         (c) => c.projectId && soloProjectIds.has(c.projectId)
