@@ -573,14 +573,6 @@ export const useStore = create<AppStore>()((set, get) => ({
 
       const uid = authUser.id;
 
-      // Optimistically set currentUser from auth metadata immediately.
-      // This unblocks the UI so it can render before Supabase queries complete.
-      // The profile will be refined with DB data once Phase 1 finishes.
-      const derivedNameEarly = authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User';
-      if (get().currentUser.id === '__loading__') {
-        set({ currentUser: { id: uid, name: derivedNameEarly, email: authUser.email ?? '', role: 'owner', flags: DEFAULT_FLAGS } });
-      }
-
       // Phase 1 — user-scoped queries with no cross-table dependencies
       const [
         tasksRes,
@@ -613,8 +605,9 @@ export const useStore = create<AppStore>()((set, get) => ({
         return r.value;
       }));
 
-      // Phase 2 — queries that depend on channel/project membership (must run after phase 1)
-      // Messages filtered to only the user's channels; profiles loaded for all collaborators.
+      // Build Phase 1 updates — everything except messages and user profiles.
+      // Setting the store here unblocks the render immediately after the first
+      // parallel query batch, without waiting for messages/profiles (Phase 2).
       const phase1Channels = channelsRes.data ?? [];
       const phase1ChannelIds = phase1Channels.map((c: any) => c.id as string);
       const phase1Projects = projectsRes.data ?? [];
@@ -624,59 +617,34 @@ export const useStore = create<AppStore>()((set, get) => ({
         uid,
       ]);
 
-      const [messagesRes, profilesRes] = await Promise.allSettled([
-        phase1ChannelIds.length > 0
-          ? supabase.from('messages').select('*').in('channel_id', phase1ChannelIds).order('created_at', { ascending: true })
-          : Promise.resolve({ data: [] as any[], error: null }),
-        supabase.from('profiles').select('*').in('id', Array.from(allCollaboratorIds)),
-      ]).then(results => results.map((r, i) => {
-        if (r.status === 'rejected') { console.error(`loadData phase2 query ${i} failed:`, r.reason); return { data: null, error: r.reason }; }
-        return r.value;
-      }));
-
-      const updates: Partial<AppStore> = { isLoading: false };
-
-      // Build users list + set currentUser from profiles
-      // Always ensure currentUser.id matches the real auth UUID so new data is saved with the right owner
-      const myProfile = (profilesRes.data ?? []).find((p: any) => p.id === uid);
-      if (myProfile) {
-        updates.currentUser = dbToUser(myProfile);
-      } else {
-        // Profile missing — upsert it so it exists for next time, and use auth identity now
-        const derivedName = authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User';
-        supabase.from('profiles').upsert({
-          id: uid,
-          name: derivedName,
-          email: authUser.email ?? '',
-          role: 'owner',
-        }).then(({ error }) => { if (error) console.error('profile upsert error:', error); });
-        updates.currentUser = { id: uid, name: derivedName, email: authUser.email ?? '', role: 'owner', flags: DEFAULT_FLAGS };
-      }
-      // Only expose profiles for users who share a channel — already filtered at DB level above
-      if (profilesRes.data && profilesRes.data.length > 0) {
-        updates.users = profilesRes.data.map(dbToUser);
-      }
+      const derivedNameEarly = authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User';
+      const p1: Partial<AppStore> = {
+        isLoading: false,
+        // Use auth metadata for currentUser now; Phase 2 will refine with DB profile
+        currentUser: { id: uid, name: derivedNameEarly, email: authUser.email ?? '', role: 'owner', flags: DEFAULT_FLAGS },
+      };
 
       // Map projects — if deleted_at column doesn't exist yet, fall back to all projects
       if (projectsRes.data) {
-        updates.projects = projectsRes.data.map(dbToProject);
-        updates.trashedProjects = (trashedProjectsRes.data ?? []).map(dbToProject);
+        p1.projects = projectsRes.data.map(dbToProject);
+        p1.trashedProjects = (trashedProjectsRes.data ?? []).map(dbToProject);
       } else {
         // Migration not yet run — fetch all projects without deleted_at filter
         const { data: allProjects } = await supabase.from('projects').select('*').contains('member_ids', [uid]).order('created_at', { ascending: true });
-        updates.projects = (allProjects ?? []).map(dbToProject);
-        updates.trashedProjects = [];
+        p1.projects = (allProjects ?? []).map(dbToProject);
+        p1.trashedProjects = [];
       }
 
       // Map tasks — same fallback pattern
       if (tasksRes.data) {
-        updates.tasks = tasksRes.data.map(dbToTask);
-        updates.trashedTasks = (trashedTasksRes.data ?? []).map(dbToTask);
+        p1.tasks = tasksRes.data.map(dbToTask);
+        p1.trashedTasks = (trashedTasksRes.data ?? []).map(dbToTask);
       } else {
         const { data: allTasks } = await supabase.from('tasks').select('*').contains('assignee_ids', [uid]).order('created_at', { ascending: true });
-        updates.tasks = (allTasks ?? []).map(dbToTask);
-        updates.trashedTasks = [];
+        p1.tasks = (allTasks ?? []).map(dbToTask);
+        p1.trashedTasks = [];
       }
+
       let userChannels = channelsRes.data ?? [];
 
       // If no channels returned, ensure a default general channel exists for this user.
@@ -706,32 +674,26 @@ export const useStore = create<AppStore>()((set, get) => ({
           userChannels = [existingGeneral];
         }
       }
-      updates.channels = userChannels.map((row: any) => dbToChannel(row, uid));
+      p1.channels = userChannels.map((row: any) => dbToChannel(row, uid));
 
       // Reset activeChannelId if it points to a channel not in the list
       const channelIds = new Set(userChannels.map((c: any) => c.id));
       if (!channelIds.has(get().activeChannelId)) {
-        updates.activeChannelId = userChannels[0]?.id ?? null;
+        p1.activeChannelId = userChannels[0]?.id ?? null;
       }
-
-      // Messages already filtered to this user's channels at DB level (phase 2 query)
-      updates.messages = (messagesRes.data ?? []).map(dbToMessage);
 
       if (contactsRes.data && contactsRes.data.length > 0) {
-        updates.contacts = contactsRes.data.map(dbToContact);
+        p1.contacts = contactsRes.data.map(dbToContact);
       }
       if (notificationsRes.data) {
-        updates.notifications = notificationsRes.data.map(dbToNotification);
+        p1.notifications = notificationsRes.data.map(dbToNotification);
       }
-
       if (prefsRes.data?.manual_order) {
-        updates.manualOrder = prefsRes.data.manual_order;
+        p1.manualOrder = prefsRes.data.manual_order;
       }
-
-      updates.meetings = (meetingsRes.data ?? []).map(dbToMeeting);
-
+      p1.meetings = (meetingsRes.data ?? []).map(dbToMeeting);
       if (settingsRes.data) {
-        updates.userSettings = dbToUserSettings(settingsRes.data);
+        p1.userSettings = dbToUserSettings(settingsRes.data);
         // Sync to localStorage so calendar/drive hooks can read them
         // without needing access to the Zustand store.
         if (settingsRes.data.google_client_id) {
@@ -741,17 +703,55 @@ export const useStore = create<AppStore>()((set, get) => ({
           localStorage.setItem('anthropic_api_key', settingsRes.data.anthropic_api_key);
         }
       }
+      p1.pages = (pagesRes.data ?? []).map(dbToPage);
+      p1.invitations = (invitationsRes.data ?? []).map(dbToInvitation);
 
-      updates.pages = (pagesRes.data ?? []).map(dbToPage);
-      updates.invitations = (invitationsRes.data ?? []).map(dbToInvitation);
+      // === Render unblocks here — all crash-sensitive data is in the store ===
+      set(p1);
 
-      set(updates);
+      // Phase 2 — messages + profile refinement (runs after render, non-blocking from user POV)
+      const [messagesRes, profilesRes] = await Promise.allSettled([
+        phase1ChannelIds.length > 0
+          ? supabase.from('messages').select('*').in('channel_id', phase1ChannelIds).order('created_at', { ascending: true })
+          : Promise.resolve({ data: [] as any[], error: null }),
+        supabase.from('profiles').select('*').in('id', Array.from(allCollaboratorIds)),
+      ]).then(results => results.map((r, i) => {
+        if (r.status === 'rejected') { console.error(`loadData phase2 query ${i} failed:`, r.reason); return { data: null, error: r.reason }; }
+        return r.value;
+      }));
+
+      const p2: Partial<AppStore> = {};
+
+      // Refine currentUser with DB profile (more accurate name/role/flags than auth metadata)
+      const myProfile = (profilesRes.data ?? []).find((p: any) => p.id === uid);
+      if (myProfile) {
+        p2.currentUser = dbToUser(myProfile);
+      } else {
+        // Profile missing — upsert it so it exists for next time
+        const derivedName = authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User';
+        supabase.from('profiles').upsert({
+          id: uid,
+          name: derivedName,
+          email: authUser.email ?? '',
+          role: 'owner',
+        }).then(({ error }) => { if (error) console.error('profile upsert error:', error); });
+        // currentUser already set from auth metadata in p1 — no change needed
+      }
+      // Only expose profiles for users who share a channel — already filtered at DB level above
+      if (profilesRes.data && profilesRes.data.length > 0) {
+        p2.users = profilesRes.data.map(dbToUser);
+      }
+
+      // Messages already filtered to this user's channels at DB level
+      p2.messages = (messagesRes.data ?? []).map(dbToMessage);
+
+      set(p2);
 
       // Backfill: create channels for shared projects (2+ members) that don't have one yet.
       // Also clean up any channels linked to solo projects (only 1 member).
       // Runs silently on every load but is a no-op once state is consistent.
-      const existingChannels: Channel[] = updates.channels ?? [];
-      const allProjects: Project[] = (updates.projects as Project[]) ?? [];
+      const existingChannels: Channel[] = p1.channels ?? [];
+      const allProjects: Project[] = (p1.projects as Project[]) ?? [];
 
       // Query ALL channels by project_id OR name to catch both linked and unlinked duplicates.
       const sharedProjects = allProjects.filter(

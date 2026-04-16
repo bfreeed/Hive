@@ -836,10 +836,10 @@ function AuthenticatedApp() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  // Block until both auth resolves AND initial data load completes.
-  // currentUser.id is set optimistically inside loadData while isLoading is still
-  // true — rendering in that window causes crashes (empty projects/channels arrays).
-  if (currentUser.id === '__loading__' || isLoading) {
+  // Block until Phase 1 data (projects, tasks, channels) is fully loaded.
+  // loadData now sets currentUser.id to the real UUID atomically with all Phase 1
+  // data — so this guard is sufficient to prevent render-with-empty-data crashes.
+  if (currentUser.id === '__loading__') {
     return (
       <div className="min-h-screen bg-[#0d0d0f] flex items-center justify-center">
         <span className="text-2xl font-bold text-white tracking-tight opacity-60">Hive</span>
