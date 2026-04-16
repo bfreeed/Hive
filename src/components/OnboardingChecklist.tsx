@@ -8,7 +8,7 @@ interface Step {
   id: string;
   title: string;
   description: React.ReactNode;
-  isComplete: (settings: any, localStorage: Storage) => boolean;
+  isComplete: (settings: any, localStorage: Storage, ctx?: { currentUser?: any }) => boolean;
   action?: { label: string; href?: string; page?: string };
 }
 
@@ -26,7 +26,7 @@ const STEPS: Step[] = [
         <li>Paste both into <strong className="text-white/60">Settings → Google Drive</strong> and save</li>
       </ol>
     ),
-    isComplete: (_s, ls) => !!(ls.getItem('hive_google_client_id') || ls.getItem('googleClientId')),
+    isComplete: (s) => !!(s?.googleClientId),
     action: { label: 'Open Google Cloud Console', href: 'https://console.cloud.google.com' },
   },
   {
@@ -64,19 +64,19 @@ const STEPS: Step[] = [
         Go to <strong className="text-white/60">Settings → Profile</strong> to set your name and add team members if needed.
       </p>
     ),
-    isComplete: (_s, ls) => ls.getItem('hive_onboarding_profile_done') === 'true',
+    isComplete: (_s, _ls, ctx) => !!(ctx?.currentUser?.name && ctx.currentUser.name !== 'User' && ctx.currentUser.id !== '__loading__'),
     action: { label: 'Mark as done' },
   },
 ];
 
 export default function OnboardingChecklist({ onNavigate }: { onNavigate?: (page: string) => void }) {
-  const { userSettings } = useStore();
+  const { userSettings, currentUser } = useStore();
   const [dismissed, setDismissed] = useState(() => localStorage.getItem(STORAGE_KEY) === 'true');
   const [expanded, setExpanded] = useState<string | null>(null);
 
   if (dismissed) return null;
 
-  const completed = STEPS.filter(s => s.isComplete(userSettings, localStorage));
+  const completed = STEPS.filter(s => s.isComplete(userSettings, localStorage, { currentUser }));
   const total = STEPS.length;
   const allDone = completed.length === total;
 
@@ -109,7 +109,7 @@ export default function OnboardingChecklist({ onNavigate }: { onNavigate?: (page
       {/* Steps */}
       <div className="divide-y divide-white/[0.04]">
         {STEPS.map(step => {
-          const done = step.isComplete(userSettings, localStorage);
+          const done = step.isComplete(userSettings, localStorage, { currentUser });
           const isOpen = expanded === step.id;
 
           return (
