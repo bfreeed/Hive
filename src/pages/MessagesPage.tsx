@@ -1188,17 +1188,22 @@ export default function MessagesPage() {
                     const hasToggle = !!onToggle;
                     return (
                       <div key={c.id} className="group relative mx-1 flex items-center">
-                        {hasToggle && (
-                          <button
-                            onClick={onToggle}
-                            className="flex-shrink-0 p-1 rounded text-white/20 hover:text-white/50 transition-colors"
-                          >
-                            {isExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-                          </button>
+                        {/* Fixed-width chevron slot — keeps all rows aligned regardless of sub-channels */}
+                        {!indent && (
+                          <div className="w-[19px] flex-shrink-0 flex items-center justify-center">
+                            {hasToggle && (
+                              <button
+                                onClick={onToggle}
+                                className="p-0.5 rounded text-white/20 hover:text-white/50 transition-colors"
+                              >
+                                {isExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                              </button>
+                            )}
+                          </div>
                         )}
                         <button
                           onClick={() => { selectChannel(c.id); setChannelMenuId(null); setShowSaved(false); }}
-                          className={`flex-1 flex items-center gap-2 py-1.5 text-sm transition-colors rounded-md ${indent ? 'pl-6 pr-3' : hasToggle ? 'pl-1 pr-3' : 'px-3'} ${
+                          className={`flex-1 flex items-center gap-2 py-1.5 text-sm transition-colors rounded-md ${indent ? 'pl-6 pr-3' : 'pl-1 pr-3'} ${
                             !showSaved && isActive ? 'bg-white/[0.08] text-white' : unread ? 'text-white font-medium hover:bg-white/[0.04]' : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'
                           }`}
                         >
