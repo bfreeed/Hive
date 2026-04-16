@@ -753,27 +753,42 @@ export const useStore = create<AppStore>()((set, get) => ({
       const existingChannels: Channel[] = updates.channels ?? [];
       const allProjects: Project[] = (updates.projects as Project[]) ?? [];
 
-      // Query ALL project-linked channels directly — bypasses the member_ids filter so we
-      // don't create duplicates for channels the current user isn't yet a member of.
-      const sharedProjectIds = allProjects
-        .filter((p) => !p.isFolder && !p.parentId && p.memberIds.length > 1)
-        .map((p) => p.id);
-      const allLinkedChannelProjectIds = new Set<string>();
+      // Query ALL channels by project_id OR name to catch both linked and unlinked duplicates.
+      const sharedProjects = allProjects.filter(
+        (p) => !p.isFolder && !p.parentId && p.memberIds.length > 1
+      );
+      const sharedProjectIds = sharedProjects.map((p) => p.id);
+      const sharedProjectNames = sharedProjects.map((p) => p.name);
+
+      // Fetch by project_id (properly linked channels)
+      const linkedProjectIds = new Set<string>();
+      // Fetch unlinked channels by name so we can link them instead of duplicating
+      const unlinkableChannels: { id: string; name: string }[] = [];
+
       if (sharedProjectIds.length > 0) {
-        const { data: linkedChannels } = await supabase
-          .from('channels')
-          .select('id, project_id')
-          .in('project_id', sharedProjectIds);
-        (linkedChannels ?? []).forEach((c: any) => {
-          if (c.project_id) allLinkedChannelProjectIds.add(c.project_id);
-        });
+        const [byId, byName] = await Promise.all([
+          supabase.from('channels').select('id, project_id').in('project_id', sharedProjectIds),
+          supabase.from('channels').select('id, name').is('project_id', null).in('name', sharedProjectNames),
+        ]);
+        (byId.data ?? []).forEach((c: any) => { if (c.project_id) linkedProjectIds.add(c.project_id); });
+        (byName.data ?? []).forEach((c: any) => unlinkableChannels.push({ id: c.id, name: c.name }));
       }
 
-      // Create missing channels for shared projects
-      const projectsNeedingChannel = allProjects.filter(
-        (p) => !p.isFolder && !p.parentId && p.memberIds.length > 1 &&
-          !allLinkedChannelProjectIds.has(p.id)
-      );
+      // Link any unlinked channels that match a shared project name
+      const nameToProject = new Map(sharedProjects.map((p) => [p.name.toLowerCase(), p]));
+      const toLink = unlinkableChannels
+        .map((c) => ({ channelId: c.id, project: nameToProject.get(c.name.toLowerCase()) }))
+        .filter((x): x is { channelId: string; project: Project } => !!x.project && !linkedProjectIds.has(x.project.id));
+
+      if (toLink.length > 0) {
+        await Promise.all(toLink.map(({ channelId, project }) =>
+          supabase.from('channels').update({ project_id: project.id }).eq('id', channelId)
+        ));
+        toLink.forEach(({ project }) => linkedProjectIds.add(project.id));
+      }
+
+      // Create channels only for projects that truly have none (by id or name)
+      const projectsNeedingChannel = sharedProjects.filter((p) => !linkedProjectIds.has(p.id));
       if (projectsNeedingChannel.length > 0) {
         const backfilledChannels: Channel[] = projectsNeedingChannel.map((p) => ({
           id: crypto.randomUUID(),
