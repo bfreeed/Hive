@@ -27,7 +27,7 @@ const NAV_ITEMS_MAP: Record<string, { label: string; icon: React.ReactNode; getB
   meetings:      { label: 'Meetings',      icon: <Calendar size={16} />, getBadge: (s) => s.meetings.filter((m: any) => m.reviewed === false && m.provider && m.provider !== 'manual').length || undefined },
   messages:      { label: 'Messages',      icon: <MessageSquare size={16} />, getBadge: (s) => {
     const unread = s.channels
-      .filter((c: any) => c.memberIds.includes(s.currentUser.id) && !c.muted)
+      .filter((c: any) => c?.memberIds?.includes(s.currentUser?.id) && !c.muted)
       .reduce((total: number, ch: any) => {
         const count = s.messages.filter((m: any) =>
           m.channelId === ch.id && m.authorId !== s.currentUser.id &&

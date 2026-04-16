@@ -342,7 +342,7 @@ function MessageBubble({ msg, prevMsg, userNames, users, replyCount, isPinned, o
                         <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-2 py-1">Move to...</p>
                         {allChannels.filter(c => c.id !== msg.channelId && !c.deletedAt).map(c => {
                           const isDm = c.type === 'dm';
-                          const dmName = isDm ? c.memberIds.filter(id => id !== msg.authorId).map(id => users.find(u => u.id === id)?.name ?? 'Unknown').join(', ') : null;
+                          const dmName = isDm ? (c.memberIds ?? []).filter(id => id !== msg.authorId).map(id => users.find(u => u.id === id)?.name ?? 'Unknown').join(', ') : null;
                           return (
                             <button key={c.id} onClick={() => { onMove(msg.id, c.id); setShowMovePicker(false); }} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-white/60 hover:bg-white/[0.08] hover:text-white/80 transition-colors">
                               {isDm ? <span className="w-2 h-2 rounded-full bg-white/20 flex-shrink-0" /> : <Hash size={11} className="flex-shrink-0 text-white/30" />}
@@ -2175,7 +2175,7 @@ export default function MessagesPage() {
             </div>
             <div className="flex-1 overflow-y-auto scrollbar-hide p-2 space-y-0.5">
               {groupedChannels.map(c => {
-                const isMember = c.memberIds.includes(currentUser.id);
+                const isMember = (c.memberIds ?? []).includes(currentUser.id);
                 const msgCount = messages.filter(m => m.channelId === c.id).length;
                 return (
                   <div key={c.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/[0.04] transition-colors">
@@ -2188,14 +2188,14 @@ export default function MessagesPage() {
                         >
                           {c.name}
                         </button>
-                        <span className="text-[10px] text-white/25">{c.memberIds.length} members · {msgCount} messages</span>
+                        <span className="text-[10px] text-white/25">{(c.memberIds ?? []).length} members · {msgCount} messages</span>
                       </div>
                       {c.description && <p className="text-xs text-white/35 truncate mt-0.5">{c.description}</p>}
                     </div>
                     {isMember ? (
                       <button
                         onClick={() => {
-                          if (c.memberIds.length > 1) updateChannel(c.id, { memberIds: c.memberIds.filter(id => id !== currentUser.id) });
+                          if ((c.memberIds ?? []).length > 1) updateChannel(c.id, { memberIds: (c.memberIds ?? []).filter(id => id !== currentUser.id) });
                         }}
                         className="flex-shrink-0 px-2.5 py-1 text-xs text-white/40 border border-white/[0.1] rounded-lg hover:border-red-500/40 hover:text-red-400 transition-colors"
                       >
