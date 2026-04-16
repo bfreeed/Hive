@@ -941,6 +941,38 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
     activeTab === 'status' &&
     filterProject !== 'all';
 
+  // Render groups as horizontal columns (list-row style) — mirrors board layout
+  const renderListColumns = (groups: ReturnType<typeof buildGroups>, showProject = true) => {
+    const nonEmpty = groups.filter(g => g.tasks.length > 0);
+    if (nonEmpty.length === 0) {
+      return <div className="py-16 text-center"><p className="text-white/20">No tasks found</p></div>;
+    }
+    return (
+      <div className="flex gap-4 overflow-x-auto pb-4">
+        {nonEmpty.map((group, gi) => (
+          <div key={gi} className="flex-shrink-0 w-80">
+            <div className="flex items-center gap-2 mb-2 px-1">
+              {group.color && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: group.color }} />}
+              <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">{group.label || 'Tasks'}</span>
+              <span className="text-xs text-white/20">{group.tasks.length}</span>
+            </div>
+            <div className="space-y-1">
+              {group.tasks.map(task => {
+                const idx = sorted.findIndex(t => t.id === task.id);
+                const isFocused = focusedIdx === idx;
+                return renderTaskWithSubtasks(task, {
+                  focused: isFocused,
+                  focusRef: isFocused ? focusedRowRef : undefined,
+                  showProject,
+                });
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   const SelectFilter = ({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: React.ReactNode }) => (
     <select
       value={value}
@@ -1167,150 +1199,6 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
           renderCompletedLog()
         ) : showSectionsView ? (
           renderSectionsView()
-        ) : activeTab === 'priority' ? (
-          // By Priority — grouped list (Urgent → High → Medium → Low)
-          filteredTopLevel.length === 0 ? (
-            <div className="py-16 text-center"><p className="text-white/20">No tasks found</p></div>
-          ) : (
-            <div className="space-y-6">
-              {([
-                { value: 'urgent', label: 'Urgent',      color: '#f87171' },
-                { value: 'high',   label: 'High',        color: '#fb923c' },
-                { value: 'medium', label: 'Medium',      color: '#facc15' },
-                { value: 'low',    label: 'Low',         color: undefined  },
-              ] as { value: string; label: string; color?: string }[]).map(pg => {
-                const groupTasks = sorted.filter(t => (t.priority ?? 'low') === pg.value);
-                if (groupTasks.length === 0) return null;
-                return (
-                  <div key={pg.value}>
-                    <div className="flex items-center gap-2 mb-1 px-1">
-                      {pg.color && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: pg.color }} />}
-                      <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">{pg.label}</span>
-                      <span className="text-xs text-white/20">{groupTasks.length}</span>
-                      <div className="flex-1 h-px bg-white/[0.05]" />
-                    </div>
-                    <div className="space-y-1">
-                      {groupTasks.map(task => {
-                        const idx = sorted.findIndex(t => t.id === task.id);
-                        const isFocused = focusedIdx === idx;
-                        return renderTaskWithSubtasks(task, {
-                          focused: isFocused,
-                          focusRef: isFocused ? focusedRowRef : undefined,
-                          showProject: true,
-                        });
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )
-        ) : activeTab === 'project' ? (
-          // By Project — grouped list, one section per project
-          filteredTopLevel.length === 0 ? (
-            <div className="py-16 text-center"><p className="text-white/20">No tasks found</p></div>
-          ) : (
-            <div className="space-y-6">
-              {boardGroups.map((group, gi) => {
-                if (group.tasks.length === 0) return null;
-                return (
-                  <div key={gi}>
-                    <div className="flex items-center gap-2 mb-1 px-1">
-                      {group.color && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: group.color }} />}
-                      <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">{group.label || 'No Project'}</span>
-                      <span className="text-xs text-white/20">{group.tasks.length}</span>
-                      <div className="flex-1 h-px bg-white/[0.05]" />
-                    </div>
-                    <div className="space-y-1">
-                      {group.tasks.map(task => {
-                        const idx = sorted.findIndex(t => t.id === task.id);
-                        const isFocused = focusedIdx === idx;
-                        return renderTaskWithSubtasks(task, {
-                          focused: isFocused,
-                          focusRef: isFocused ? focusedRowRef : undefined,
-                          showProject: false,
-                        });
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )
-        ) : activeTab === 'date' ? (
-          // By Date — grouped list, with assignee super-groups when multi-user
-          filteredTopLevel.length === 0 ? (
-            <div className="py-16 text-center">
-              <p className="text-white/20">No tasks found</p>
-            </div>
-          ) : isMultiAssignee ? (
-            <div className="space-y-8">
-              {assigneeGroups.map(ag => {
-                const agDateGroups = buildGroups(ag.tasks, 'date', projects, users);
-                return (
-                  <div key={ag.userId}>
-                    <div className="flex items-center gap-2 mb-3 px-1">
-                      <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">{ag.name}</span>
-                      <span className="text-xs text-white/20">{ag.tasks.length}</span>
-                    </div>
-                    <div className="space-y-6 pl-0">
-                      {agDateGroups.map((group, gi) => (
-                        <div key={gi}>
-                          {group.label && (
-                            <div className="flex items-center gap-2 mb-1 px-1 pl-3">
-                              {group.color && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: group.color }} />}
-                              <span className="text-xs font-semibold text-white/30 uppercase tracking-wider">{group.label}</span>
-                              <span className="text-xs text-white/15">{group.tasks.length}</span>
-                            </div>
-                          )}
-                          <div className="space-y-1">
-                            {group.tasks.map(task => {
-                              const idx = sorted.findIndex(t => t.id === task.id);
-                              const isFocused = focusedIdx === idx;
-                              return renderTaskWithSubtasks(task, {
-                                focused: isFocused,
-                                focusRef: isFocused ? focusedRowRef : undefined,
-                                showProject: true,
-                              });
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {dateGroups.map((group, gi) => (
-                <div key={gi}>
-                  {group.label && (
-                    <div className="flex items-center gap-2 mb-1 px-1">
-                      {group.color && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: group.color }} />}
-                      <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">{group.label}</span>
-                      <span className="text-xs text-white/20">{group.tasks.length}</span>
-                    </div>
-                  )}
-                  <div className="space-y-1">
-                    {group.tasks.map(task => {
-                      const idx = sorted.findIndex(t => t.id === task.id);
-                      const isFocused = focusedIdx === idx;
-                      return renderTaskWithSubtasks(task, {
-                        focused: isFocused,
-                        focusRef: isFocused ? focusedRowRef : undefined,
-                        showProject: true,
-                      });
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )
-        ) : filteredTopLevel.length === 0 ? (
-          <div className="py-16 text-center">
-            <p className="text-white/20">No tasks found</p>
-          </div>
         ) : isManual ? (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={sorted.map(t => t.id)} strategy={verticalListSortingStrategy}>
@@ -1331,39 +1219,8 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
               </div>
             </SortableContext>
           </DndContext>
-        ) : isMultiAssignee ? (
-          <div className="space-y-6">
-            {assigneeGroups.map(group => (
-              <div key={group.userId}>
-                <div className="flex items-center gap-2 mb-1 px-1">
-                  <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">{group.name}</span>
-                  <span className="text-xs text-white/20">{group.tasks.length}</span>
-                </div>
-                <div className="space-y-1">
-                  {group.tasks.map(task => {
-                    const idx = sorted.findIndex(t => t.id === task.id);
-                    const isFocused = focusedIdx === idx;
-                    return renderTaskWithSubtasks(task, {
-                      focused: isFocused,
-                      focusRef: isFocused ? focusedRowRef : undefined,
-                      showProject: true,
-                    });
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
         ) : (
-          <div className="space-y-1">
-            {sorted.map((task, idx) => {
-              const isFocused = focusedIdx === idx;
-              return renderTaskWithSubtasks(task, {
-                focused: isFocused,
-                focusRef: isFocused ? focusedRowRef : undefined,
-                showProject: true,
-              });
-            })}
-          </div>
+          renderListColumns(boardGroups, activeTab !== 'project')
         )}
 
         <p className="text-xs text-white/20 mt-6 text-center">
