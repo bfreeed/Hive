@@ -27,3 +27,4 @@ dist-ssr
 .gstack/
 .vercel
 CLAUDE.md
+.design-audit-*

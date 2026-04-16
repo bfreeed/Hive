@@ -617,13 +617,27 @@ export default function TaskDetail({ taskId, draftInitial, onClose, inline = fal
                   {showProjectPicker && (() => {
                     const assigned = task.projectIds ?? [];
                     const flatList = flattenProjects(projects).filter(({ project: p }) => !assigned.includes(p.id));
-                    const topLevel = flatList.filter(({ depth }) => depth === 0);
+                    const topLevel = flatList.filter(({ project: p, depth }) => depth === 0 && !p.isFolder);
                     const childrenOf = (parentId: string) =>
                       flatList.filter(({ project: c }) => c.parentId === parentId);
 
+                    // Most-recently-used ordering
+                    const recency: Record<string, number> = (() => {
+                      try { return JSON.parse(localStorage.getItem('project-pick-recency') ?? '{}'); } catch { return {}; }
+                    })();
+                    const recordPick = (projectId: string) => {
+                      try {
+                        const updated = { ...recency, [projectId]: Date.now() };
+                        localStorage.setItem('project-pick-recency', JSON.stringify(updated));
+                      } catch {}
+                    };
+                    const sortedTopLevel = [...topLevel].sort((a, b) =>
+                      (recency[b.project.id] ?? 0) - (recency[a.project.id] ?? 0)
+                    );
+
                     return (
                       <div className="flex flex-col gap-0.5 min-w-[180px] max-h-56 overflow-y-auto scrollbar-hide">
-                        {topLevel.map(({ project: p }) => {
+                        {sortedTopLevel.map(({ project: p }) => {
                           const children = childrenOf(p.id);
                           const hasChildren = children.length > 0;
                           const isExpanded = expandedPickerProjects.has(p.id);
@@ -632,16 +646,12 @@ export default function TaskDetail({ taskId, draftInitial, onClose, inline = fal
                               <div className="flex items-center gap-0.5">
                                 <button
                                   onClick={() => {
-                                    if (p.isFolder) return;
+                                    recordPick(p.id);
                                     const current = task.projectIds ?? [];
                                     update('projectIds', [...current, p.id]);
                                     setShowProjectPicker(false);
                                   }}
-                                  className={`flex-1 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors text-left ${
-                                    p.isFolder
-                                      ? 'text-white/25 cursor-default'
-                                      : 'bg-white/[0.04] hover:bg-white/[0.07] text-white/40 hover:text-white/70'
-                                  }`}
+                                  className="flex-1 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors text-left bg-white/[0.04] hover:bg-white/[0.07] text-white/40 hover:text-white/70"
                                 >
                                   <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: p.color }} />
                                   {p.name}
@@ -663,6 +673,7 @@ export default function TaskDetail({ taskId, draftInitial, onClose, inline = fal
                                 <button
                                   key={child.id}
                                   onClick={() => {
+                                    recordPick(child.id);
                                     const current = task.projectIds ?? [];
                                     update('projectIds', [...current, child.id]);
                                     setShowProjectPicker(false);
