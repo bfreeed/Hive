@@ -746,6 +746,29 @@ export const useStore = create<AppStore>()((set, get) => ({
       updates.invitations = (invitationsRes.data ?? []).map(dbToInvitation);
 
       set(updates);
+
+      // Backfill: create channels for existing projects that don't have one yet.
+      // Runs silently on every load but is a no-op once all channels exist.
+      const existingChannels: Channel[] = updates.channels ?? [];
+      const projectsNeedingChannel = ((updates.projects as Project[]) ?? []).filter(
+        (p) => !p.isFolder && !p.parentId && !existingChannels.some((c) => c.projectId === p.id)
+      );
+      if (projectsNeedingChannel.length > 0) {
+        const backfilledChannels: Channel[] = projectsNeedingChannel.map((p) => ({
+          id: crypto.randomUUID(),
+          name: p.name,
+          type: 'channel' as const,
+          memberIds: p.memberIds && p.memberIds.length > 0 ? p.memberIds : [uid],
+          projectId: p.id,
+          hiddenFromSidebar: false,
+          pinnedMessageIds: [],
+          readBy: {},
+        }));
+        await Promise.all(backfilledChannels.map((c) =>
+          supabase.from('channels').insert(channelToDb(c))
+        ));
+        set((s) => ({ channels: [...s.channels, ...backfilledChannels] }));
+      }
     } catch (err) {
       console.error('Supabase loadData error:', err);
       set({ isLoading: false });
