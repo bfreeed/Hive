@@ -747,18 +747,23 @@ export const useStore = create<AppStore>()((set, get) => ({
 
       set(updates);
 
-      // Backfill: create channels for existing projects that don't have one yet.
-      // Runs silently on every load but is a no-op once all channels exist.
+      // Backfill: create channels for shared projects (2+ members) that don't have one yet.
+      // Also clean up any channels linked to solo projects (only 1 member).
+      // Runs silently on every load but is a no-op once state is consistent.
       const existingChannels: Channel[] = updates.channels ?? [];
-      const projectsNeedingChannel = ((updates.projects as Project[]) ?? []).filter(
-        (p) => !p.isFolder && !p.parentId && !existingChannels.some((c) => c.projectId === p.id)
+      const allProjects: Project[] = (updates.projects as Project[]) ?? [];
+
+      // Create missing channels for shared projects
+      const projectsNeedingChannel = allProjects.filter(
+        (p) => !p.isFolder && !p.parentId && p.memberIds.length > 1 &&
+          !existingChannels.some((c) => c.projectId === p.id)
       );
       if (projectsNeedingChannel.length > 0) {
         const backfilledChannels: Channel[] = projectsNeedingChannel.map((p) => ({
           id: crypto.randomUUID(),
           name: p.name,
           type: 'channel' as const,
-          memberIds: p.memberIds && p.memberIds.length > 0 ? p.memberIds : [uid],
+          memberIds: p.memberIds,
           projectId: p.id,
           hiddenFromSidebar: false,
           pinnedMessageIds: [],
@@ -768,6 +773,21 @@ export const useStore = create<AppStore>()((set, get) => ({
           supabase.from('channels').insert(channelToDb(c))
         ));
         set((s) => ({ channels: [...s.channels, ...backfilledChannels] }));
+      }
+
+      // Remove channels linked to solo projects (1 member — no one to chat with)
+      const soloProjectIds = new Set(
+        allProjects.filter((p) => !p.isFolder && p.memberIds.length <= 1).map((p) => p.id)
+      );
+      const channelsToRemove = existingChannels.filter(
+        (c) => c.projectId && soloProjectIds.has(c.projectId)
+      );
+      if (channelsToRemove.length > 0) {
+        await Promise.all(channelsToRemove.map((c) =>
+          supabase.from('channels').delete().eq('id', c.id)
+        ));
+        const removeIds = new Set(channelsToRemove.map((c) => c.id));
+        set((s) => ({ channels: s.channels.filter((c) => !removeIds.has(c.id)) }));
       }
     } catch (err) {
       console.error('Supabase loadData error:', err);
@@ -1073,15 +1093,14 @@ export const useStore = create<AppStore>()((set, get) => ({
     set((s) => ({ projects: [...s.projects, newProject] }));
     supabase.from('projects').insert(projectToDb(newProject))
       .then(({ error }) => { if (error) { console.error('addProject error:', error); get().addToast('error', 'Failed to save project. Check your connection.'); } });
-    // Auto-create a linked channel (skipped for folders and sub-projects).
-    // Only add the creator — collaborators are added when they accept their project invitation.
-    if (!p.isFolder) {
-      const creatorId = get().currentUser.id;
+    // Auto-create a linked channel only for shared projects (2+ members).
+    // Solo projects get a channel when the first collaborator is added (see updateProject).
+    if (!p.isFolder && !p.parentId && (p.memberIds ?? []).length > 1) {
       const newChannel = {
         id: uid(),
         name: p.name,
         type: 'channel' as const,
-        memberIds: creatorId && creatorId !== '__loading__' ? [creatorId] : (p.memberIds ?? []),
+        memberIds: p.memberIds ?? [],
         projectId: newProject.id,
         hiddenFromSidebar: false,
         pinnedMessageIds: [],
@@ -1114,6 +1133,25 @@ export const useStore = create<AppStore>()((set, get) => ({
           projectId: id,
         });
       });
+    }
+    // Create a channel when a solo project gets its first collaborator
+    if (u.memberIds && u.memberIds.length > 1 && updated && !updated.isFolder && !updated.parentId) {
+      const existingChannel = get().channels.find(c => c.projectId === id);
+      if (!existingChannel) {
+        const newChannel = {
+          id: uid(),
+          name: updated.name,
+          type: 'channel' as const,
+          memberIds: u.memberIds,
+          projectId: id,
+          hiddenFromSidebar: false,
+          pinnedMessageIds: [],
+          readBy: {},
+        };
+        set((s) => ({ channels: [...s.channels, newChannel] }));
+        supabase.from('channels').insert(channelToDb(newChannel))
+          .then(({ error }) => { if (error) console.error('addChannel (on share) error:', error); });
+      }
     }
   },
 
