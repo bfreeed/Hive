@@ -755,7 +755,7 @@ export const useStore = create<AppStore>()((set, get) => ({
 
       // Query ALL channels by project_id OR name to catch both linked and unlinked duplicates.
       const sharedProjects = allProjects.filter(
-        (p) => !p.isFolder && !p.parentId && p.memberIds.length > 1
+        (p) => !p.isFolder && p.memberIds.length > 1
       );
       const sharedProjectIds = sharedProjects.map((p) => p.id);
       const sharedProjectNames = sharedProjects.map((p) => p.name);
@@ -1126,7 +1126,7 @@ export const useStore = create<AppStore>()((set, get) => ({
       .then(({ error }) => { if (error) { console.error('addProject error:', error); get().addToast('error', 'Failed to save project. Check your connection.'); } });
     // Auto-create a linked channel only for shared projects (2+ members).
     // Solo projects get a channel when the first collaborator is added (see updateProject).
-    if (!p.isFolder && !p.parentId && (p.memberIds ?? []).length > 1) {
+    if (!p.isFolder && (p.memberIds ?? []).length > 1) {
       const newChannel = {
         id: uid(),
         name: p.name,
@@ -1166,7 +1166,7 @@ export const useStore = create<AppStore>()((set, get) => ({
       });
     }
     // Create a channel when a solo project gets its first collaborator
-    if (u.memberIds && u.memberIds.length > 1 && updated && !updated.isFolder && !updated.parentId) {
+    if (u.memberIds && u.memberIds.length > 1 && updated && !updated.isFolder) {
       const existingChannel = get().channels.find(c => c.projectId === id);
       if (!existingChannel) {
         const newChannel = {

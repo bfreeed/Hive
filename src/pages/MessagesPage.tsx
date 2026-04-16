@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useStore } from '../store';
 import { supabase } from '../lib/supabase';
-import { Hash, Plus, Search, Smile, Paperclip, Send, X, Pencil, Trash2, MessageSquare, Link, MoreHorizontal, Pin, Copy, ChevronDown, BellOff, Bell, RotateCcw, Archive, Bookmark, ExternalLink, Globe, UserPlus, Mic, MicOff, Play, Pause, FileText, ImageIcon, Loader2, ChevronLeft, Flag, ArrowRight } from 'lucide-react';
+import { Hash, Plus, Search, Smile, Paperclip, Send, X, Pencil, Trash2, MessageSquare, Link, MoreHorizontal, Pin, Copy, ChevronDown, ChevronRight, BellOff, Bell, RotateCcw, Archive, Bookmark, ExternalLink, Globe, UserPlus, Mic, MicOff, Play, Pause, FileText, ImageIcon, Loader2, ChevronLeft, Flag, ArrowRight } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 import type { Message, MessagePriority, User, Channel } from '../types';
 
@@ -461,7 +461,7 @@ function MessageBubble({ msg, prevMsg, userNames, users, replyCount, isPinned, o
 
 export default function MessagesPage() {
   const {
-    channels, messages, users, currentUser, activeChannelId,
+    channels, messages, users, currentUser, activeChannelId, projects,
     setActiveChannel, sendMessage, addReaction,
     updateMessage, deleteMessage, replyToMessage, addNotification, deleteChannel, addChannel,
     updateChannel, pinMessage, unpinMessage, restoreChannel, permanentlyDeleteChannel,
@@ -522,6 +522,14 @@ export default function MessagesPage() {
   const [msgPriority, setMsgPriority] = useState<MessagePriority | null>(null);
   const prevChannelIdRef = useRef<string | null>(null);
 
+  // Grouped channel sidebar: track which parent project channels are expanded
+  const [expandedProjectGroups, setExpandedProjectGroups] = useState<Set<string>>(new Set());
+  const toggleProjectGroup = (channelId: string) => setExpandedProjectGroups(prev => {
+    const next = new Set(prev);
+    if (next.has(channelId)) next.delete(channelId); else next.add(channelId);
+    return next;
+  });
+
   // Mobile: 'list' shows the channel sidebar full-screen; 'chat' shows the message area full-screen
   const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
 
@@ -558,6 +566,32 @@ export default function MessagesPage() {
   // Project channels hidden from sidebar are excluded unless they're actively selected
   const groupedChannels = channels.filter(c => c.type === 'channel' && !c.deletedAt && (!c.hiddenFromSidebar || c.id === activeChannelId));
   const dmChannels = channels.filter(c => c.type === 'dm' && !c.deletedAt);
+
+  // Build grouped channel hierarchy for the sidebar
+  const standaloneChannels = groupedChannels.filter(c => !c.projectId);
+  const parentProjectChannels = groupedChannels.filter(c => {
+    if (!c.projectId) return false;
+    const proj = projects.find(p => p.id === c.projectId);
+    return proj && !proj.parentId;
+  });
+  // Sub-project channels grouped by their parent project's id
+  const subChannelsByParentProjectId = new Map<string, Channel[]>();
+  groupedChannels.forEach(c => {
+    if (!c.projectId) return;
+    const proj = projects.find(p => p.id === c.projectId);
+    if (proj?.parentId) {
+      const arr = subChannelsByParentProjectId.get(proj.parentId) ?? [];
+      arr.push(c);
+      subChannelsByParentProjectId.set(proj.parentId, arr);
+    }
+  });
+  // Orphaned sub-project channels (sub-project exists but parent has no channel) → show flat
+  const orphanedSubChannels = groupedChannels.filter(c => {
+    if (!c.projectId) return false;
+    const proj = projects.find(p => p.id === c.projectId);
+    if (!proj?.parentId) return false;
+    return !parentProjectChannels.some(pc => pc.projectId === proj.parentId);
+  });
   const deletedChannels = channels.filter(c => c.deletedAt);
   const userNames = users.map(u => u.name);
   const pinnedIds = new Set(channel?.pinnedMessageIds ?? []);
@@ -1147,69 +1181,103 @@ export default function MessagesPage() {
                     <button onClick={() => { setShowNewChannel(false); setNewChannelName(''); }} className="text-white/30 hover:text-white/60"><X size={12} /></button>
                   </div>
                 )}
-                {groupedChannels.map(c => {
-                  const unread = isUnread(c);
-                  const isActive = c.id === activeChannelId;
-                  return (
-                    <div key={c.id} className="group relative mx-1 flex items-center">
-                      <button
-                        onClick={() => { selectChannel(c.id); setChannelMenuId(null); setShowSaved(false); }}
-                        className={`flex-1 flex items-center gap-2 px-3 py-1.5 text-sm transition-colors rounded-md ${
-                          !showSaved && isActive ? 'bg-white/[0.08] text-white' : unread ? 'text-white font-medium hover:bg-white/[0.04]' : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'
-                        }`}
-                      >
-                        <Hash size={14} className="flex-shrink-0 text-white/30" />
-                        <span className="truncate flex-1 text-left">{c.name}</span>
-                        {!isActive && hasDraft(c.id) && <span className="text-[9px] text-amber-400/70 font-medium flex-shrink-0">DRAFT</span>}
-                        {c.muted && <BellOff size={11} className="text-white/20 flex-shrink-0" />}
-                        {unread && !isActive && !c.muted && <span className="w-1.5 h-1.5 rounded-full bg-brand-400 flex-shrink-0" />}
-                      </button>
-                      <div className="relative flex-shrink-0">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setChannelMenuId(channelMenuId === c.id ? null : c.id); setConfirmDeleteId(null); }}
-                          className="opacity-0 group-hover:opacity-100 p-1 mr-1 rounded text-white/30 hover:text-white/60 hover:bg-white/[0.06] transition-all"
-                        >
-                          <MoreHorizontal size={13} />
-                        </button>
-                        {channelMenuId === c.id && (
-                          <div className="absolute right-0 top-full mt-0.5 z-50 bg-[#1c1c1f] border border-white/[0.1] rounded-lg shadow-xl overflow-hidden w-44">
-                            {confirmDeleteId === c.id ? (
-                              <div className="p-2">
-                                <p className="text-xs text-white/60 mb-2">Delete <span className="text-white font-medium">#{c.name}</span> and all its messages?</p>
-                                <div className="flex gap-1">
-                                  <button onClick={() => { deleteChannel(c.id); setChannelMenuId(null); setConfirmDeleteId(null); }} className="flex-1 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs rounded transition-colors">Delete</button>
-                                  <button onClick={() => setConfirmDeleteId(null)} className="flex-1 py-1 bg-white/[0.04] hover:bg-white/[0.08] text-white/50 text-xs rounded transition-colors">Cancel</button>
-                                </div>
-                              </div>
-                            ) : (
-                              <>
-                                <button
-                                  onClick={() => { setActiveChannel(c.id); setShowMembers(true); setChannelMenuId(null); }}
-                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/60 hover:bg-white/[0.06] transition-colors"
-                                >
-                                  <UserPlus size={12} /> Manage members
-                                </button>
-                                <button
-                                  onClick={() => { updateChannel(c.id, { muted: !c.muted }); setChannelMenuId(null); }}
-                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/60 hover:bg-white/[0.06] transition-colors"
-                                >
-                                  {c.muted ? <Bell size={12} /> : <BellOff size={12} />}
-                                  {c.muted ? 'Unmute channel' : 'Mute channel'}
-                                </button>
-                                <button
-                                  onClick={() => setConfirmDeleteId(c.id)}
-                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-white/[0.06] transition-colors"
-                                >
-                                  <Trash2 size={12} /> Delete channel
-                                </button>
-                              </>
-                            )}
-                          </div>
+                {(() => {
+                  const renderChannelRow = (c: Channel, indent = false, subUnread = false, onToggle?: () => void, isExpanded?: boolean) => {
+                    const unread = isUnread(c);
+                    const isActive = c.id === activeChannelId;
+                    const hasToggle = !!onToggle;
+                    return (
+                      <div key={c.id} className="group relative mx-1 flex items-center">
+                        {hasToggle && (
+                          <button
+                            onClick={onToggle}
+                            className="flex-shrink-0 p-1 rounded text-white/20 hover:text-white/50 transition-colors"
+                          >
+                            {isExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                          </button>
                         )}
+                        <button
+                          onClick={() => { selectChannel(c.id); setChannelMenuId(null); setShowSaved(false); }}
+                          className={`flex-1 flex items-center gap-2 py-1.5 text-sm transition-colors rounded-md ${indent ? 'pl-6 pr-3' : hasToggle ? 'pl-1 pr-3' : 'px-3'} ${
+                            !showSaved && isActive ? 'bg-white/[0.08] text-white' : unread ? 'text-white font-medium hover:bg-white/[0.04]' : 'text-white/50 hover:text-white/80 hover:bg-white/[0.04]'
+                          }`}
+                        >
+                          <Hash size={14} className="flex-shrink-0 text-white/30" />
+                          <span className="truncate flex-1 text-left">{c.name}</span>
+                          {!isActive && hasDraft(c.id) && <span className="text-[9px] text-amber-400/70 font-medium flex-shrink-0">DRAFT</span>}
+                          {c.muted && <BellOff size={11} className="text-white/20 flex-shrink-0" />}
+                          {unread && !isActive && !c.muted && <span className="w-1.5 h-1.5 rounded-full bg-brand-400 flex-shrink-0" />}
+                          {!unread && !isActive && subUnread && <span className="w-1.5 h-1.5 rounded-full bg-brand-400/50 flex-shrink-0" />}
+                        </button>
+                        <div className="relative flex-shrink-0">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setChannelMenuId(channelMenuId === c.id ? null : c.id); setConfirmDeleteId(null); }}
+                            className="opacity-0 group-hover:opacity-100 p-1 mr-1 rounded text-white/30 hover:text-white/60 hover:bg-white/[0.06] transition-all"
+                          >
+                            <MoreHorizontal size={13} />
+                          </button>
+                          {channelMenuId === c.id && (
+                            <div className="absolute right-0 top-full mt-0.5 z-50 bg-[#1c1c1f] border border-white/[0.1] rounded-lg shadow-xl overflow-hidden w-44">
+                              {confirmDeleteId === c.id ? (
+                                <div className="p-2">
+                                  <p className="text-xs text-white/60 mb-2">Delete <span className="text-white font-medium">#{c.name}</span> and all its messages?</p>
+                                  <div className="flex gap-1">
+                                    <button onClick={() => { deleteChannel(c.id); setChannelMenuId(null); setConfirmDeleteId(null); }} className="flex-1 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs rounded transition-colors">Delete</button>
+                                    <button onClick={() => setConfirmDeleteId(null)} className="flex-1 py-1 bg-white/[0.04] hover:bg-white/[0.08] text-white/50 text-xs rounded transition-colors">Cancel</button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => { setActiveChannel(c.id); setShowMembers(true); setChannelMenuId(null); }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/60 hover:bg-white/[0.06] transition-colors"
+                                  >
+                                    <UserPlus size={12} /> Manage members
+                                  </button>
+                                  <button
+                                    onClick={() => { updateChannel(c.id, { muted: !c.muted }); setChannelMenuId(null); }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/60 hover:bg-white/[0.06] transition-colors"
+                                  >
+                                    {c.muted ? <Bell size={12} /> : <BellOff size={12} />}
+                                    {c.muted ? 'Unmute channel' : 'Mute channel'}
+                                  </button>
+                                  <button
+                                    onClick={() => setConfirmDeleteId(c.id)}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-white/[0.06] transition-colors"
+                                  >
+                                    <Trash2 size={12} /> Delete channel
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    );
+                  };
+
+                  return (
+                    <>
+                      {/* Standalone channels (not linked to any project) */}
+                      {standaloneChannels.map(c => renderChannelRow(c))}
+                      {/* Orphaned sub-project channels (parent has no channel) */}
+                      {orphanedSubChannels.map(c => renderChannelRow(c))}
+                      {/* Parent project channels, with collapsible sub-project channels */}
+                      {parentProjectChannels.map(c => {
+                        const subChannels = subChannelsByParentProjectId.get(c.projectId!) ?? [];
+                        const hasSubChannels = subChannels.length > 0;
+                        const isExpanded = expandedProjectGroups.has(c.id);
+                        const subUnread = !isExpanded && subChannels.some(sc => isUnread(sc));
+                        return (
+                          <React.Fragment key={c.id}>
+                            {renderChannelRow(c, false, subUnread, hasSubChannels ? () => toggleProjectGroup(c.id) : undefined, isExpanded)}
+                            {hasSubChannels && isExpanded && subChannels.map(sc => renderChannelRow(sc, true))}
+                          </React.Fragment>
+                        );
+                      })}
+                    </>
                   );
-                })}
+                })()}
               </div>
 
               <div>
