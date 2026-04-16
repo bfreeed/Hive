@@ -87,6 +87,7 @@ export default function TaskDetail({ taskId, draftInitial, onClose, inline = fal
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [showPriorityPicker, setShowPriorityPicker] = useState(false);
   const [showProjectPicker, setShowProjectPicker] = useState(false);
+  const [expandedPickerProjects, setExpandedPickerProjects] = useState<Set<string>>(new Set());
   const [reminderUnit, setReminderUnit] = useState<'minutes' | 'hours' | 'days' | 'weeks'>('minutes');
   const [reminderValue, setReminderValue] = useState<string>('30');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -605,30 +606,80 @@ export default function TaskDetail({ taskId, draftInitial, onClose, inline = fal
                     </button>
                   ))}
                   <button
-                    onClick={() => setShowProjectPicker(v => !v)}
+                    onClick={() => {
+                      setShowProjectPicker(v => !v);
+                      setExpandedPickerProjects(new Set());
+                    }}
                     className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-white/45 hover:text-white/50 bg-white/[0.04] hover:bg-white/[0.06] transition-colors"
                   >
                     <Plus size={10} />
                   </button>
-                  {showProjectPicker && (
-                    <div className="flex flex-col gap-0.5 min-w-[160px]">
-                      {flattenProjects(projects).filter(({ project: p }) => !(task.projectIds ?? []).includes(p.id)).map(({ project: p, depth }) => (
-                        <button
-                          key={p.id}
-                          onClick={() => {
-                            const current = task.projectIds ?? [];
-                            update('projectIds', [...current, p.id]);
-                            setShowProjectPicker(false);
-                          }}
-                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors bg-white/[0.04] hover:bg-white/[0.07] text-white/40 hover:text-white/70 text-left"
-                          style={{ paddingLeft: depth > 0 ? `${0.625 + depth * 0.75}rem` : undefined }}
-                        >
-                          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: p.color }} />
-                          {p.name}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  {showProjectPicker && (() => {
+                    const assigned = task.projectIds ?? [];
+                    const flatList = flattenProjects(projects).filter(({ project: p }) => !assigned.includes(p.id));
+                    const topLevel = flatList.filter(({ depth }) => depth === 0);
+                    const childrenOf = (parentId: string) =>
+                      flatList.filter(({ project: c }) => c.parentId === parentId);
+
+                    return (
+                      <div className="flex flex-col gap-0.5 min-w-[180px] max-h-56 overflow-y-auto scrollbar-hide">
+                        {topLevel.map(({ project: p }) => {
+                          const children = childrenOf(p.id);
+                          const hasChildren = children.length > 0;
+                          const isExpanded = expandedPickerProjects.has(p.id);
+                          return (
+                            <React.Fragment key={p.id}>
+                              <div className="flex items-center gap-0.5">
+                                <button
+                                  onClick={() => {
+                                    if (p.isFolder) return;
+                                    const current = task.projectIds ?? [];
+                                    update('projectIds', [...current, p.id]);
+                                    setShowProjectPicker(false);
+                                  }}
+                                  className={`flex-1 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors text-left ${
+                                    p.isFolder
+                                      ? 'text-white/25 cursor-default'
+                                      : 'bg-white/[0.04] hover:bg-white/[0.07] text-white/40 hover:text-white/70'
+                                  }`}
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: p.color }} />
+                                  {p.name}
+                                </button>
+                                {hasChildren && (
+                                  <button
+                                    onClick={() => setExpandedPickerProjects(prev => {
+                                      const next = new Set(prev);
+                                      if (next.has(p.id)) next.delete(p.id); else next.add(p.id);
+                                      return next;
+                                    })}
+                                    className="p-1 rounded text-white/20 hover:text-white/55 flex-shrink-0 transition-colors"
+                                  >
+                                    {isExpanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+                                  </button>
+                                )}
+                              </div>
+                              {hasChildren && isExpanded && children.map(({ project: child }) => (
+                                <button
+                                  key={child.id}
+                                  onClick={() => {
+                                    const current = task.projectIds ?? [];
+                                    update('projectIds', [...current, child.id]);
+                                    setShowProjectPicker(false);
+                                  }}
+                                  className="flex items-center gap-1.5 py-1 pr-2.5 rounded-lg text-xs font-medium transition-colors bg-white/[0.04] hover:bg-white/[0.07] text-white/35 hover:text-white/70 text-left"
+                                  style={{ paddingLeft: '1.5rem' }}
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: child.color }} />
+                                  {child.name}
+                                </button>
+                              ))}
+                            </React.Fragment>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                 </div>
               </PropRow>
 
