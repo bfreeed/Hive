@@ -331,17 +331,21 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
   // ---------------------------------------------------------------------------
   const isManual = sortBy === ('manual' as BoardSortBy);
   const baseSorted = sortTasks(filteredTopLevel, isManual ? 'date' : sortBy, sortOrder, projects, users);
-  const sorted = isManual
-    ? [...baseSorted].sort((a, b) => {
-        const ai = manualOrder.indexOf(a.id);
-        const bi = manualOrder.indexOf(b.id);
-        if (ai === -1 && bi === -1) return 0;
-        if (ai === -1) return 1;
-        if (bi === -1) return -1;
-        return ai - bi;
-      })
-    : baseSorted;
-  const sortedAllStatuses = sortTasks(filteredAllTopLevel, isManual ? 'date' : sortBy, sortOrder, projects, users);
+  const sorted = activeTab === 'recent'
+    ? [...filteredTopLevel].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    : isManual
+      ? [...baseSorted].sort((a, b) => {
+          const ai = manualOrder.indexOf(a.id);
+          const bi = manualOrder.indexOf(b.id);
+          if (ai === -1 && bi === -1) return 0;
+          if (ai === -1) return 1;
+          if (bi === -1) return -1;
+          return ai - bi;
+        })
+      : baseSorted;
+  const sortedAllStatuses = activeTab === 'recent'
+    ? [...filteredAllTopLevel].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    : sortTasks(filteredAllTopLevel, isManual ? 'date' : sortBy, sortOrder, projects, users);
 
   // ---------------------------------------------------------------------------
   // Groups (for regular list view — date grouping)
@@ -1208,9 +1212,7 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
           />
         ) : activeTab === 'recent' ? (
           <div className="space-y-0.5">
-            {[...filteredTopLevel]
-              .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-              .map(t => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} showProject />)}
+            {sorted.map(t => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} showProject />)}
           </div>
         ) : activeTab === 'completed' ? (
           renderCompletedLog()
