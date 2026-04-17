@@ -989,13 +989,29 @@ export const useStore = create<AppStore>()((set, get) => ({
     const task = s.tasks.find(t => t.id === taskId);
     const commenterId = s.currentUser.id;
     const commenterName = s.currentUser.name || 'Someone';
+
+    // Parse @mentions from the body — matches @FirstName, @first.last, etc.
+    const mentionRegex = /@(\w[\w.]*)/g;
+    const mentionedIds = new Set<string>();
+    let m;
+    while ((m = mentionRegex.exec(body)) !== null) {
+      const token = m[1].toLowerCase();
+      const hit = s.users.find(u => {
+        if (!u.name) return false;
+        const full = u.name.toLowerCase();
+        const first = full.split(' ')[0];
+        return first === token || full === token || full.replace(/\s+/g, '.') === token || u.id === token;
+      });
+      if (hit && hit.id !== commenterId) mentionedIds.add(hit.id);
+    }
+
     const comment = {
       id: uid(),
       taskId,
       authorId: commenterId,
       body,
       createdAt: new Date().toISOString(),
-      mentions: [],
+      mentions: Array.from(mentionedIds),
     };
     const tasks = s.tasks.map((t) =>
       t.id === taskId
@@ -1010,20 +1026,47 @@ export const useStore = create<AppStore>()((set, get) => ({
         .then(({ error }) => { if (error) console.error('addComment error:', error); });
     }
 
-    // Notify every assignee except the commenter
+    // Build notification recipients. Mentioned users get a "mentioned you"
+    // notification; other assignees get a plain "commented" notification.
+    // Commenter never gets notified. Each recipient gets at most one row.
     if (task) {
       const preview = body.slice(0, 120) + (body.length > 120 ? '\u2026' : '');
-      const recipients = (task.assigneeIds ?? []).filter(id => id && id !== commenterId);
-      const notifs: Notification[] = recipients.map(userId => ({
-        id: uid(),
-        type: 'comment',
-        title: `${commenterName} commented`,
-        body: preview,
-        taskId,
-        userId,
-        read: false,
-        createdAt: new Date().toISOString(),
-      }));
+      const nowIso = new Date().toISOString();
+      const seen = new Set<string>();
+      const notifs: Notification[] = [];
+
+      // Mentions first (higher signal)
+      mentionedIds.forEach(userId => {
+        if (seen.has(userId)) return;
+        seen.add(userId);
+        notifs.push({
+          id: uid(),
+          type: 'mention',
+          title: `${commenterName} mentioned you`,
+          body: preview,
+          taskId,
+          userId,
+          read: false,
+          createdAt: nowIso,
+        });
+      });
+
+      // Assignees (skip anyone already getting a mention)
+      (task.assigneeIds ?? []).forEach(userId => {
+        if (!userId || userId === commenterId || seen.has(userId)) return;
+        seen.add(userId);
+        notifs.push({
+          id: uid(),
+          type: 'comment',
+          title: `${commenterName} commented`,
+          body: preview,
+          taskId,
+          userId,
+          read: false,
+          createdAt: nowIso,
+        });
+      });
+
       if (notifs.length > 0) {
         supabase.from('notifications').insert(notifs.map(notificationToDb))
           .then(({ error }) => { if (error) console.error('comment notifications error:', error); });
