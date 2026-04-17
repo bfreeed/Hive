@@ -987,10 +987,12 @@ export const useStore = create<AppStore>()((set, get) => ({
 
   addComment: (taskId, body) => set((s) => {
     const task = s.tasks.find(t => t.id === taskId);
+    const commenterId = s.currentUser.id;
+    const commenterName = s.currentUser.name || 'Someone';
     const comment = {
       id: uid(),
       taskId,
-      authorId: s.currentUser.id,
+      authorId: commenterId,
       body,
       createdAt: new Date().toISOString(),
       mentions: [],
@@ -1000,9 +1002,6 @@ export const useStore = create<AppStore>()((set, get) => ({
         ? { ...t, comments: [...t.comments, comment], updatedAt: new Date().toISOString() }
         : t
     );
-    const notif = (task && task.assigneeIds.length > 1)
-      ? [{ id: uid(), type: 'comment', title: 'New comment on task', body: body.slice(0, 80) + (body.length > 80 ? '\u2026' : ''), taskId, read: false, createdAt: new Date().toISOString() }]
-      : [];
 
     // Persist updated task
     const updated = tasks.find(t => t.id === taskId);
@@ -1011,7 +1010,27 @@ export const useStore = create<AppStore>()((set, get) => ({
         .then(({ error }) => { if (error) console.error('addComment error:', error); });
     }
 
-    return { tasks, notifications: [...notif, ...s.notifications] };
+    // Notify every assignee except the commenter
+    if (task) {
+      const preview = body.slice(0, 120) + (body.length > 120 ? '\u2026' : '');
+      const recipients = (task.assigneeIds ?? []).filter(id => id && id !== commenterId);
+      const notifs: Notification[] = recipients.map(userId => ({
+        id: uid(),
+        type: 'comment',
+        title: `${commenterName} commented`,
+        body: preview,
+        taskId,
+        userId,
+        read: false,
+        createdAt: new Date().toISOString(),
+      }));
+      if (notifs.length > 0) {
+        supabase.from('notifications').insert(notifs.map(notificationToDb))
+          .then(({ error }) => { if (error) console.error('comment notifications error:', error); });
+      }
+    }
+
+    return { tasks };
   }),
 
   updateTask: (id, u) => set((s) => {
