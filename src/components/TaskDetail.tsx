@@ -70,6 +70,11 @@ export default function TaskDetail({ taskId, draftInitial, onClose, inline = fal
 
   const task = isDraft ? draftTask : storeTask;
   const [commentText, setCommentText] = useState('');
+  const commentRef = useRef<HTMLTextAreaElement>(null);
+  // @mention autocomplete state
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null); // lowercased query after @; null = dropdown hidden
+  const [mentionStart, setMentionStart] = useState(0); // index of '@' in commentText
+  const [mentionIdx, setMentionIdx] = useState(0); // selected option index
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showSubtasks, setShowSubtasks] = useState(true);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
@@ -227,6 +232,59 @@ export default function TaskDetail({ taskId, draftInitial, onClose, inline = fal
     if (!commentText.trim()) return;
     addComment(taskId, commentText.trim());
     setCommentText('');
+    setMentionQuery(null);
+  };
+
+  // Detect active @mention token at cursor and update dropdown state
+  const updateMentionState = (value: string, caret: number) => {
+    // Find the '@' that starts the current token (before caret, no whitespace between)
+    const uptoCaret = value.slice(0, caret);
+    const atIdx = uptoCaret.lastIndexOf('@');
+    if (atIdx < 0) { setMentionQuery(null); return; }
+    // '@' must be at start of string or preceded by whitespace
+    if (atIdx > 0 && !/\s/.test(value[atIdx - 1])) { setMentionQuery(null); return; }
+    const token = uptoCaret.slice(atIdx + 1);
+    // Token must be word chars / dots only (no spaces yet)
+    if (!/^[\w.]*$/.test(token)) { setMentionQuery(null); return; }
+    setMentionStart(atIdx);
+    setMentionQuery(token.toLowerCase());
+    setMentionIdx(0);
+  };
+
+  // Candidate users for the current mention query
+  const mentionCandidates = (() => {
+    if (mentionQuery === null) return [];
+    const q = mentionQuery;
+    return users
+      .filter(u => u && u.id !== currentUser.id)
+      .filter(u => {
+        if (!u.name) return false;
+        if (!q) return true; // empty query shows all
+        const full = u.name.toLowerCase();
+        const first = full.split(' ')[0];
+        return first.startsWith(q) || full.startsWith(q) || full.replace(/\s+/g, '.').startsWith(q);
+      })
+      .slice(0, 6);
+  })();
+
+  const insertMention = (userName: string) => {
+    // Replace the @partial token with @FirstName (or full name with dots if multi-word)
+    const first = userName.split(' ')[0];
+    const mentionText = `@${first}`;
+    const before = commentText.slice(0, mentionStart);
+    const afterStart = commentText.slice(mentionStart).search(/[^\w.@]/);
+    const after = afterStart < 0 ? '' : commentText.slice(mentionStart + afterStart);
+    const next = before + mentionText + ' ' + after.replace(/^\s+/, '');
+    setCommentText(next);
+    setMentionQuery(null);
+    // Restore focus + caret position after the inserted mention
+    setTimeout(() => {
+      const el = commentRef.current;
+      if (!el) return;
+      el.focus();
+      const pos = (before + mentionText + ' ').length;
+      el.setSelectionRange(pos, pos);
+    }, 0);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1134,18 +1192,60 @@ export default function TaskDetail({ taskId, draftInitial, onClose, inline = fal
                 <div className="w-7 h-7 rounded-full bg-brand-600 flex items-center justify-center text-xs font-bold text-white flex-shrink-0 mt-0.5">
                   {currentUser.name[0]}
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 relative">
                   <textarea
+                    ref={commentRef}
                     value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
+                    onChange={(e) => {
+                      setCommentText(e.target.value);
+                      updateMentionState(e.target.value, e.target.selectionStart ?? e.target.value.length);
+                    }}
+                    onKeyUp={(e) => {
+                      const el = e.target as HTMLTextAreaElement;
+                      updateMentionState(el.value, el.selectionStart ?? el.value.length);
+                    }}
+                    onClick={(e) => {
+                      const el = e.target as HTMLTextAreaElement;
+                      updateMentionState(el.value, el.selectionStart ?? el.value.length);
+                    }}
                     onKeyDown={(e) => {
+                      // Mention dropdown nav
+                      if (mentionQuery !== null && mentionCandidates.length > 0) {
+                        if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIdx(i => (i + 1) % mentionCandidates.length); return; }
+                        if (e.key === 'ArrowUp') { e.preventDefault(); setMentionIdx(i => (i - 1 + mentionCandidates.length) % mentionCandidates.length); return; }
+                        if (e.key === 'Enter' || e.key === 'Tab') {
+                          e.preventDefault();
+                          const pick = mentionCandidates[mentionIdx];
+                          if (pick) insertMention(pick.name);
+                          return;
+                        }
+                        if (e.key === 'Escape') { e.preventDefault(); setMentionQuery(null); return; }
+                      }
                       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddComment(); }
                       if (e.key === 'Escape') { setCommentText(''); (e.target as HTMLElement).blur(); }
                     }}
-                    placeholder="Add a comment... (Enter to post)"
+                    placeholder="Add a comment... (Enter to post, @ to mention)"
                     rows={2}
                     className="w-full px-4 py-2.5 bg-white/[0.04] border border-white/[0.08] rounded-xl text-sm text-white/80 placeholder-white/20 focus:outline-none focus:border-brand-500/30 resize-none"
                   />
+                  {mentionQuery !== null && mentionCandidates.length > 0 && (
+                    <div className="absolute left-0 bottom-full mb-1 z-30 w-60 bg-[#1c1c1f] border border-white/[0.1] rounded-xl shadow-xl py-1 overflow-hidden">
+                      {mentionCandidates.map((u, i) => (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onMouseDown={(e) => { e.preventDefault(); insertMention(u.name); }}
+                          onMouseEnter={() => setMentionIdx(i)}
+                          className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-left transition-colors ${i === mentionIdx ? 'bg-white/[0.08]' : 'hover:bg-white/[0.05]'}`}
+                        >
+                          <span className="w-6 h-6 rounded-full bg-brand-600/40 flex items-center justify-center text-[10px] font-bold text-brand-300 flex-shrink-0">
+                            {u.name[0]?.toUpperCase() ?? '?'}
+                          </span>
+                          <span className="text-sm text-white/80 truncate">{u.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   {commentText.trim() && (
                     <button onClick={handleAddComment} className="mt-2 px-4 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs rounded-lg transition-colors">
                       Post comment
