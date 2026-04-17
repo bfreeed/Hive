@@ -184,7 +184,7 @@ export interface Meeting {
 }
 
 export interface HomeSection {
-  id: 'within_72h' | 'overdue' | 'today' | 'high_priority' | 'upcoming' | 'questions';
+  id: 'within_72h' | 'overdue' | 'today' | 'high_priority' | 'upcoming' | 'questions' | 'recently_assigned';
   enabled: boolean;
   label: string;
 }
@@ -196,6 +196,7 @@ export const DEFAULT_HOME_SECTIONS: HomeSection[] = [
   { id: 'high_priority',      enabled: true,  label: 'High Priority' },
   { id: 'upcoming',           enabled: true,  label: 'Coming Up' },
   { id: 'questions',          enabled: true,  label: 'Questions for Me' },
+  { id: 'recently_assigned', enabled: true,  label: 'Recently Assigned' },
 ];
 
 export interface UserSettings {

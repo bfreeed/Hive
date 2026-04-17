@@ -273,6 +273,9 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
     return isWithinInterval(d, { start: addDays(startOfDay(now), 1), end: addDays(startOfDay(now), 7) });
   });
   const questions = activeTasks.filter(t => t.flags?.some(f => f.flagId === 'flag-questions'));
+  const recentlyAssigned = [...activeTasks]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 15);
   const sectionData: Record<string, { tasks?: typeof activeTasks; count: number; render: () => React.ReactNode }> = {
     within_72h: {
       count: within72.length,
@@ -319,6 +322,14 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
       render: () => (
         <Section title="Questions for Me" icon={<MessageSquare size={13} />} count={questions.length} color="text-purple-400">
           {questions.map(t => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} showProject />)}
+        </Section>
+      ),
+    },
+    recently_assigned: {
+      count: recentlyAssigned.length,
+      render: () => (
+        <Section title="Recently Assigned" icon={<Sparkles size={13} />} count={recentlyAssigned.length} color="text-brand-400">
+          {recentlyAssigned.map(t => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} showProject />)}
         </Section>
       ),
     },
