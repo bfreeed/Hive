@@ -23,7 +23,7 @@ import { CSS } from '@dnd-kit/utilities';
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-type ActiveTab = 'status' | 'priority' | 'project' | 'date' | 'today' | 'completed' | 'flag';
+type ActiveTab = 'status' | 'priority' | 'project' | 'date' | 'today' | 'completed' | 'flag' | 'recent';
 
 // ---------------------------------------------------------------------------
 // Sortable task row (used in manual DnD mode)
@@ -167,6 +167,7 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
     flag:      { viewMode: 'list',  sortBy: 'flag',     sortOrder: 'asc' },
     today:     { viewMode: 'list',  sortBy: 'priority', sortOrder: 'asc' },
     completed: { viewMode: 'list',  sortBy: 'date',     sortOrder: 'desc' },
+    recent:    { viewMode: 'list',  sortBy: 'date',     sortOrder: 'desc' },
   };
   const [tabSettings, setTabSettings] = useState<Record<ActiveTab, TabSettings>>(() => {
     try {
@@ -228,6 +229,7 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
     { id: 'flag' as ActiveTab,      label: 'Flag'     },
     { id: 'today' as ActiveTab,     label: 'Today'    },
     { id: 'completed' as ActiveTab, label: 'Done'     },
+    { id: 'recent'    as ActiveTab, label: 'Recent'   },
   ];
   const DEFAULT_TAB_ORDER = ALL_TABS.map(t => t.id);
   const [tabOrder, setTabOrder] = useState<ActiveTab[]>(() => {
@@ -1204,6 +1206,12 @@ export default function TasksPage({ onOpenTask, filterProject: filterProjectProp
             addTask={handleAddTaskFromBoard}
             filterProject={filterProject}
           />
+        ) : activeTab === 'recent' ? (
+          <div className="space-y-0.5">
+            {[...filteredTopLevel]
+              .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+              .map(t => <TaskRow key={t.id} task={t} onOpenTask={onOpenTask} showProject />)}
+          </div>
         ) : activeTab === 'completed' ? (
           renderCompletedLog()
         ) : showSectionsView ? (
