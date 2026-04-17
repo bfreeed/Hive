@@ -852,8 +852,8 @@ export const useStore = create<AppStore>()((set, get) => ({
         : c
       ),
     }));
-    // Persist readBy to Supabase (best-effort, column may not exist yet)
-    supabase.from('channels').update({ read_by: { [currentUser.id]: now } }).eq('id', id)
+    // Atomic merge — only updates THIS user's entry, never wipes other users' positions
+    supabase.rpc('mark_channel_read', { p_channel_id: id, p_user_id: currentUser.id, p_read_at: now })
       .then(() => {});
   },
 
