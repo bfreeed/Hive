@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '../store';
-import { AlertTriangle, Clock, MessageSquare, ArrowRight, Plus, X, Sun, Calendar, Sparkles, ChevronRight, ChevronDown, Send, Loader2, UserPlus, Check, FolderOpen, Hash } from 'lucide-react';
+import { AlertTriangle, Clock, MessageSquare, ArrowRight, Plus, X, Sun, Calendar, Sparkles, ChevronRight, ChevronDown, Send, Loader2, UserPlus, Check, FolderOpen, Hash, Search } from 'lucide-react';
 import OnboardingChecklist from '../components/OnboardingChecklist';
 import { isPast, addDays, isWithinInterval, startOfDay } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
@@ -107,6 +107,7 @@ function Section({ title, icon, count, color = 'text-white/50', children }: {
 export default function Home({ onNavigate, onOpenTask }: { onNavigate: (page: string, id?: string) => void; onOpenTask: (id: string) => void }) {
   const { tasks, projects, messages, channels, userSettings, saveUserSettings, currentUser, invitations, respondToInvitation, isLoading } = useStore();
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [search, setSearch] = useState('');
   const captureRef = useRef<InlineCaptureHandle>(null);
 
   // Claude bar
@@ -253,6 +254,7 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
   const activeTasks = tasks.filter(t => {
     if (t.status === 'done') return false;
     if (t.snoozeDate && new Date(t.snoozeDate) > now) return false;
+    if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
@@ -427,8 +429,19 @@ PROJECTS: ${projects.map(p => p.name).join(', ') || 'None'}`;
           </div>
         )}
 
-        <div className="mb-4">
-          <InlineCapture ref={captureRef} onOpenDetail={id => onOpenTask(id)} />
+        <div className="mb-4 flex items-center gap-3">
+          <div className="relative flex-shrink-0 w-44">
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search tasks..."
+              className="h-10 w-full bg-white/[0.04] border border-white/40 hover:border-white/55 rounded-xl pl-8 pr-3 text-sm text-white/70 placeholder-white/30 focus:outline-none focus:border-brand-500/50 transition-colors"
+            />
+          </div>
+          <div className="flex-1">
+            <InlineCapture ref={captureRef} onOpenDetail={id => onOpenTask(id)} />
+          </div>
         </div>
 
         {/* Sections — rendered in user-defined order */}
