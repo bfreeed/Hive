@@ -1474,6 +1474,27 @@ export const useStore = create<AppStore>()((set, get) => ({
     set((st) => ({ messages: [...st.messages, newMsg] }));
     supabase.from('messages').insert(messageToDb(newMsg))
       .then(({ error }) => { if (error) { console.error('sendMessage error:', error); get().addToast('error', 'Message failed to send. Check your connection.'); } });
+
+    // Fire push notifications to other channel members (best-effort, non-blocking)
+    const channel = s.channels.find((c) => c.id === channelId);
+    const otherMembers = (channel?.memberIds ?? []).filter((id) => id !== s.currentUser.id);
+    if (otherMembers.length > 0) {
+      const preview = body.replace(/\n/g, ' ').slice(0, 120);
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session) return;
+        fetch('/api/send-push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({
+            userIds: otherMembers,
+            title: `${s.currentUser.name} in #${channel?.name ?? 'messages'}`,
+            body: preview,
+            url: '/#messages',
+            tag: `hive-channel-${channelId}`,
+          }),
+        }).catch(() => {}); // fire and forget
+      });
+    }
   },
 
   updateMessage: (id, body) => {

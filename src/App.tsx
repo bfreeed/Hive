@@ -3,6 +3,7 @@ import { useStore } from './store';
 import type { Toast } from './store';
 import { DEFAULT_HOME_SECTIONS } from './types';
 import { useAuth } from './hooks/useAuth';
+import { usePushNotifications } from './hooks/usePushNotifications';
 import { apiFetch } from './lib/apiFetch';
 import { Home as HomeIcon, CheckSquare, MessageSquare, Users, MoreHorizontal, Calendar, FolderOpen, Eye, EyeOff } from 'lucide-react';
 import LoginPage from './pages/LoginPage';
@@ -805,6 +806,7 @@ function AuthenticatedApp() {
   useHealthSweep(currentUser?.id || '__loading__');
   useGranolaSync();
   useFirefliesSync();
+  usePushNotifications();
   const unreviewedMeetingCount = useUnreviewedMeetingCount();
 
   // Handle ?task=xxx URL param for deep links from SMS reminders
