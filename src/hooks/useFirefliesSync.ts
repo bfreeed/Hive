@@ -31,7 +31,8 @@ export function useFirefliesSync() {
       if (!apiKey) return;
 
       try {
-        const syncRes = await apiFetch('/api/sync-fireflies', {
+        const syncRes = await apiFetch('/api/sync', {
+          service: 'fireflies',
           since: userSettings?.firefliesLastSyncedAt ?? null,
           limit: 30,
         });

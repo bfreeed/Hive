@@ -124,7 +124,8 @@ export function useGranolaSync() {
 
       try {
         // --- 1. Fetch from Granola ---
-        const syncRes = await apiFetch('/api/sync-granola', {
+        const syncRes = await apiFetch('/api/sync', {
+          service: 'granola',
           since: userSettings?.granolaLastSyncedAt ?? null,
           limit: 30,
         });

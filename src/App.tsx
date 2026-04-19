@@ -144,7 +144,7 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
     if (!apiKey || syncing) return;
     setSyncing(true);
     try {
-      const res = await apiFetch('/api/sync-granola', { since: null, limit: 30 });
+      const res = await apiFetch('/api/sync', { service: 'granola', since: null, limit: 30 });
       if (!res.ok) { setSyncing(false); return; }
       const { notes } = await res.json() as { notes: any[]; count: number };
       const { upsertMeeting, updateMeeting, meetings: currentMeetings, projects } = useStore.getState();
@@ -215,7 +215,7 @@ function SettingsPage({ currentUser, darkMode, toggleDarkMode }: { currentUser: 
     if (!apiKey || syncingFireflies) return;
     setSyncingFireflies(true);
     try {
-      const res = await apiFetch('/api/sync-fireflies', { since: null, limit: 30 });
+      const res = await apiFetch('/api/sync', { service: 'fireflies', since: null, limit: 30 });
       if (!res.ok) { setSyncingFireflies(false); return; }
       const { notes } = await res.json() as { notes: any[]; count: number };
       const { upsertMeeting, updateMeeting, meetings: currentMeetings, contacts, projects } = useStore.getState();
